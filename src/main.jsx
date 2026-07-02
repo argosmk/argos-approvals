@@ -1254,13 +1254,16 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],system,
   const clientCompany = effectiveUser.role==='client' ? companies.find(c=>(effectiveUser.companyIds||[]).includes(c.id)) : null;
   const displayAvatar = clientCompany?.logo || effectiveUser.avatar;
   const roleLabel = viewAs ? 'Visualização simulada' : (effectiveUser.title || (effectiveUser.role==='admin'?'Administrador':effectiveUser.role==='team'?'Equipe':'Cliente'));
+  const activeViewUsers = users.filter(u=>u.active && u.role!=='admin');
+  const teamViewUsers = activeViewUsers.filter(u=>u.role==='team');
+  const clientViewUsers = activeViewUsers.filter(u=>u.role==='client');
   return <aside className="side">
     <div className="brand brand-clean brand-logo-only">
       <div className="brand-logo">{system?.logo ? <img src={driveDirect(system.logo)}/> : <span>A</span>}</div>
       <small>{system?.title || 'Painel de Aprovação'}</small>
     </div>
     <div className="user-card user-clean"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{roleLabel}</small></div></div>
-    {realAdmin&&<div className="impersonate"><small>ACESSAR COMO</small><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Visão admin</option>{users.filter(u=>u.role!=='admin'&&u.active).map(u=><option value={u.id} key={u.id}>{u.name} ({u.role==='client'?'cliente':'equipe'})</option>)}</select><small>Permissões reais do usuário simulado.</small></div>}
+    {realAdmin&&<div className="impersonate"><small>ACESSAR COMO</small><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>────────────</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup><option disabled>────────────</option><optgroup label="Usuários clientes">{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</optgroup></select><small>Permissões reais do usuário simulado.</small></div>}
     <nav>{nav.map(([id,label])=><button key={id} onClick={()=>setScreen(id)} className={screen===id?'active':''}>{label}</button>)}</nav>
     <div className="spacer"/>
     <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
