@@ -1375,7 +1375,7 @@ function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
           const instagram=socialUsernameLabel(m);
           return <button key={m.id} className={'team-member-card '+(selected?.id===m.id?'selected':'')} onClick={()=>setSelectedId(m.id)}>
             <span className={'presence-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={m.avatar} label={m.name}/></span>
-            <span className="member-card-text"><b>{m.name}</b><small>{instagram || (m.title||m.username||'Membro')}</small></span>
+            <span className="member-card-text"><b>{m.name}</b><small>{instagram || (m.title || (m.role==='admin'?'Administrador':'Membro'))}</small></span>
             {activeTask&&<span className="member-work-dot">●</span>}
           </button>
         })}</div>
@@ -1423,7 +1423,7 @@ function TeamProfileHeader({member,tasks,statuses,postCount}){
   return <div className="team-profile-header panel">
     <div className={'team-profile-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={member.avatar} label={member.name}/></div>
     <div className="team-profile-main">
-      <div className="team-profile-name-row"><h2>{instagram || member.username || member.name}</h2><span className={'presence-pill '+(online?'on':'off')}>{online?'Online':'Offline'}</span>{activeTask&&<span className="presence-pill working">Em trabalho</span>}</div>
+      <div className="team-profile-name-row"><h2>{instagram || member.name}</h2><span className={'presence-pill '+(online?'on':'off')}>{online?'Online':'Offline'}</span>{activeTask&&<span className="presence-pill working">Em trabalho</span>}</div>
       <b>{member.name}</b>
       <p>{member.title || (member.role==='admin'?'Administrador':'Membro')}</p>
       {(member.socialStatus||member.statusMessage)&&<div className="team-status-bubble">{member.socialStatus||member.statusMessage}</div>}
