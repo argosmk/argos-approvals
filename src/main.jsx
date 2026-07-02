@@ -779,7 +779,9 @@ function avg(arr){ const clean=arr.filter(n=>Number.isFinite(n)); return clean.l
 function slug(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 function driveId(url){ const m = (url||'').match(/\/file\/d\/([^/]+)/) || (url||'').match(/[?&]id=([^&]+)/); return m ? m[1] : ''; }
 function driveDirect(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/uc?export=view&id=${id}` : url; }
-// Round94: sem logo genérica embutida. Usa apenas logos configuradas no sistema.
+function drivePreview(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/file/d/${id}/preview` : url; }
+// Round95: restaura drivePreview usado no fallback de prévia das tarefas.
+// Sem logo genérica embutida: usa apenas logos configuradas no sistema.
 function argosLogoSrc(value){ return value ? driveDirect(value) : ''; }
 function priorityClass(date){ if(!date) return 'neutral'; const diff=Math.ceil((dObj(date)-dObj(todayStr()))/86400000); if(diff < 0) return 'late'; if(diff <= 1) return 'hot'; if(diff <= 3) return 'warn'; return 'ok'; }
 function priorityText(date){ const c=priorityClass(date); return c==='late'?'Atrasada':c==='hot'?'Urgente':c==='warn'?'Alta':c==='ok'?'Baixa':'Sem prazo'; }
