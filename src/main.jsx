@@ -1267,8 +1267,8 @@ function App(){
     setTasks([...tasks,...created]);
     alert(`${created.length} tarefa(s) gerada(s) para ${company.name}.`);
   }
-  const navAdmin=[['dashboard','Dashboard'],['teamhub','Equipe'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['settings','Configurações']];
-  const navTeam=[['dashboard','Dashboard'],['teamhub','Equipe'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas']];
+  const navAdmin=[['dashboard','Dashboard'],['teamhub','Portfólios'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['settings','Configurações']];
+  const navTeam=[['dashboard','Dashboard'],['teamhub','Portfólios'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas']];
   const navClient=[['calendar','Calendário']];
   const nav=isAdmin?navAdmin:(effectiveUser.role==='team'?navTeam:navClient);
   const activeScreen = nav.some(([id])=>id===screen) ? screen : nav[0][0];
@@ -1329,6 +1329,22 @@ function Login({users,companies,setAuth}){ const [email,setEmail]=useState('admi
   function login(){ const u=users.find(x=>x.email===email&&x.password===pass); if(!u) return alert('Login inválido'); if(!u.active) return alert('Usuário inativo'); if(u.role==='client' && !(u.companyIds||[]).some(id=>companies.find(c=>c.id===id)?.active)) return alert('Nenhuma empresa ativa vinculada a este usuário.'); setAuth(u); }
   return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Argos Approval</h1><p>Central de produção, aprovação e operação.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="login"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password"/><button onClick={login}>Entrar</button></div></div>
 }
+
+function NavIcon({id}){
+  const common={viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:'1.8', strokeLinecap:'round', strokeLinejoin:'round', 'aria-hidden':'true'};
+  const icons={
+    dashboard:<><rect x="4" y="4" width="6" height="6" rx="1.4"/><rect x="14" y="4" width="6" height="6" rx="1.4"/><rect x="4" y="14" width="6" height="6" rx="1.4"/><path d="M14 17h6M17 14v6"/></>,
+    teamhub:<><circle cx="8" cy="8" r="3"/><path d="M3.5 19c.7-3.2 2.4-5 4.5-5s3.8 1.8 4.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M14.4 18.5c.5-2.3 1.8-3.7 3.4-3.7 1.4 0 2.5.9 3.1 2.7"/></>,
+    notifications:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M10 19a2 2 0 0 0 4 0"/></>,
+    planning:<><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h4M8 17h7"/></>,
+    calendar:<><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/></>,
+    kanban:<><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v16M15 4v16M6.5 8h.01M11.5 12h.01M17.5 9h.01"/></>,
+    tasks:<><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></>,
+    settings:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1.82V22a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 20.6a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.82-.33H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.4 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1.82V2a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 3.4a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.39.29.73.63 1 1h.09a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1 1z"/></>,
+  };
+  return <svg className="nav-icon" {...common}>{icons[id] || icons.dashboard}</svg>;
+}
+
 function SearchBox({value,setValue,tasks,companies,users,user,open}){
   const [show,setShow]=useState(false);
   const wrapRef=useRef(null);
@@ -1373,7 +1389,7 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],system,
     </div>
     <div className="user-card user-clean"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{roleLabel}</small></div></div>
     {realAdmin&&<div className="impersonate"><small>ACESSAR COMO</small><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>────────────</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup><option disabled>────────────</option><optgroup label="Usuários clientes">{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</optgroup></select><small>Permissões reais do usuário simulado.</small></div>}
-    <nav>{nav.map(([id,label])=><button key={id} onClick={()=>setScreen(id)} className={screen===id?'active':''}>{label}</button>)}</nav>
+    <nav>{nav.map(([id,label])=><button key={id} onClick={()=>setScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span></button>)}</nav>
     <div className="spacer"/>
     <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
   </aside> 
@@ -1421,9 +1437,9 @@ function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
     if(!auth?.id) return;
     setUsers(prev=>prev.map(u=>u.id===auth.id?{...u,...patch}:u));
   }
-  if(!members.length) return <section><h1>Equipe</h1><p>Nenhum membro ativo encontrado.</p></section>;
+  if(!members.length) return <section><h1>Portfólios</h1><p>Nenhum membro ativo encontrado.</p></section>;
   return <section className="team-hub">
-    <div className="team-hub-hero"><div><h1>Equipe</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div></div>
+    <div className="team-hub-hero"><div><h1>Portfólios</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div></div>
     <TeamStoriesStrip members={members} selected={selected} tasks={tasks} setSelectedId={setSelectedId}/>
     <div className="team-profile-area">
       {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} stats={selectedStats} canEdit={selected.id===auth?.id} updateOwnSocial={updateOwnSocial}/>} 
@@ -1533,7 +1549,7 @@ function TeamFeedItem({task}){
   const index=Math.min(slide, Math.max(0, links.length-1));
   if(!links.length) return null;
   return <article className="team-feed-item">
-    <div className="team-feed-media"><Media url={links[index]}/>{links.length>1&&<div className="team-feed-arrows"><button onClick={()=>setSlide(i=>Math.max(0,i-1))} disabled={index<=0}>‹</button><span>{index+1}/{links.length}</span><button onClick={()=>setSlide(i=>Math.min(links.length-1,i+1))} disabled={index>=links.length-1}>›</button></div>}</div>
+    <div className="team-feed-media"><Media url={links[index]}/>{links.length>1&&<div className="team-feed-arrows"><button className="feed-arrow prev" onClick={()=>setSlide(i=>Math.max(0,i-1))} disabled={index<=0} aria-label="Arte anterior">‹</button><button className="feed-arrow next" onClick={()=>setSlide(i=>Math.min(links.length-1,i+1))} disabled={index>=links.length-1} aria-label="Próxima arte">›</button></div>}</div>
   </article>;
 }
 
