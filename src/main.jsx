@@ -1278,8 +1278,10 @@ function App(){
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
       {selectedTask ? <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={()=>setSelectedTask(null)} open={setSelectedTask} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
       : <>
-        <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={setSelectedTask}/>
-        {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
+        <div className="top-actions">
+          <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={setSelectedTask}/>
+          {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
+        </div>
         {activeScreen==='dashboard' && <Dashboard tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
         {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser}/>}
         {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask}/>} 
@@ -1329,15 +1331,32 @@ function Login({users,companies,setAuth}){ const [email,setEmail]=useState('admi
 }
 function SearchBox({value,setValue,tasks,companies,users,user,open}){
   const [show,setShow]=useState(false);
+  const wrapRef=useRef(null);
   const q=(value||'').trim().toLowerCase();
+  useEffect(()=>{
+    function closeOnOutside(ev){
+      if(wrapRef.current && !wrapRef.current.contains(ev.target)) setShow(false);
+    }
+    document.addEventListener('mousedown', closeOnOutside);
+    document.addEventListener('touchstart', closeOnOutside, {passive:true});
+    return ()=>{
+      document.removeEventListener('mousedown', closeOnOutside);
+      document.removeEventListener('touchstart', closeOnOutside);
+    };
+  },[]);
+  const clearSearch=()=>{ setValue(''); setShow(false); };
   const results=q?tasks.filter(t=>{
     const company=companies.find(c=>c.id===t.companyId)?.name||'';
     const resp=users.find(u=>u.id===t.responsibleId)?.name||'';
     const visibleLogs=(t.logs||[]).filter(l=>user?.role!=='client'||l.visibility==='client'||l.userId===user.id).map(l=>l.text).join(' ');
     return `${t.title} ${company} ${resp} ${t.type} ${t.copy} ${t.caption} ${visibleLogs}`.toLowerCase().includes(q);
   }).slice(0,5):[];
-  return <div className="search-wrap"><input value={value} onFocus={()=>setShow(true)} onChange={e=>{setValue(e.target.value);setShow(true)}} placeholder="Pesquisar tarefa, cliente, copy, legenda ou comentário..."/>
-    {show&&q&&<div className="search-results">{results.length?results.map(t=><button key={t.id} onClick={()=>{open(t.id);setShow(false)}}><b>{t.title}</b><small>{companies.find(c=>c.id===t.companyId)?.name} • {fmtDate(t.postDate)} {t.archived?'• Arquivada':''}</small></button>):<p>Nenhuma tarefa encontrada.</p>}<button className="ghost" onClick={()=>setShow(true)}>Pesquisa restrita às tarefas permitidas</button></div>}
+  return <div className="search-wrap" ref={wrapRef}>
+    <div className="search-input-shell">
+      <input value={value} onFocus={()=>{if(q)setShow(true)}} onChange={e=>{setValue(e.target.value);setShow(true)}} onKeyDown={e=>{if(e.key==='Escape') clearSearch();}} placeholder="Pesquisar tarefa, cliente, copy, legenda ou comentário..."/>
+      {q&&<button type="button" className="search-clear" aria-label="Limpar pesquisa" onClick={clearSearch}>×</button>}
+    </div>
+    {show&&q&&<div className="search-results">{results.length?results.map(t=><button key={t.id} onClick={()=>{open(t.id);setShow(false)}}><b>{t.title}</b><small>{companies.find(c=>c.id===t.companyId)?.name} • {fmtDate(t.postDate)} {t.archived?'• Arquivada':''}</small></button>):<p>Nenhuma tarefa encontrada.</p>}<small className="search-note">Pesquisa restrita às tarefas permitidas.</small></div>}
   </div>
 }
 function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],system,realAdmin,nav,screen,setScreen,setAuth}){

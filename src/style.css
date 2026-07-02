@@ -902,3 +902,91 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   .profile-gear{margin-left:6px!important;}
   .insta-stats{gap:12px!important;font-size:12px!important;}
 }
+
+/* ROUND101: topbar fixa com busca inteligente */
+.top-actions{
+  width:100%;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  margin:0 0 22px;
+}
+.top-actions .search-wrap{
+  flex:1 1 auto;
+  min-width:0;
+  max-width:none!important;
+  margin:0!important;
+}
+.search-input-shell{
+  position:relative;
+  width:100%;
+}
+.search-input-shell input{
+  padding-right:42px;
+}
+.search-clear{
+  position:absolute;
+  right:7px;
+  top:50%;
+  transform:translateY(-50%);
+  width:28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center;
+  border-radius:999px!important;
+  border-color:transparent!important;
+  background:transparent!important;
+  color:rgba(244,236,219,.58)!important;
+  font-size:20px!important;
+  line-height:1!important;
+  text-align:center!important;
+}
+.search-clear:hover{
+  color:var(--text)!important;
+  background:rgba(255,255,255,.08)!important;
+}
+.top-actions .new-btn,
+.new-btn{
+  position:static!important;
+  flex:0 0 auto;
+  margin:0!important;
+  white-space:nowrap;
+  width:auto!important;
+  min-width:max-content;
+  height:42px;
+  min-height:42px;
+  padding:0 18px;
+  align-self:flex-start;
+}
+.search-results{
+  width:min(680px,100%)!important;
+}
+.search-note{
+  display:block;
+  padding:6px 4px 2px;
+  color:var(--muted);
+  font-size:11px;
+}
+@media(max-width:760px){
+  .top-actions{
+    gap:8px;
+    align-items:flex-start;
+  }
+  .top-actions .new-btn{
+    padding:0 11px!important;
+    font-size:12px;
+    min-width:auto;
+  }
+  .search-input-shell input{
+    height:42px;
+    padding-left:10px;
+    padding-right:34px;
+    font-size:13px;
+    text-overflow:ellipsis;
+  }
+  .search-clear{
+    right:4px;
+  }
+}
