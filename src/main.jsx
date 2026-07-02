@@ -1344,11 +1344,113 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
 function AvatarMini({value,label}){ const v=String(value||''); const text=String(label||value||'?').slice(0,2).toUpperCase(); return <span className="avatar-mini">{(/^https?:\/\//.test(v)||v.startsWith('data:'))?<img src={driveDirect(v)} onError={e=>{e.currentTarget.remove();}}/>:text}</span> }
 function EntityLabel({value,label}){ return <span className="entity-label"><AvatarMini value={value} label={label}/><span>{label}</span></span> }
 function TaskButton({t,companies,users,statusById,open}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); return <button className="mini-task" onClick={()=>open(t.id)} style={{borderLeftColor:statusById[t.status]?.color}}><b>{t.title}</b><small>{company?.name} • {resp?.name}</small></button> }
-function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open}){ const cur=dObj(selectedDay); return <div className="month"><div className="month-head"><h2>{monthLabel(selectedDay)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div><small>{tasks.length} tarefa(s)</small></div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=d.toISOString().slice(0,10); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); return <div className={'day '+(other?'muted-day':'')} key={ds}><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
-function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return d.toISOString().slice(0,10)}); return <div><div className="month-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div></div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); return <div className="week-col" key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}</div>})}</div></div> }
+
+const FIXED_SPECIAL_DATES = [
+  { md:'01-01', name:'Ano Novo', type:'feriado', icon:'✦' },
+  { md:'01-06', name:'Dia de Reis', type:'comemorativa', icon:'✦' },
+  { md:'01-20', name:'Dia do Farmacêutico', type:'nicho', icon:'•' },
+  { md:'01-30', name:'Dia da Saudade', type:'conteúdo', icon:'•' },
+  { md:'02-14', name:'Valentine’s Day', type:'comercial global', icon:'♡' },
+  { md:'03-08', name:'Dia da Mulher', type:'comercial', icon:'✦' },
+  { md:'03-15', name:'Dia do Consumidor', type:'comercial', icon:'✦' },
+  { md:'03-20', name:'Início do outono', type:'estação', icon:'◐' },
+  { md:'04-01', name:'Dia da Mentira', type:'conteúdo', icon:'•' },
+  { md:'04-21', name:'Tiradentes', type:'feriado', icon:'✦' },
+  { md:'04-23', name:'Dia Mundial do Livro', type:'conteúdo', icon:'•' },
+  { md:'05-01', name:'Dia do Trabalho', type:'feriado', icon:'✦' },
+  { md:'05-25', name:'Dia do Orgulho Nerd', type:'conteúdo', icon:'•' },
+  { md:'06-05', name:'Dia do Meio Ambiente', type:'conteúdo', icon:'•' },
+  { md:'06-12', name:'Dia dos Namorados', type:'comercial', icon:'♡' },
+  { md:'06-20', name:'Início do inverno', type:'estação', icon:'◐' },
+  { md:'06-24', name:'São João', type:'sazonal', icon:'✦' },
+  { md:'07-13', name:'Dia do Rock', type:'conteúdo', icon:'•' },
+  { md:'07-20', name:'Dia do Amigo', type:'conteúdo', icon:'•' },
+  { md:'08-15', name:'Dia dos Solteiros', type:'conteúdo', icon:'•' },
+  { md:'09-07', name:'Independência do Brasil', type:'feriado', icon:'✦' },
+  { md:'09-15', name:'Dia do Cliente', type:'comercial', icon:'✦' },
+  { md:'09-22', name:'Início da primavera', type:'estação', icon:'◐' },
+  { md:'10-12', name:'Dia das Crianças', type:'comercial', icon:'✦' },
+  { md:'10-15', name:'Dia dos Professores', type:'conteúdo', icon:'•' },
+  { md:'10-31', name:'Halloween', type:'sazonal', icon:'✦' },
+  { md:'11-02', name:'Finados', type:'feriado', icon:'•' },
+  { md:'11-15', name:'Proclamação da República', type:'feriado', icon:'✦' },
+  { md:'11-20', name:'Consciência Negra', type:'feriado/conteúdo', icon:'✦' },
+  { md:'12-21', name:'Início do verão', type:'estação', icon:'◐' },
+  { md:'12-24', name:'Véspera de Natal', type:'sazonal', icon:'✦' },
+  { md:'12-25', name:'Natal', type:'comercial', icon:'✦' },
+  { md:'12-31', name:'Réveillon', type:'sazonal', icon:'✦' }
+];
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dateKeyLocal(d){
+  const date = d instanceof Date ? d : dObj(String(d));
+  if(!date || Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${pad2(date.getMonth()+1)}-${pad2(date.getDate())}`;
+}
+function makeDateKey(year, month, day){ return `${year}-${pad2(month)}-${pad2(day)}`; }
+function addDateKeys(base, offset){
+  const d = dObj(base);
+  if(!d) return '';
+  d.setDate(d.getDate()+offset);
+  return dateKeyLocal(d);
+}
+function nthWeekdayOfMonth(year, monthIndex, weekday, nth){
+  const d = new Date(year, monthIndex, 1);
+  const diff = (weekday - d.getDay() + 7) % 7;
+  d.setDate(1 + diff + (nth-1)*7);
+  return dateKeyLocal(d);
+}
+function lastWeekdayOfMonth(year, monthIndex, weekday){
+  const d = new Date(year, monthIndex + 1, 0);
+  const diff = (d.getDay() - weekday + 7) % 7;
+  d.setDate(d.getDate() - diff);
+  return dateKeyLocal(d);
+}
+function easterDateKey(year){
+  const a=year%19, b=Math.floor(year/100), c=year%100, d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31), day=((h+l-7*m+114)%31)+1;
+  return makeDateKey(year, month, day);
+}
+function variableSpecialDates(year){
+  const easter = easterDateKey(year);
+  const blackFriday = lastWeekdayOfMonth(year,10,5);
+  return [
+    { date:addDateKeys(easter,-47), name:'Carnaval', type:'sazonal', icon:'✦' },
+    { date:addDateKeys(easter,-46), name:'Carnaval', type:'sazonal', icon:'✦' },
+    { date:addDateKeys(easter,-2), name:'Sexta-feira Santa', type:'feriado', icon:'✦' },
+    { date:easter, name:'Páscoa', type:'comercial', icon:'✦' },
+    { date:addDateKeys(easter,60), name:'Corpus Christi', type:'feriado', icon:'✦' },
+    { date:nthWeekdayOfMonth(year,4,0,2), name:'Dia das Mães', type:'comercial', icon:'♡' },
+    { date:nthWeekdayOfMonth(year,7,0,2), name:'Dia dos Pais', type:'comercial', icon:'♡' },
+    { date:blackFriday, name:'Black Friday', type:'comercial', icon:'✦' },
+    { date:addDateKeys(blackFriday,3), name:'Cyber Monday', type:'comercial', icon:'✦' }
+  ].filter(x=>x.date);
+}
+function specialDatesFor(ds){
+  const d = dObj(ds);
+  if(!d || Number.isNaN(d.getTime())) return [];
+  const year = d.getFullYear();
+  const md = `${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const fixed = FIXED_SPECIAL_DATES.filter(x=>x.md===md).map(x=>({...x, date:ds}));
+  const variable = variableSpecialDates(year).filter(x=>x.date===ds);
+  return [...fixed, ...variable];
+}
+function SpecialDateMarks({items=[]}){
+  if(!items.length) return null;
+  return <div className="special-date-marks" title={items.map(i=>`${i.name} (${i.type})`).join(' • ')}>{items.slice(0,2).map((item,idx)=><span className={'special-date-chip type-'+String(item.type||'').replace(/[^a-z0-9]/gi,'-').toLowerCase()} key={item.name+idx}><i>{item.icon||'✦'}</i><em>{item.name}</em></span>)}{items.length>2&&<span className="special-date-more">+{items.length-2}</span>}</div>
+}
+function SpecialDatePanel({items=[]}){
+  if(!items.length) return null;
+  return <div className="special-date-panel"><h3>Datas especiais</h3>{items.map((item,idx)=><div className="special-date-line" key={item.name+idx}><b>{item.icon||'✦'}</b><span>{item.name}</span><small>{item.type}</small></div>)}</div>
+}
+
+function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open}){ const cur=dObj(selectedDay); return <div className="month"><div className="month-head"><h2>{monthLabel(selectedDay)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div><small>{tasks.length} tarefa(s)</small></div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className="special-date-dot" onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
+function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div><div className="month-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div></div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}</div>})}</div></div> }
 function DayView({day,setSelectedDay,tasks,companies,users,statusById,open}){ 
   const list=tasks.filter(t=>t.postDate===day); 
-  return <div><div className="month-head"><h2>{fmtDate(day)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div><small>{list.length} tarefa(s) neste dia</small></div><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} onClick={()=>open(t.id)} style={{borderColor:statusById[t.status]?.color}}><b>{t.title}</b><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small><span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span></button>)}</div></div> 
+  const specials=specialDatesFor(day);
+  return <div><div className="month-head"><h2>{fmtDate(day)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div><small>{list.length} tarefa(s) neste dia</small></div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} onClick={()=>open(t.id)} style={{borderColor:statusById[t.status]?.color}}><b>{t.title}</b><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small><span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span></button>)}</div></div> 
 }
 function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
   const [period,setPeriod]=useState('month'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'),[archivedOnly,setArchivedOnly]=useState(false),[sort,setSort]=useState('priority'); 
@@ -4042,5 +4144,158 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style73);
   }
   style73.textContent = ARGOS_ROUND73_MOBILE_ACTION_UUID_FIX_CSS;
+}
+
+
+const ARGOS_ROUND74_SPECIAL_DATES_CSS = `
+/* Round 74: datas especiais discretas no calendário */
+.day-headline{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:6px!important;
+}
+
+.special-date-dot{
+  width:22px!important;
+  height:22px!important;
+  min-width:22px!important;
+  min-height:22px!important;
+  padding:0!important;
+  border-radius:999px!important;
+  border:1px solid rgba(225,177,44,.55)!important;
+  color:#e1b12c!important;
+  background:rgba(225,177,44,.08)!important;
+  display:grid!important;
+  place-items:center!important;
+  font-size:12px!important;
+  line-height:1!important;
+}
+
+.has-special-date{
+  box-shadow:inset 0 0 0 1px rgba(225,177,44,.10)!important;
+}
+
+.special-date-marks{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:4px!important;
+  margin:2px 0 6px!important;
+  max-width:100%!important;
+}
+
+.special-date-chip{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  max-width:100%!important;
+  padding:3px 7px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(225,177,44,.28)!important;
+  background:rgba(225,177,44,.08)!important;
+  color:#e8d9a6!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+}
+
+.special-date-chip i{
+  font-style:normal!important;
+  color:#e1b12c!important;
+  font-size:10px!important;
+}
+
+.special-date-chip em{
+  font-style:normal!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+.special-date-chip.type-estacao,
+.special-date-chip.type-esta-o{
+  border-color:rgba(97,218,251,.28)!important;
+  background:rgba(97,218,251,.07)!important;
+  color:#cbeefa!important;
+}
+
+.special-date-chip.type-estacao i,
+.special-date-chip.type-esta-o i{
+  color:#61dafb!important;
+}
+
+.special-date-more{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-width:22px!important;
+  padding:2px 6px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  font-size:10px!important;
+  opacity:.75!important;
+}
+
+.special-date-panel{
+  margin:0 0 14px!important;
+  padding:14px!important;
+  border:1px solid rgba(225,177,44,.25)!important;
+  border-radius:16px!important;
+  background:rgba(225,177,44,.06)!important;
+}
+
+.special-date-panel h3{
+  margin:0 0 10px!important;
+}
+
+.special-date-line{
+  display:grid!important;
+  grid-template-columns:auto 1fr auto!important;
+  align-items:center!important;
+  gap:8px!important;
+  padding:7px 0!important;
+  border-top:1px solid rgba(255,255,255,.06)!important;
+}
+
+.special-date-line:first-of-type{
+  border-top:0!important;
+}
+
+.special-date-line b{
+  color:#e1b12c!important;
+}
+
+.special-date-line small{
+  opacity:.66!important;
+  text-transform:capitalize!important;
+}
+
+.week-col .special-date-marks{
+  margin-bottom:8px!important;
+}
+
+@media(max-width:760px){
+  .special-date-chip{
+    font-size:11px!important;
+    padding:4px 8px!important;
+  }
+
+  .special-date-marks{
+    margin:4px 0 8px!important;
+  }
+
+  .special-date-dot{
+    width:24px!important;
+    height:24px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style74 = document.getElementById('argos-round74-special-dates');
+  if (!style74) {
+    style74 = document.createElement('style');
+    style74.id = 'argos-round74-special-dates';
+    document.head.appendChild(style74);
+  }
+  style74.textContent = ARGOS_ROUND74_SPECIAL_DATES_CSS;
 }
 
