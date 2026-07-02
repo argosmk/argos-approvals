@@ -672,6 +672,27 @@ async function createAuthBackedAppUser(draft){
     createdAt: draft.createdAt || now(),
   };
 }
+
+async function updateAuthBackedAppUserProfile(draft){
+  if(!isSupabaseConfigured || !draft?.id) return draft;
+  const patch={
+    display_name: draft.name || '',
+    username: draft.email || draft.username || '',
+    role: draft.role || 'team',
+    title: draft.title || '',
+    active: draft.active !== false,
+    avatar_url: draft.avatar || '',
+    visible_statuses: draft.visibleStatuses || [],
+    notification_prefs: {
+      events: draft.notificationPrefs || NOTIFICATION_EVENTS,
+      statuses: draft.notificationStatusPrefs || {}
+    }
+  };
+  const { error } = await supabase.from('profiles').update(patch).eq('id', draft.id);
+  if(error) throw error;
+  return draft;
+}
+
 async function fetchCurrentProfile(session){
   if(!isSupabaseConfigured || !session?.user?.id) return null;
   const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
@@ -914,7 +935,13 @@ function App(){
   },[users,companies,statuses,tasks,notifications,system,cloudReady,auth?.organizationId]);
 
   const setSystem=v=>{setSystemState(v); save('argos_system_r18',v)};
-  const setUsers=v=>{setUsersState(v); if(!isSupabaseConfigured) save('argos_users_r8',v)};
+  const setUsers=v=>{
+    const next = typeof v === 'function' ? v(users) : v;
+    setUsersState(next);
+    const updatedAuth = next.find(u=>u.id===auth?.id);
+    if(updatedAuth) setAuth(prev=>prev && prev.id===updatedAuth.id ? {...prev,...updatedAuth} : prev);
+    if(!isSupabaseConfigured) save('argos_users_r8',next);
+  };
   const setCompanies=v=>{setCompaniesState(v); if(!isSupabaseConfigured) save('argos_companies_r8',v)};
   const setStatuses=v=>{setStatusesState(v); if(!isSupabaseConfigured) save('argos_statuses_r8',v)};
   const setTasks=v=>{setTasksState(v); if(!isSupabaseConfigured) save('argos_tasks_r8',v)};
@@ -1500,7 +1527,7 @@ function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open
   }
   return <section>
     <div className="calendar-titlebar"><div><h1>Planejamento Semanal</h1><p>Gere remessas de tarefas por cliente a partir dos templates configurados.</p></div><button className="primary" onClick={generateAll}>Gerar todos pendentes</button></div>
-    <div className="filters"><label>Semana começa em<input type="date" value={weekStart} onChange={e=>setWeekStart(weekStartStr(e.target.value))}/></label><div className="panel planning-summary"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div><div className="panel planning-summary"><small>Total previsto</small><b>{totalExpected}</b></div><div className="panel planning-summary"><small>Já geradas</small><b>{totalCreated}</b></div></div>
+    <div className="filters planning-top-filters"><label className="planning-date-filter">Semana começa em<input type="date" value={weekStart} onChange={e=>setWeekStart(weekStartStr(e.target.value))}/></label><div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Total previsto</small><b>{totalExpected}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Já geradas</small><b>{totalCreated}</b></div></div>
     <div className="client-grid compact-admin-grid planning-grid" style={{display:'flex',flexDirection:'column',gap:16}}>{activeCompanies.map(c=>{ const template=c.weeklyTemplate||[]; const expected=template.reduce((a,item)=>a+(Number(item.quantity)||0),0); const createdTasks=tasks.filter(t=>t.companyId===c.id && t.generatedWeek===weekStart); const created=createdTasks.length; return <div className="panel planning-card" key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{expected} tarefa(s) previstas • {created} gerada(s)</small></div></div>{template.length?<div className="template-preview">{template.map(item=><small key={item.id||item.type}>{item.quantity||0}× {item.type} • {WEEK_DAYS.find(d=>d.value===Number(item.postDay))?.label||'Segunda'}</small>)}</div>:<p className="muted-note">Sem template semanal configurado.</p>}<div className="row-actions"><button className="primary" disabled={!expected} onClick={()=>createWeeklyTasks(c.id,weekStart,false)}>{created?'Gerar novamente':'Gerar semana'}</button><button onClick={()=>setEditingTemplate(c)}>{template.length?'Editar template':'Criar template'}</button>{createdTasks.length>0&&<button onClick={()=>open(createdTasks[0].id)}>Ver tarefas</button>}</div></div>})}</div>
     {editingTemplate&&<WeeklyTemplateEditor company={editingTemplate} users={users} save={saveTemplate} cancel={()=>setEditingTemplate(null)}/>} 
   </section>
@@ -1722,6 +1749,7 @@ function ClientUsersPage({users,setUsers,companies,statuses}){
         data=await createAuthBackedAppUser(data);
       } else {
         data={...data,id:data.id||safeUUID()};
+        if(isSupabaseConfigured && exists) data=await updateAuthBackedAppUserProfile(data);
       }
       setUsers(exists?users.map(x=>x.id===data.id?data:x):[...users,data]);
       setEditing(null);
@@ -1765,6 +1793,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
         data=await createAuthBackedAppUser(data);
       } else {
         data={...data,id:data.id||safeUUID()};
+        if(isSupabaseConfigured && exists) data=await updateAuthBackedAppUserProfile(data);
       }
       setUsers(exists?users.map(x=>x.id===data.id?data:x):[...users,data]);
       setEditing(null);
@@ -4297,5 +4326,551 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style74);
   }
   style74.textContent = ARGOS_ROUND74_SPECIAL_DATES_CSS;
+}
+
+
+const ARGOS_ROUND75_USER_PROFILE_SAVE_NOTE_CSS = `
+/* Round 75: só um ajuste pequeno para o campo de login não parecer editável demais quando for usuário já criado no Auth */
+.modal label small.profile-save-note{
+  display:block!important;
+  margin-top:6px!important;
+  opacity:.65!important;
+  font-size:12px!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style75 = document.getElementById('argos-round75-user-profile-save');
+  if (!style75) {
+    style75 = document.createElement('style');
+    style75.id = 'argos-round75-user-profile-save';
+    document.head.appendChild(style75);
+  }
+  style75.textContent = ARGOS_ROUND75_USER_PROFILE_SAVE_NOTE_CSS;
+}
+
+
+const ARGOS_ROUND76_PLANNING_SPACING_CSS = `
+/* Round 76: respiro visual no Planejamento Semanal */
+.planning-summary,
+.week-summary,
+.planning-stats,
+.planning-kpis {
+  display:flex!important;
+  align-items:stretch!important;
+  gap:12px!important;
+  flex-wrap:wrap!important;
+}
+
+.planning-summary > *,
+.week-summary > *,
+.planning-stats > *,
+.planning-kpis > * {
+  padding:14px 18px!important;
+  min-width:120px!important;
+}
+
+.planning-summary small,
+.week-summary small,
+.planning-stats small,
+.planning-kpis small {
+  display:block!important;
+  margin-bottom:6px!important;
+  line-height:1.25!important;
+  opacity:.72!important;
+}
+
+.planning-summary b,
+.week-summary b,
+.planning-stats b,
+.planning-kpis b {
+  display:block!important;
+  line-height:1.35!important;
+  white-space:nowrap!important;
+}
+
+.planning-card,
+.week-plan-card,
+.template-card,
+.client-plan-card {
+  padding:22px 18px!important;
+}
+
+.planning-card h2,
+.week-plan-card h2,
+.template-card h2,
+.client-plan-card h2 {
+  margin-bottom:6px!important;
+}
+
+.planning-card p,
+.week-plan-card p,
+.template-card p,
+.client-plan-card p {
+  line-height:1.45!important;
+}
+
+/* Linha de detalhes do template: antes ficava tudo grudado tipo código de barras */
+.planning-card small,
+.week-plan-card small,
+.template-card small,
+.client-plan-card small,
+.planning-template-line,
+.template-summary,
+.week-template-summary {
+  display:flex!important;
+  flex-wrap:wrap!important;
+  align-items:center!important;
+  gap:8px!important;
+  line-height:1.45!important;
+}
+
+.planning-card small > *,
+.week-plan-card small > *,
+.template-card small > *,
+.client-plan-card small > *,
+.planning-template-line > *,
+.template-summary > *,
+.week-template-summary > * {
+  margin-right:0!important;
+}
+
+/* Quando o texto vier como texto puro com separadores ×/•, cria mais ar visual pela própria linha */
+.planning-card .muted,
+.week-plan-card .muted,
+.template-card .muted,
+.client-plan-card .muted {
+  line-height:1.6!important;
+  word-spacing:2px!important;
+}
+
+.planning-card .card-actions,
+.week-plan-card .card-actions,
+.template-card .card-actions,
+.client-plan-card .card-actions,
+.planning-actions {
+  margin-top:16px!important;
+  padding-top:14px!important;
+  gap:10px!important;
+}
+
+/* Mira também nos cards atuais por estrutura, caso estejam sem classe específica */
+section:has(h1) .panel:has(button) small {
+  line-height:1.5!important;
+}
+
+section:has(h1) .panel:has(button) .row {
+  gap:12px!important;
+}
+
+@media(max-width:760px){
+  .planning-summary,
+  .week-summary,
+  .planning-stats,
+  .planning-kpis {
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+  }
+
+  .planning-summary > *,
+  .week-summary > *,
+  .planning-stats > *,
+  .planning-kpis > * {
+    min-width:0!important;
+    width:100%!important;
+  }
+
+  .planning-card,
+  .week-plan-card,
+  .template-card,
+  .client-plan-card {
+    padding:18px 14px!important;
+  }
+
+  .planning-card small,
+  .week-plan-card small,
+  .template-card small,
+  .client-plan-card small,
+  .planning-template-line,
+  .template-summary,
+  .week-template-summary {
+    gap:6px 10px!important;
+  }
+
+  .planning-card .card-actions,
+  .week-plan-card .card-actions,
+  .template-card .card-actions,
+  .client-plan-card .card-actions,
+  .planning-actions {
+    display:grid!important;
+    grid-template-columns:1fr!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style76 = document.getElementById('argos-round76-planning-spacing');
+  if (!style76) {
+    style76 = document.createElement('style');
+    style76.id = 'argos-round76-planning-spacing';
+    document.head.appendChild(style76);
+  }
+  style76.textContent = ARGOS_ROUND76_PLANNING_SPACING_CSS;
+}
+
+
+const ARGOS_ROUND77_PLANNING_KPIS_COMPACT_CSS = `
+/* Round 77: caixas de resumo do Planejamento mais baixas e elegantes */
+.planning-summary > *,
+.week-summary > *,
+.planning-stats > *,
+.planning-kpis > * {
+  padding:10px 16px!important;
+  min-height:54px!important;
+  height:auto!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+}
+
+.planning-summary small,
+.week-summary small,
+.planning-stats small,
+.planning-kpis small {
+  margin:0!important;
+  line-height:1.15!important;
+}
+
+.planning-summary b,
+.week-summary b,
+.planning-stats b,
+.planning-kpis b {
+  margin:0!important;
+  line-height:1.15!important;
+}
+
+/* Mira nos cards reais do topo do Planejamento, mesmo se estiverem sem classe própria */
+section:has(h1) > .row:first-of-type .stat,
+section:has(h1) > .row:first-of-type .metric,
+section:has(h1) > .row:first-of-type .kpi,
+section:has(h1) > .row:first-of-type .panel,
+section:has(h1) > div:first-of-type .stat-card {
+  padding:10px 16px!important;
+  min-height:54px!important;
+}
+
+/* Caso os cards sejam filhos diretos da linha depois do input de semana */
+section:has(h1) .row:has(input[type="date"]) > div:not(:has(input)),
+section:has(h1) .row:has(input[type="date"]) > article,
+section:has(h1) .row:has(input[type="date"]) > aside {
+  padding:10px 16px!important;
+  min-height:54px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+}
+
+/* Aperta especificamente textos pequenos e números dentro desses cards */
+section:has(h1) .row:has(input[type="date"]) small,
+section:has(h1) .row:has(input[type="date"]) label,
+section:has(h1) .row:has(input[type="date"]) span {
+  line-height:1.15!important;
+}
+
+section:has(h1) .row:has(input[type="date"]) b,
+section:has(h1) .row:has(input[type="date"]) strong {
+  line-height:1.15!important;
+}
+
+/* Desktop: mantém os KPIs mais horizontais, sem bloco gigante */
+@media(min-width:761px){
+  .planning-summary > *,
+  .week-summary > *,
+  .planning-stats > *,
+  .planning-kpis > * {
+    flex-direction:row!important;
+    justify-content:center!important;
+  }
+
+  section:has(h1) .row:has(input[type="date"]) > div:not(:has(input)),
+  section:has(h1) .row:has(input[type="date"]) > article,
+  section:has(h1) .row:has(input[type="date"]) > aside {
+    flex-direction:row!important;
+    justify-content:center!important;
+  }
+}
+
+/* Mobile: continua legível, só sem virar tijolão */
+@media(max-width:760px){
+  .planning-summary > *,
+  .week-summary > *,
+  .planning-stats > *,
+  .planning-kpis > * {
+    min-height:48px!important;
+    padding:10px 14px!important;
+  }
+
+  section:has(h1) .row:has(input[type="date"]) > div:not(:has(input)),
+  section:has(h1) .row:has(input[type="date"]) > article,
+  section:has(h1) .row:has(input[type="date"]) > aside {
+    min-height:48px!important;
+    padding:10px 14px!important;
+  }
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style77 = document.getElementById('argos-round77-planning-kpis-compact');
+  if (!style77) {
+    style77 = document.createElement('style');
+    style77.id = 'argos-round77-planning-kpis-compact';
+    document.head.appendChild(style77);
+  }
+  style77.textContent = ARGOS_ROUND77_PLANNING_KPIS_COMPACT_CSS;
+}
+
+
+const ARGOS_ROUND78_PLANNING_KPIS_SAME_HEIGHT_CSS = `
+/* Round 78: corrige apenas a altura das caixas de resumo do Planejamento.
+   Objetivo: mesma altura visual do campo "Semana começa em". */
+
+/* Remove a alteração anterior que deixou as caixas largas/altas demais */
+.planning-summary > *,
+.week-summary > *,
+.planning-stats > *,
+.planning-kpis > * {
+  min-height:0!important;
+  height:42px!important;
+  padding:0 14px!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:10px!important;
+  box-sizing:border-box!important;
+}
+
+.planning-summary small,
+.week-summary small,
+.planning-stats small,
+.planning-kpis small,
+.planning-summary b,
+.week-summary b,
+.planning-stats b,
+.planning-kpis b {
+  margin:0!important;
+  line-height:1!important;
+}
+
+/* Mira nos cards reais da linha que contém o input de data */
+section:has(h1) .row:has(input[type="date"]) > div:not(:has(input)),
+section:has(h1) .row:has(input[type="date"]) > article,
+section:has(h1) .row:has(input[type="date"]) > aside {
+  height:42px!important;
+  min-height:42px!important;
+  max-height:42px!important;
+  padding:0 14px!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:10px!important;
+  box-sizing:border-box!important;
+}
+
+/* Evita que textos internos aumentem a altura */
+section:has(h1) .row:has(input[type="date"]) > div:not(:has(input)) *,
+section:has(h1) .row:has(input[type="date"]) > article *,
+section:has(h1) .row:has(input[type="date"]) > aside * {
+  margin-top:0!important;
+  margin-bottom:0!important;
+  line-height:1!important;
+}
+
+/* Mantém o campo de data como referência, sem alterar sua posição */
+section:has(h1) .row:has(input[type="date"]) label:has(input[type="date"]) {
+  align-self:flex-end!important;
+}
+
+/* Mobile: mantém compacto, sem esticar verticalmente */
+@media(max-width:760px){
+  .planning-summary > *,
+  .week-summary > *,
+  .planning-stats > *,
+  .planning-kpis > *,
+  section:has(h1) .row:has(input[type="date"]) > div:not(:has(input)),
+  section:has(h1) .row:has(input[type="date"]) > article,
+  section:has(h1) .row:has(input[type="date"]) > aside {
+    height:42px!important;
+    min-height:42px!important;
+    max-height:42px!important;
+    padding:0 12px!important;
+  }
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style78 = document.getElementById('argos-round78-planning-kpis-same-height');
+  if (!style78) {
+    style78 = document.createElement('style');
+    style78.id = 'argos-round78-planning-kpis-same-height';
+    document.head.appendChild(style78);
+  }
+  style78.textContent = ARGOS_ROUND78_PLANNING_KPIS_SAME_HEIGHT_CSS;
+}
+
+
+const ARGOS_ROUND79_PLANNING_KPIS_CORRECT_LAYOUT_CSS = `
+/* Round 79: layout correto dos KPIs do Planejamento.
+   Só mexe na linha do topo do Planejamento. */
+
+.planning-top-filters{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:flex-end!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  flex-wrap:nowrap!important;
+  margin:18px 0 22px!important;
+  width:100%!important;
+}
+
+.planning-top-filters .planning-date-filter{
+  width:150px!important;
+  min-width:150px!important;
+  max-width:150px!important;
+  margin:0!important;
+  flex:0 0 150px!important;
+}
+
+.planning-top-filters .planning-date-filter input[type="date"]{
+  height:42px!important;
+  min-height:42px!important;
+  max-height:42px!important;
+  box-sizing:border-box!important;
+}
+
+.planning-top-filters .planning-kpi-card{
+  height:42px!important;
+  min-height:42px!important;
+  max-height:42px!important;
+  padding:0 14px!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:14px!important;
+  align-self:flex-end!important;
+  overflow:hidden!important;
+}
+
+.planning-top-filters .planning-kpi-period{
+  width:350px!important;
+  min-width:300px!important;
+  max-width:350px!important;
+  flex:0 1 350px!important;
+}
+
+.planning-top-filters .planning-kpi-small{
+  width:180px!important;
+  min-width:150px!important;
+  max-width:180px!important;
+  flex:0 0 180px!important;
+}
+
+.planning-top-filters .planning-kpi-card small,
+.planning-top-filters .planning-kpi-card b{
+  display:block!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  padding:0!important;
+  margin:0!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+}
+
+.planning-top-filters .planning-kpi-card small{
+  font-size:12px!important;
+  opacity:.62!important;
+  flex:0 0 auto!important;
+}
+
+.planning-top-filters .planning-kpi-card b{
+  font-size:14px!important;
+  text-align:right!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+
+/* Mata interferências dos rounds anteriores dentro dessa linha */
+.planning-top-filters .planning-summary,
+.planning-top-filters .planning-summary > *,
+.planning-top-filters .planning-kpis,
+.planning-top-filters .planning-kpis > *,
+.planning-top-filters .week-summary,
+.planning-top-filters .week-summary > *,
+.planning-top-filters .planning-stats,
+.planning-top-filters .planning-stats > *{
+  min-height:0!important;
+  max-height:none!important;
+}
+
+/* Notebook/telas menores: reduz larguras sem quebrar a linha */
+@media(max-width:1180px){
+  .planning-top-filters{
+    gap:10px!important;
+  }
+
+  .planning-top-filters .planning-kpi-period{
+    width:300px!important;
+    min-width:250px!important;
+    flex-basis:300px!important;
+  }
+
+  .planning-top-filters .planning-kpi-small{
+    width:145px!important;
+    min-width:125px!important;
+    max-width:145px!important;
+    flex-basis:145px!important;
+  }
+}
+
+/* Mobile/tablet: aí sim pode empilhar com ordem limpa */
+@media(max-width:760px){
+  .planning-top-filters{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+    align-items:stretch!important;
+  }
+
+  .planning-top-filters .planning-date-filter,
+  .planning-top-filters .planning-kpi-card,
+  .planning-top-filters .planning-kpi-period,
+  .planning-top-filters .planning-kpi-small{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:auto!important;
+  }
+
+  .planning-top-filters .planning-kpi-card{
+    height:42px!important;
+    min-height:42px!important;
+    max-height:42px!important;
+  }
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style79 = document.getElementById('argos-round79-planning-kpis-correct-layout');
+  if (!style79) {
+    style79 = document.createElement('style');
+    style79.id = 'argos-round79-planning-kpis-correct-layout';
+    document.head.appendChild(style79);
+  }
+  style79.textContent = ARGOS_ROUND79_PLANNING_KPIS_CORRECT_LAYOUT_CSS;
 }
 
