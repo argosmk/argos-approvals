@@ -1377,17 +1377,17 @@ function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
   }
   if(!members.length) return <section><h1>Equipe</h1><p>Nenhum membro ativo encontrado.</p></section>;
   return <section className="team-hub">
-    <div className="team-hub-hero"><div><h1>Equipe</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div><OwnSocialEditor user={users.find(u=>u.id===auth?.id)} update={updateOwnSocial}/></div>
+    <div className="team-hub-hero"><div><h1>Equipe</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div></div>
     <TeamStoriesStrip members={members} selected={selected} tasks={tasks} setSelectedId={setSelectedId}/>
     <div className="team-profile-area">
-      {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} postCount={portfolio.length}/>} 
-      <div className="team-feed-toolbar"><b>Últimos trabalhos</b><span>{portfolio.length} post(s)</span></div>
-      {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t}/>)}</div>:<div className="panel empty-team-feed"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
-      <div className="team-feed-pager">
+      {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} postCount={portfolio.length} canEdit={selected.id===auth?.id} updateOwnSocial={updateOwnSocial}/>} 
+      <div className="team-feed-toolbar"><b>Últimos trabalhos</b>{portfolio.length>0&&<span>{portfolio.length} post(s)</span>}</div>
+      {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t}/>)}</div>:<div className="empty-team-feed inline-empty"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
+      {portfolio.length>12&&<div className="team-feed-pager">
         <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
         <span>Página {safePage+1} de {totalPages}</span>
         <button disabled={safePage>=totalPages-1} onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))}>Próximos →</button>
-      </div>
+      </div>}
     </div>
   </section>;
 }
@@ -1427,21 +1427,52 @@ function OwnSocialEditor({user,update}){
   </div>;
 }
 
-function TeamProfileHeader({member,tasks,statuses,postCount}){
+function TeamProfileHeader({member,tasks,statuses,postCount,canEdit=false,updateOwnSocial}){
   const online=isUserOnline(member);
   const activeTask=activeTimerTaskForUser(tasks,member);
-  const instagram=socialUsernameLabel(member);
-  const workTitle=activeTask?.title || '';
+  const [editing,setEditing]=useState(false);
+  const [instagram,setInstagram]=useState(member?.socialInstagram || member?.instagramUsername || member?.socialUsername || '');
+  const [status,setStatus]=useState(member?.socialStatus || member?.statusMessage || '');
+  useEffect(()=>{
+    setInstagram(member?.socialInstagram || member?.instagramUsername || member?.socialUsername || '');
+    setStatus(member?.socialStatus || member?.statusMessage || '');
+    setEditing(false);
+  },[member?.id, member?.socialInstagram, member?.socialStatus, member?.instagramUsername, member?.statusMessage]);
   const displayName=safeMemberName(member);
-  return <div className="team-profile-header panel">
+  const currentInstagram=socialUsernameLabel({...member,socialInstagram:instagram});
+  const handle=socialUsernameLabel(member) || displayName;
+  const roleText=member.title || (member.role==='admin'?'Administrador':'Membro');
+  const workTitle=activeTask?.title || '';
+  function save(){
+    updateOwnSocial?.({ socialInstagram:String(instagram||'').trim(), socialStatus:String(status||'').trim().slice(0,140) });
+    setEditing(false);
+  }
+  function cancel(){
+    setInstagram(member?.socialInstagram || member?.instagramUsername || member?.socialUsername || '');
+    setStatus(member?.socialStatus || member?.statusMessage || '');
+    setEditing(false);
+  }
+  return <div className="team-profile-header insta-profile-header">
     <div className={'team-profile-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={member.avatar} label={displayName}/></div>
     <div className="team-profile-main">
-      <div className="team-profile-name-row"><h2>{instagram || displayName}</h2><span className={'presence-pill '+(online?'on':'off')}>{online?'Online':'Offline'}</span>{activeTask&&<span className="presence-pill working">Em trabalho</span>}</div>
-      <b>{displayName}</b>
-      <p>{member.title || (member.role==='admin'?'Administrador':'Membro')}</p>
-      {(member.socialStatus||member.statusMessage)&&<div className="team-status-bubble">{member.socialStatus||member.statusMessage}</div>}
+      <div className="team-profile-name-row insta-name-row">
+        {editing?
+          <input className="inline-social-input username-inline" value={instagram} onChange={e=>setInstagram(e.target.value)} placeholder="@instagram" autoFocus/>:
+          <h2>{handle}</h2>
+        }
+        <span className={'presence-pill '+(online?'on':'off')}>{online?'Online':'Offline'}</span>
+        {activeTask&&<span className="presence-pill working">Em trabalho</span>}
+        {canEdit&&!editing&&<button className="profile-gear" type="button" onClick={()=>setEditing(true)} title="Editar recado e Instagram">⚙</button>}
+        {editing&&<div className="inline-edit-actions"><button type="button" className="mini-save" onClick={save}>Salvar</button><button type="button" className="mini-cancel" onClick={cancel}>Cancelar</button></div>}
+      </div>
+      <div className="team-profile-stats insta-stats"><span><b>{postCount}</b> posts</span></div>
+      <b className="profile-display-name">{displayName}</b>
+      <p className="profile-role-text">{roleText}</p>
+      {editing?
+        <textarea className="inline-social-textarea" value={status} maxLength={140} onChange={e=>setStatus(e.target.value)} placeholder="Recado curto para a equipe..."/>:
+        (status?<div className="team-status-bio">{status}</div>:canEdit?<button className="empty-bio-edit" type="button" onClick={()=>setEditing(true)}>Adicionar recado</button>:null)
+      }
       {activeTask&&<small className="team-work-note">Timer ativo: {workTitle}</small>}
-      <div className="team-profile-stats"><span><b>{postCount}</b> posts</span></div>
     </div>
   </div>;
 }
