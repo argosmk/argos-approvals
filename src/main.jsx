@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
-import { loadWorkspaceState, saveWorkspaceState } from './services/workspaceStateService';
+import { loadWorkspaceRecord, saveWorkspaceState } from './services/workspaceStateService';
 
 
 
@@ -655,6 +655,115 @@ function mergeProfileWithWorkspaceUser(profile, payload){
   };
   return merged;
 }
+
+function clonePayload(payload){
+  try{ return JSON.parse(JSON.stringify(payload || EMPTY_CLOUD_STATE)); }
+  catch(e){ return {...EMPTY_CLOUD_STATE}; }
+}
+function normalizeWorkspacePayload(payload){
+  const p = payload || EMPTY_CLOUD_STATE;
+  return {
+    users: Array.isArray(p.users) ? p.users : [],
+    companies: Array.isArray(p.companies) ? p.companies : [],
+    statuses: Array.isArray(p.statuses) && p.statuses.length ? p.statuses : DEFAULT_STATUS,
+    tasks: Array.isArray(p.tasks) ? p.tasks : [],
+    notifications: Array.isArray(p.notifications) ? p.notifications : [],
+    system: p.system || { logo:'', title:'Painel de Aprovação' },
+  };
+}
+function payloadSignature(payload){
+  try{ return JSON.stringify(normalizeWorkspacePayload(payload)); }
+  catch(e){ return String(Date.now()); }
+}
+function mergeLogs(baseLogs=[], localLogs=[], remoteLogs=[]){
+  const byId = new Map();
+  [...(baseLogs||[]), ...(remoteLogs||[]), ...(localLogs||[])].forEach((log,idx)=>{
+    if(!log) return;
+    const id = log.id || `log-${log.at||''}-${log.userId||''}-${idx}`;
+    byId.set(id, {...(byId.get(id)||{}), ...log, id});
+  });
+  return [...byId.values()].sort((a,b)=>new Date(a.at||0)-new Date(b.at||0));
+}
+function mergeItem(base={}, local={}, remote={}){
+  const merged = {...remote};
+  const keys = new Set([...Object.keys(base||{}), ...Object.keys(remote||{}), ...Object.keys(local||{})]);
+  keys.forEach(key=>{
+    if(key === 'logs'){
+      merged.logs = mergeLogs(base?.logs||[], local?.logs||[], remote?.logs||[]);
+      return;
+    }
+    const b = JSON.stringify(base?.[key] ?? null);
+    const l = JSON.stringify(local?.[key] ?? null);
+    const r = JSON.stringify(remote?.[key] ?? null);
+    const localChanged = l !== b;
+    const remoteChanged = r !== b;
+    if(localChanged && !remoteChanged) merged[key] = local?.[key];
+    else if(!localChanged && remoteChanged) merged[key] = remote?.[key];
+    else if(localChanged && remoteChanged) merged[key] = local?.[key];
+    else merged[key] = remote?.[key] ?? local?.[key] ?? base?.[key];
+  });
+  return merged;
+}
+function mergeArrayById(baseArr=[], localArr=[], remoteArr=[], kind='items'){
+  const baseMap = new Map((baseArr||[]).filter(x=>x?.id).map(x=>[x.id,x]));
+  const localMap = new Map((localArr||[]).filter(x=>x?.id).map(x=>[x.id,x]));
+  const remoteMap = new Map((remoteArr||[]).filter(x=>x?.id).map(x=>[x.id,x]));
+  const ids = new Set([...baseMap.keys(), ...localMap.keys(), ...remoteMap.keys()]);
+  const result=[];
+  ids.forEach(id=>{
+    const b=baseMap.get(id), l=localMap.get(id), r=remoteMap.get(id);
+    const lExists=localMap.has(id), rExists=remoteMap.has(id), bExists=baseMap.has(id);
+    const lChanged = JSON.stringify(l ?? null) !== JSON.stringify(b ?? null);
+    const rChanged = JSON.stringify(r ?? null) !== JSON.stringify(b ?? null);
+    if(!bExists){
+      if(lExists && rExists) result.push(mergeItem({},l,r));
+      else if(lExists) result.push(l);
+      else if(rExists) result.push(r);
+      return;
+    }
+    if(!lExists && !rExists) return;
+    if(!lExists && rExists){
+      // Se local apagou e remoto também mudou, preserva remoto para evitar perda acidental.
+      if(rChanged) result.push(r);
+      return;
+    }
+    if(lExists && !rExists){
+      // Se remoto apagou e local mudou, preserva local; se local não mudou, respeita remoção remota.
+      if(lChanged) result.push(l);
+      return;
+    }
+    if(lChanged && rChanged) result.push(mergeItem(b,l,r));
+    else if(lChanged) result.push(l);
+    else if(rChanged) result.push(r);
+    else result.push(r || l || b);
+  });
+  const orderSource = localArr?.length ? localArr : remoteArr;
+  const order = new Map((orderSource||[]).map((x,i)=>[x?.id,i]));
+  return result.sort((a,b)=>(order.get(a.id)??999999)-(order.get(b.id)??999999));
+}
+function mergeWorkspacePayload(basePayload, localPayload, remotePayload){
+  const base=normalizeWorkspacePayload(basePayload);
+  const local=normalizeWorkspacePayload(localPayload);
+  const remote=normalizeWorkspacePayload(remotePayload);
+  return {
+    users: mergeArrayById(base.users, local.users, remote.users, 'users'),
+    companies: mergeArrayById(base.companies, local.companies, remote.companies, 'companies'),
+    statuses: mergeArrayById(base.statuses, local.statuses, remote.statuses, 'statuses'),
+    tasks: mergeArrayById(base.tasks, local.tasks, remote.tasks, 'tasks'),
+    notifications: mergeArrayById(base.notifications, local.notifications, remote.notifications, 'notifications'),
+    system: mergeItem(base.system || {}, local.system || {}, remote.system || {}),
+  };
+}
+function applyWorkspacePayload(payload, setters, options={}){
+  const p=normalizeWorkspacePayload(payload);
+  setters.setUsersState(p.users||[]);
+  setters.setCompaniesState(p.companies||[]);
+  setters.setStatusesState((p.statuses&&p.statuses.length)?p.statuses:DEFAULT_STATUS);
+  setters.setTasksState(p.tasks||[]);
+  setters.setNotificationsState(p.notifications||[]);
+  setters.setSystemState(p.system||{logo:'',title:'Painel de Aprovação'});
+  if(!options.skipSystemCache) save('argos_system_r18', p.system||{logo:'',title:'Painel de Aprovação'});
+}
 async function createAuthBackedAppUser(draft){
   // Compatibilidade interna: versões antigas chamavam create-app-user.
   // A partir da round87, toda criação passa pela manage-app-user.
@@ -998,6 +1107,10 @@ function App(){
   const [cloudLoading,setCloudLoading]=useState(isSupabaseConfigured);
   const [cloudReady,setCloudReady]=useState(!isSupabaseConfigured);
   const [cloudError,setCloudError]=useState('');
+  const [saveTick,setSaveTick]=useState(0);
+  const [saveStatus,setSaveStatus]=useState('');
+  const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
+  const saveRetryRef=useRef(null);
 
   useEffect(()=>{
     if(!isSupabaseConfigured) return;
@@ -1008,23 +1121,21 @@ function App(){
         const session=data?.session;
         if(!session){ if(alive){ setCloudLoading(false); setCloudReady(false); } return; }
         const profile=await fetchCurrentProfile(session);
-        const saved=await loadWorkspaceState(profile.organizationId);
-        const payload=saved || EMPTY_CLOUD_STATE;
+        const record=await loadWorkspaceRecord(profile.organizationId);
+        const payload=normalizeWorkspacePayload(record.payload || EMPTY_CLOUD_STATE);
         const mergedProfile=mergeProfileWithWorkspaceUser(profile,payload);
         if(!mergedProfile?.active){ await supabase.auth.signOut(); throw new Error('Usuário inativo.'); }
-        const nextUsers=[mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)];
+        const nextPayload={...payload, users:[mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)]};
         if(alive){
           setAuth(mergedProfile);
-          setUsersState(nextUsers);
-          setCompaniesState(payload.companies||[]);
-          setStatusesState(payload.statuses?.length?payload.statuses:DEFAULT_STATUS);
-          setTasksState(payload.tasks||[]);
-          setNotificationsState(payload.notifications||[]);
-          const cloudSystem = payload.system||{logo:'',title:'Painel de Aprovação'};
-          setSystemState(cloudSystem);
-          save('argos_system_r18', cloudSystem);
-          setCloudReady(true); setCloudLoading(false); setCloudError('');
-          if(!saved) await saveWorkspaceState(profile.organizationId,{...payload, users: nextUsers});
+          workspaceMetaRef.current={updatedAt:record.updatedAt, basePayload:clonePayload(nextPayload), lastSavedSignature:payloadSignature(nextPayload), applyingRemote:true};
+          applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
+          workspaceMetaRef.current.applyingRemote=false;
+          setCloudReady(true); setCloudLoading(false); setCloudError(''); setSaveStatus('Sincronizado');
+          if(!record.payload){
+            const savedRecord=await saveWorkspaceState(profile.organizationId,nextPayload,null);
+            workspaceMetaRef.current={updatedAt:savedRecord.updatedAt, basePayload:clonePayload(savedRecord.payload||nextPayload), lastSavedSignature:payloadSignature(savedRecord.payload||nextPayload), applyingRemote:false};
+          }
         }
       }catch(err){ console.error(err); if(alive){ setCloudError(err.message||'Erro ao carregar Supabase.'); setCloudLoading(false); } }
     })();
@@ -1033,12 +1144,66 @@ function App(){
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
-    const timer=setTimeout(()=>{
-      saveWorkspaceState(auth.organizationId,{ users, companies, statuses, tasks, notifications, system })
-        .catch(err=>{ console.error(err); setCloudError('Não foi possível salvar no Supabase: '+(err.message||err)); });
-    },500);
+    if(workspaceMetaRef.current.applyingRemote) return;
+    const localPayload=normalizeWorkspacePayload({ users, companies, statuses, tasks, notifications, system });
+    const localSignature=payloadSignature(localPayload);
+    if(localSignature === workspaceMetaRef.current.lastSavedSignature) return;
+    if(saveRetryRef.current) clearTimeout(saveRetryRef.current);
+    const timer=setTimeout(async()=>{
+      try{
+        setSaveStatus('Salvando...');
+        let result=await saveWorkspaceState(auth.organizationId, localPayload, workspaceMetaRef.current.updatedAt);
+        let finalPayload=localPayload;
+        if(result?.conflict){
+          const remoteRecord=await loadWorkspaceRecord(auth.organizationId);
+          finalPayload=mergeWorkspacePayload(workspaceMetaRef.current.basePayload, localPayload, remoteRecord.payload || EMPTY_CLOUD_STATE);
+          result=await saveWorkspaceState(auth.organizationId, finalPayload, remoteRecord.updatedAt);
+          if(result?.conflict) throw new Error('Outra alteração foi salva ao mesmo tempo. Tentando novamente.');
+          workspaceMetaRef.current.applyingRemote=true;
+          applyWorkspacePayload(finalPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
+          workspaceMetaRef.current.applyingRemote=false;
+        }
+        const savedPayload=normalizeWorkspacePayload(result?.payload || finalPayload);
+        workspaceMetaRef.current={updatedAt:result?.updatedAt || workspaceMetaRef.current.updatedAt, basePayload:clonePayload(savedPayload), lastSavedSignature:payloadSignature(savedPayload), applyingRemote:false};
+        setCloudError(''); setSaveStatus('Salvo');
+      }catch(err){
+        console.error(err);
+        setSaveStatus('Erro ao salvar. Tentando novamente...');
+        setCloudError('Não foi possível salvar no Supabase. Suas alterações serão reenviadas automaticamente: '+(err.message||err));
+        saveRetryRef.current=setTimeout(()=>setSaveTick(x=>x+1),3000);
+      }
+    },650);
     return()=>clearTimeout(timer);
-  },[users,companies,statuses,tasks,notifications,system,cloudReady,auth?.organizationId]);
+  },[users,companies,statuses,tasks,notifications,system,cloudReady,auth?.organizationId,saveTick]);
+
+  useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
+    let cancelled=false;
+    async function pullRemoteChanges(){
+      try{
+        const record=await loadWorkspaceRecord(auth.organizationId);
+        if(cancelled || !record.payload || !record.updatedAt) return;
+        if(record.updatedAt === workspaceMetaRef.current.updatedAt) return;
+        const remotePayload=normalizeWorkspacePayload(record.payload);
+        const currentPayload=normalizeWorkspacePayload({ users, companies, statuses, tasks, notifications, system });
+        const basePayload=workspaceMetaRef.current.basePayload || EMPTY_CLOUD_STATE;
+        const hasLocalChanges=payloadSignature(currentPayload)!==workspaceMetaRef.current.lastSavedSignature;
+        const nextPayload=hasLocalChanges ? mergeWorkspacePayload(basePayload,currentPayload,remotePayload) : remotePayload;
+        workspaceMetaRef.current.applyingRemote=true;
+        applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
+        workspaceMetaRef.current.applyingRemote=false;
+        workspaceMetaRef.current.updatedAt=record.updatedAt;
+        workspaceMetaRef.current.basePayload=clonePayload(remotePayload);
+        workspaceMetaRef.current.lastSavedSignature=hasLocalChanges ? payloadSignature(remotePayload) : payloadSignature(nextPayload);
+        setCloudError('');
+        setSaveStatus(hasLocalChanges?'Mudanças recebidas. Salvando merge...':'Sincronizado');
+      }catch(err){
+        console.error(err);
+      }
+    }
+    const interval=setInterval(pullRemoteChanges,5000);
+    return()=>{cancelled=true; clearInterval(interval);};
+  },[cloudReady,auth?.organizationId,users,companies,statuses,tasks,notifications,system]);
 
   const setSystem=v=>{setSystemState(v); save('argos_system_r18',v)};
   const setUsers=v=>{
@@ -1101,7 +1266,7 @@ function App(){
   },[cloudReady,tasks]);
 
   if(cloudLoading) return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Carregando Argos</h1><p>Conectando ao Supabase...</p></div></div>;
-  if(isSupabaseConfigured && !auth) return <CloudLogin setAuth={setAuth} setUsersState={setUsersState} setCompaniesState={setCompaniesState} setStatusesState={setStatusesState} setTasksState={setTasksState} setNotificationsState={setNotificationsState} setSystemState={setSystemState} setCloudReady={setCloudReady} setCloudError={setCloudError} cloudError={cloudError} system={system}/>;
+  if(isSupabaseConfigured && !auth) return <CloudLogin setAuth={setAuth} setUsersState={setUsersState} setCompaniesState={setCompaniesState} setStatusesState={setStatusesState} setTasksState={setTasksState} setNotificationsState={setNotificationsState} setSystemState={setSystemState} setCloudReady={setCloudReady} setCloudError={setCloudError} setWorkspaceMeta={(meta)=>{workspaceMetaRef.current=meta}} cloudError={cloudError} system={system}/>;
   if(!auth) return <SetupRequired/>;
   const authUser=users.find(u=>u.id===auth.id)||auth;
   const simulatedUser=viewAs ? (users.find(u=>u.id===viewAs.id)||viewAs) : null;
@@ -1267,8 +1432,8 @@ function App(){
     setTasks([...tasks,...created]);
     alert(`${created.length} tarefa(s) gerada(s) para ${company.name}.`);
   }
-  const navAdmin=[['dashboard','Dashboard'],['teamhub','Portfólios'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['settings','Configurações']];
-  const navTeam=[['dashboard','Dashboard'],['teamhub','Portfólios'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas']];
+  const navAdmin=[['dashboard','Dashboard'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios'],['settings','Configurações']];
+  const navTeam=[['dashboard','Dashboard'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios']];
   const navClient=[['calendar','Calendário']];
   const nav=isAdmin?navAdmin:(effectiveUser.role==='team'?navTeam:navClient);
   const activeScreen = nav.some(([id])=>id===screen) ? screen : nav[0][0];
@@ -1296,25 +1461,30 @@ function App(){
   </div>
 }
 
-async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError){
+async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta){
   const { data } = await supabase.auth.getSession();
   const profile=await fetchCurrentProfile(data.session);
-  const saved=await loadWorkspaceState(profile.organizationId);
-  const payload=saved || EMPTY_CLOUD_STATE;
+  const record=await loadWorkspaceRecord(profile.organizationId);
+  const payload=normalizeWorkspacePayload(record.payload || EMPTY_CLOUD_STATE);
   const mergedProfile=mergeProfileWithWorkspaceUser(profile,payload);
-  const nextUsers=[mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)];
-  const cloudSystem = payload.system||{logo:'',title:'Painel de Aprovação'};
-  setAuth(mergedProfile); setUsersState(nextUsers); setCompaniesState(payload.companies||[]); setStatusesState(payload.statuses?.length?payload.statuses:DEFAULT_STATUS); setTasksState(payload.tasks||[]); setNotificationsState(payload.notifications||[]); setSystemState(cloudSystem); save('argos_system_r18', cloudSystem); setCloudReady(true); setCloudError('');
-  if(!saved) await saveWorkspaceState(mergedProfile.organizationId,{...payload, users: nextUsers});
+  const nextPayload={...payload, users:[mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)]};
+  setAuth(mergedProfile);
+  applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
+  setCloudReady(true); setCloudError('');
+  if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:record.updatedAt, basePayload:clonePayload(nextPayload), lastSavedSignature:payloadSignature(nextPayload), applyingRemote:false});
+  if(!record.payload){
+    const savedRecord=await saveWorkspaceState(mergedProfile.organizationId,nextPayload,null);
+    if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:savedRecord.updatedAt, basePayload:clonePayload(savedRecord.payload||nextPayload), lastSavedSignature:payloadSignature(savedRecord.payload||nextPayload), applyingRemote:false});
+  }
 }
-function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,cloudError,system}){
+function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta,cloudError,system}){
   const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [busy,setBusy]=useState(false);
   const cachedSystem = load('argos_system_r18', {});
   const loginLogo = system?.loginLogo || system?.logo || cachedSystem?.loginLogo || cachedSystem?.logo || ''; 
   const loginTitle = system?.loginTitle || system?.title || cachedSystem?.loginTitle || cachedSystem?.title || 'Painel de Aprovação';
   const loginSubtitle = system?.loginSubtitle || cachedSystem?.loginSubtitle || 'Entre com seu acesso.';
   async function login(){
-    try{ setBusy(true); setCloudError(''); const { error } = await supabase.auth.signInWithPassword({ email, password: pass }); if(error) throw error; await hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError); }
+    try{ setBusy(true); setCloudError(''); const { error } = await supabase.auth.signInWithPassword({ email, password: pass }); if(error) throw error; await hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta); }
     catch(err){ setCloudError(err.message||'Login inválido.'); }
     finally{ setBusy(false); }
   }
