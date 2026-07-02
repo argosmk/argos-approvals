@@ -881,6 +881,34 @@ function applyFilters(tasks, filters={}){
     return true;
   });
 }
+function taskMaterialLinks(task){
+  return String(task?.materialLinks||'').split('\n').map(x=>x.trim()).filter(Boolean);
+}
+function isUserOnline(user, thresholdMs=150000){
+  const ts = user?.lastSeenAt || user?.last_seen_at || '';
+  const time = ts ? new Date(ts).getTime() : NaN;
+  return Number.isFinite(time) && Date.now() - time <= thresholdMs;
+}
+function activeTimerTaskForUser(tasks, user){
+  if(!user || user.role === 'admin') return null;
+  return (tasks||[]).find(t=>t.startedAt && (t.startedById===user.id || (!t.startedById && t.responsibleId===user.id))) || null;
+}
+function isPortfolioTask(task, statuses){
+  if(!task || task.archived) return false;
+  const status = (statuses||[]).find(s=>s.id===task.status);
+  const finalStatus = !!status?.final || ['agendamento','pronto','finalizado'].includes(task.status);
+  return finalStatus && taskMaterialLinks(task).length > 0;
+}
+function portfolioDateValue(task){
+  const raw = task?.postDate || task?.createdAt || task?.internalDate || '';
+  const time = raw ? new Date(raw).getTime() : NaN;
+  return Number.isFinite(time) ? time : 0;
+}
+function socialUsernameLabel(user){
+  const raw = String(user?.socialInstagram || user?.instagramUsername || user?.socialUsername || '').trim();
+  if(!raw) return '';
+  return raw.startsWith('@') ? raw : '@' + raw;
+}
 
 function entityCreatedValue(item, index){
   const raw = item.createdAt || item.entryDate || '';
@@ -1001,6 +1029,17 @@ function App(){
     }
     if(system?.title) document.title = system.title;
   },[system?.favicon, system?.title]);
+
+  useEffect(()=>{
+    if(!cloudReady || !auth?.id || !['admin','team'].includes(auth.role)) return;
+    const touchPresence = () => {
+      const stamp = now();
+      setUsers(prev=>prev.map(u=>u.id===auth.id?{...u,lastSeenAt:stamp}:u));
+    };
+    touchPresence();
+    const interval = setInterval(touchPresence, 60000);
+    return ()=>clearInterval(interval);
+  },[cloudReady, auth?.id, auth?.role]);
 
   useEffect(()=>{
     if(!cloudReady) return;
@@ -1195,8 +1234,8 @@ function App(){
     setTasks([...tasks,...created]);
     alert(`${created.length} tarefa(s) gerada(s) para ${company.name}.`);
   }
-  const navAdmin=[['dashboard','Dashboard'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['settings','Configurações']];
-  const navTeam=[['dashboard','Dashboard'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas']];
+  const navAdmin=[['dashboard','Dashboard'],['teamhub','Equipe'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['settings','Configurações']];
+  const navTeam=[['dashboard','Dashboard'],['teamhub','Equipe'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas']];
   const navClient=[['calendar','Calendário']];
   const nav=isAdmin?navAdmin:(effectiveUser.role==='team'?navTeam:navClient);
   const activeScreen = nav.some(([id])=>id===screen) ? screen : nav[0][0];
@@ -1209,6 +1248,7 @@ function App(){
         <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={setSelectedTask}/>
         {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
         {activeScreen==='dashboard' && <Dashboard tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
+        {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser}/>}
         {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask}/>} 
         {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={setSelectedTask}/>} 
         {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask} search=""/>} 
@@ -1301,6 +1341,106 @@ function Card({title,value}){ return <div className="card"><small>{title}</small
 function Bar({title,rows}){
   const max=Math.max(1,...rows.map(r=>r[1]));
   return <div className="panel"><h2>{title}</h2>{rows.map(([label,val,color,avatar])=><div className="bar" key={label} style={{display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',columnGap:12}}><span className="bar-label" style={{display:'inline-flex',alignItems:'center',gap:8,minWidth:0}}>{avatar&&<AvatarMini value={avatar} label={label}/>}<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</span></span><b>{val}</b><i style={{gridColumn:'1 / -1'}}><em style={{width:`${val/max*100}%`,background:color}}/></i></div>)}</div>
+}
+
+function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
+  const members = sortMembersAdminFirst(users.filter(u=>u.active && (u.role==='admin'||u.role==='team')));
+  const [selectedId,setSelectedId]=useState(()=>viewer?.id || auth?.id || members[0]?.id || '');
+  const [page,setPage]=useState(0);
+  const selected = members.find(u=>u.id===selectedId) || members[0] || null;
+  useEffect(()=>{ if(selected && selected.id!==selectedId) setSelectedId(selected.id); },[selected?.id]);
+  useEffect(()=>{ setPage(0); },[selected?.id]);
+  const portfolio = useMemo(()=>{
+    if(!selected) return [];
+    return (tasks||[])
+      .filter(t=>t.responsibleId===selected.id && isPortfolioTask(t,statuses))
+      .sort((a,b)=>portfolioDateValue(b)-portfolioDateValue(a));
+  },[tasks,statuses,selected?.id]);
+  const totalPages=Math.max(1, Math.ceil(portfolio.length/12));
+  const safePage=Math.min(page,totalPages-1);
+  const visiblePosts=portfolio.slice(safePage*12, safePage*12+12);
+  function updateOwnSocial(patch){
+    if(!auth?.id) return;
+    setUsers(prev=>prev.map(u=>u.id===auth.id?{...u,...patch}:u));
+  }
+  if(!members.length) return <section><h1>Equipe</h1><p>Nenhum membro ativo encontrado.</p></section>;
+  return <section className="team-hub">
+    <div className="team-hub-hero"><div><h1>Equipe</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div></div>
+    <div className="team-hub-layout">
+      <aside className="team-hub-sidebar panel">
+        <h2>Membros</h2>
+        <div className="team-member-list">{members.map(m=>{
+          const online=isUserOnline(m);
+          const activeTask=activeTimerTaskForUser(tasks,m);
+          const instagram=socialUsernameLabel(m);
+          return <button key={m.id} className={'team-member-card '+(selected?.id===m.id?'selected':'')} onClick={()=>setSelectedId(m.id)}>
+            <span className={'presence-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={m.avatar} label={m.name}/></span>
+            <span className="member-card-text"><b>{m.name}</b><small>{instagram || (m.title||m.username||'Membro')}</small></span>
+            {activeTask&&<span className="member-work-dot">●</span>}
+          </button>
+        })}</div>
+        <OwnSocialEditor user={users.find(u=>u.id===auth?.id)} update={updateOwnSocial}/>
+      </aside>
+      <div className="team-profile-area">
+        {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} postCount={portfolio.length}/>}
+        <div className="team-feed-toolbar"><b>Últimos trabalhos</b><span>{portfolio.length} post(s)</span></div>
+        {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t}/>)}</div>:<div className="panel empty-team-feed"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
+        <div className="team-feed-pager">
+          <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
+          <span>Página {safePage+1} de {totalPages}</span>
+          <button disabled={safePage>=totalPages-1} onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))}>Próximos →</button>
+        </div>
+      </div>
+    </div>
+  </section>;
+}
+
+function OwnSocialEditor({user,update}){
+  const [open,setOpen]=useState(false);
+  const [instagram,setInstagram]=useState(user?.socialInstagram || user?.instagramUsername || user?.socialUsername || '');
+  const [status,setStatus]=useState(user?.socialStatus || user?.statusMessage || '');
+  useEffect(()=>{ setInstagram(user?.socialInstagram || user?.instagramUsername || user?.socialUsername || ''); setStatus(user?.socialStatus || user?.statusMessage || ''); },[user?.id,user?.socialInstagram,user?.socialStatus]);
+  if(!user) return null;
+  function save(){
+    update({ socialInstagram:String(instagram||'').trim(), socialStatus:String(status||'').trim().slice(0,120) });
+    setOpen(false);
+  }
+  return <div className="own-social-editor">
+    <button type="button" onClick={()=>setOpen(!open)}>{open?'Fechar meu recado':'Editar meu recado'}</button>
+    {open&&<div className="own-social-form">
+      <label>@ Instagram<input value={instagram} onChange={e=>setInstagram(e.target.value)} placeholder="@seuuser"/></label>
+      <label>Recado<textarea value={status} maxLength={120} onChange={e=>setStatus(e.target.value)} placeholder="No que você está focado hoje?"/></label>
+      <button className="primary" type="button" onClick={save}>Salvar</button>
+    </div>}
+  </div>;
+}
+
+function TeamProfileHeader({member,tasks,statuses,postCount}){
+  const online=isUserOnline(member);
+  const activeTask=activeTimerTaskForUser(tasks,member);
+  const instagram=socialUsernameLabel(member);
+  const workTitle=activeTask?.title || '';
+  return <div className="team-profile-header panel">
+    <div className={'team-profile-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={member.avatar} label={member.name}/></div>
+    <div className="team-profile-main">
+      <div className="team-profile-name-row"><h2>{instagram || member.username || member.name}</h2><span className={'presence-pill '+(online?'on':'off')}>{online?'Online':'Offline'}</span>{activeTask&&<span className="presence-pill working">Em trabalho</span>}</div>
+      <b>{member.name}</b>
+      <p>{member.title || (member.role==='admin'?'Administrador':'Membro')}</p>
+      {(member.socialStatus||member.statusMessage)&&<div className="team-status-bubble">{member.socialStatus||member.statusMessage}</div>}
+      {activeTask&&<small className="team-work-note">Timer ativo: {workTitle}</small>}
+      <div className="team-profile-stats"><span><b>{postCount}</b> posts</span></div>
+    </div>
+  </div>;
+}
+
+function TeamFeedItem({task}){
+  const links=taskMaterialLinks(task);
+  const [slide,setSlide]=useState(0);
+  const index=Math.min(slide, Math.max(0, links.length-1));
+  if(!links.length) return null;
+  return <article className="team-feed-item">
+    <div className="team-feed-media"><Media url={links[index]}/>{links.length>1&&<div className="team-feed-arrows"><button onClick={()=>setSlide(i=>Math.max(0,i-1))} disabled={index<=0}>‹</button><span>{index+1}/{links.length}</span><button onClick={()=>setSlide(i=>Math.min(links.length-1,i+1))} disabled={index>=links.length-1}>›</button></div>}</div>
+  </article>;
 }
 
 function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,open}){
