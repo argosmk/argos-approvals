@@ -5,6 +5,30 @@ import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { loadWorkspaceState, saveWorkspaceState } from './services/workspaceStateService';
 
 
+function safeUUID(){
+  try{
+    if(typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'){
+      return safeUUID();
+    }
+    if(typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function'){
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = [...bytes].map(b=>b.toString(16).padStart(2,'0'));
+      return `${hex[0]}${hex[1]}${hex[2]}${hex[3]}-${hex[4]}${hex[5]}-${hex[6]}${hex[7]}-${hex[8]}${hex[9]}-${hex[10]}${hex[11]}${hex[12]}${hex[13]}${hex[14]}${hex[15]}`;
+    }
+  }catch(e){}
+  // Fallback para mobile/local HTTP antigo. Mantém formato UUID v4 aceito pelo Supabase.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+    const r = Math.random()*16|0;
+    const v = c === 'x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+
+
+
 const ARGOS_UI_POLISH_CSS = `
 .task-topbar-split{display:grid;grid-template-columns:auto minmax(260px,1fr);align-items:center;gap:12px;margin-bottom:12px;}
 .task-topbar-split .task-nav-actions{justify-self:end;display:flex;gap:8px;flex-wrap:wrap;}
@@ -700,7 +724,7 @@ async function uploadImageToSupabase(file, folder='uploads'){
 
   if(isSupabaseConfigured){
     const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const filePath = `${folder}/${crypto.randomUUID()}.${ext}`;
+    const filePath = `${folder}/${safeUUID()}.${ext}`;
 
     const { error } = await supabase.storage
       .from('avatars')
@@ -922,7 +946,7 @@ function App(){
         return {
           ...t,
           ...patch,
-          logs:[...(t.logs||[]), {id:crypto.randomUUID(), user:'Sistema Argos', userId:'system', type:'log', visibility:'internal', at:now(), text:'Timer pausado automaticamente por inatividade.'}]
+          logs:[...(t.logs||[]), {id:safeUUID(), user:'Sistema Argos', userId:'system', type:'log', visibility:'internal', at:now(), text:'Timer pausado automaticamente por inatividade.'}]
         };
       });
       if(changed) setTasks(next);
@@ -954,7 +978,7 @@ function App(){
   function openCreate(){ const firstResponsible=users.find(u=>u.active&&(u.role==='team'||u.role==='admin')); setForm({ title:'', companyId:companies.find(c=>c.active)?.id||'', responsibleId:firstResponsible?.id||'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:'', internalDate:'', copyInstructions:'', editorInstructions:'', copy:'', caption:'', materialLinks:'' }); setCreateOpen(true); }
   function createTask(){
     if(!form.title||!form.companyId||!form.responsibleId||!form.type||!form.status){ alert('Preencha os campos principais.'); return; }
-    const t={ id:crypto.randomUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:crypto.randomUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
+    const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
     setTasks([...tasks,t]); setCreateOpen(false); setForm(null);
   }
   function notifyTask(task,text,event,statusId=null){
@@ -962,7 +986,7 @@ function App(){
     const recipients = users.filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
       .filter(u=>u.id!==effectiveUser.id)
       .filter(u=>wantsNotification(u,event,statusId));
-    if(recipients.length) setNotifications([...recipients.map(u=>({id:crypto.randomUUID(),taskId:task.id,userId:u.id,text:`${task.title}: ${text}`,at:now(),done:false,event,statusId})),...notifications]);
+    if(recipients.length) setNotifications([...recipients.map(u=>({id:safeUUID(),taskId:task.id,userId:u.id,text:`${task.title}: ${text}`,at:now(),done:false,event,statusId})),...notifications]);
   }
   function updateTask(id, patch, logText){
     const original=tasks.find(t=>t.id===id);
@@ -990,7 +1014,7 @@ function App(){
         const statusText=`Status alterado de ${statusById[t.status]?.name||t.status} para ${statusById[patch.status]?.name||patch.status}.`;
 
         logs.push({
-          id:crypto.randomUUID(),
+          id:safeUUID(),
           user:effectiveUser.name,
           userId:effectiveUser.id,
           type:'status',
@@ -1006,7 +1030,7 @@ function App(){
 
       if(logText){
         logs.push({
-          id:crypto.randomUUID(),
+          id:safeUUID(),
           user:effectiveUser.name,
           userId:effectiveUser.id,
           type:'log',
@@ -1041,7 +1065,7 @@ function App(){
   }
 
   function addLog(id,text,type='comment',visibility='internal'){
-    const entry={id:crypto.randomUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:now(),text,resolved:false};
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:now(),text,resolved:false};
     setTasks(tasks.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     const task=tasks.find(t=>t.id===id);
     const event = type==='change' ? 'Solicitação de alteração' : type==='approval' ? 'Aprovação do cliente' : 'Comentário na tarefa';
@@ -1068,7 +1092,7 @@ function App(){
         const internalDate=addDays(postDate,-Math.max(0, Number(item.internalOffset)||0));
         const suffix=qty>1 ? ` ${String(i+1).padStart(2,'0')}` : '';
         created.push({
-          id:crypto.randomUUID(),
+          id:safeUUID(),
           title:`${company.name} | ${item.type || TASK_TYPES[0]}${suffix} | Semana ${fmtDate(weekStart)}`,
           companyId:company.id,
           type:item.type || TASK_TYPES[0],
@@ -1091,7 +1115,7 @@ function App(){
           materialLinks:'',
           generatedWeek:weekStart,
           generatedFromTemplate:true,
-          logs:[{id:crypto.randomUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:now(),text:`Tarefa gerada pelo Planejamento Semanal (${fmtDate(weekStart)} a ${fmtDate(weekEndStr(weekStart))}).`}]
+          logs:[{id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:now(),text:`Tarefa gerada pelo Planejamento Semanal (${fmtDate(weekStart)} a ${fmtDate(weekEndStr(weekStart))}).`}]
         });
       }
     });
@@ -1108,12 +1132,12 @@ function App(){
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={setScreen} setAuth={setAuth}/>
     <main className="main">
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
-      {selectedTask ? <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={()=>setSelectedTask(null)} open={setSelectedTask} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
+      {selectedTask ? <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={()=>setSelectedTask(null)} open={setSelectedTask} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
       : <>
         <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={setSelectedTask}/>
         {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
         {activeScreen==='dashboard' && <Dashboard tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
-        {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask}/>} 
+        {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask}/>} 
         {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={setSelectedTask}/>} 
         {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask} search=""/>} 
         {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask} search=""/>} 
@@ -1204,9 +1228,14 @@ function Bar({title,rows}){
   return <div className="panel"><h2>{title}</h2>{rows.map(([label,val,color,avatar])=><div className="bar" key={label} style={{display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',columnGap:12}}><span className="bar-label" style={{display:'inline-flex',alignItems:'center',gap:8,minWidth:0}}>{avatar&&<AvatarMini value={avatar} label={label}/>}<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</span></span><b>{val}</b><i style={{gridColumn:'1 / -1'}}><em style={{width:`${val/max*100}%`,background:color}}/></i></div>)}</div>
 }
 
-function TasksPanel({tasks,companies,users,statuses,statusById,user,open}){
-  const [mode,setMode]=useState('priority'),[type,setType]=useState('all');
-  const filtered=tasks.filter(t=>type==='all'||t.type===type);
+function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,open}){
+  const [mode,setMode]=useState('priority'),[type,setType]=useState('all'),[showArchived,setShowArchived]=useState(false),[selected,setSelected]=useState([]),[bulkEdit,setBulkEdit]=useState(null),[bulkValue,setBulkValue]=useState('');
+  const isAdmin=user.role==='admin';
+  const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
+  const activeStatuses=statuses.filter(s=>s.active!==false);
+  const visibleForArchive = isAdmin && showArchived ? tasks : tasks.filter(t=>!t.archived);
+  const filtered=visibleForArchive.filter(t=>type==='all'||t.type===type);
+  const selectedFiltered = selected.filter(id=>filtered.some(t=>t.id===id));
   const priorityOrder={late:0,hot:1,warn:2,ok:3,neutral:4};
   const groupers={
     priority:t=>priorityText(t.internalDate),
@@ -1216,9 +1245,92 @@ function TasksPanel({tasks,companies,users,statuses,statusById,user,open}){
     date:t=>fmtDate(t.internalDate),
     responsible:t=>users.find(u=>u.id===t.responsibleId)?.name||'Sem responsável'
   };
-  const sorted=[...filtered].sort((a,b)=>priorityOrder[priorityClass(a.internalDate)]-priorityOrder[priorityClass(b.internalDate)] || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || a.title.localeCompare(b.title));
+  const sorted=[...filtered].sort((a,b)=>{
+    if(showArchived && isAdmin && (a.archived!==b.archived)) return a.archived?1:-1;
+    return priorityOrder[priorityClass(a.internalDate)]-priorityOrder[priorityClass(b.internalDate)] || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || a.title.localeCompare(b.title);
+  });
   const groups={}; sorted.forEach(t=>{const k=(groupers[mode]||groupers.priority)(t); (groups[k] ||= []).push(t)});
-  return <section><h1>Tarefas</h1><p>Visão rápida das tarefas atribuídas e filtradas.</p><div className="filters"><label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="date">Prazo</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label><label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="tasks-board" style={{display:'flex',flexDirection:'column',gap:16}}>{Object.entries(groups).map(([group,items])=><div className="panel task-group" style={{width:'100%'}} key={group}><h2>{group}<small>{items.length}</small></h2>{items.map(t=>{const c=companies.find(x=>x.id===t.companyId);const r=users.find(x=>x.id===t.responsibleId);return <button className={'task-row priority-'+priorityClass(t.internalDate)} key={t.id} onClick={()=>open(t.id)}><b>{t.title}</b><span>{c?.name} • {statusById[t.status]?.name} • Prazo: {fmtDate(t.internalDate)} • {priorityText(t.internalDate)}</span><span className="avatars"><AvatarMini value={c?.logo} label={c?.name}/><AvatarMini value={r?.avatar} label={r?.name}/></span></button>})}</div>)}</div></section>
+  function toggleSelected(id){
+    setSelected(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+  }
+  function selectAllVisible(){
+    const ids=filtered.map(t=>t.id);
+    const allSelected=ids.length && ids.every(id=>selected.includes(id));
+    setSelected(allSelected?selected.filter(id=>!ids.includes(id)):[...new Set([...selected,...ids])]);
+  }
+  function clearSelected(){ setSelected([]); }
+  function addBulkLog(t,text){
+    return {...t,logs:[...(t.logs||[]),{id:safeUUID(),user:user.name,userId:user.id,type:'log',visibility:'internal',at:now(),text}]};
+  }
+  function bulkArchive(archived=true){
+    if(!selectedFiltered.length) return;
+    if(!confirm(`${archived?'Arquivar':'Desarquivar'} ${selectedFiltered.length} tarefa(s)?`)) return;
+    setTasks(prev=>prev.map(t=>selectedFiltered.includes(t.id)?addBulkLog({...t,archived}, archived?'Tarefa arquivada em massa.':'Tarefa desarquivada em massa.'):t));
+    clearSelected();
+  }
+  function bulkDelete(){
+    if(!selectedFiltered.length) return;
+    const typed=prompt(`Digite EXCLUIR para apagar permanentemente ${selectedFiltered.length} tarefa(s).`);
+    if(typed!=='EXCLUIR') return;
+    setTasks(prev=>prev.filter(t=>!selectedFiltered.includes(t.id)));
+    clearSelected();
+  }
+  function bulkDuplicate(){
+    if(!selectedFiltered.length) return;
+    if(!confirm(`Duplicar ${selectedFiltered.length} tarefa(s)?`)) return;
+    const source=tasks.filter(t=>selectedFiltered.includes(t.id));
+    const copies=source.map(t=>({
+      ...t,
+      id:safeUUID(),
+      title:`Cópia de ${t.title||'Tarefa'}`,
+      archived:false,
+      startedAt:null,
+      startedById:null,
+      timerHeartbeatAt:null,
+      generatedFromTemplate:false,
+      generatedWeek:'',
+      logs:[...(t.logs||[]),{id:safeUUID(),user:user.name,userId:user.id,type:'log',visibility:'internal',at:now(),text:'Tarefa duplicada.'}]
+    }));
+    setTasks(prev=>[...prev,...copies]);
+    clearSelected();
+  }
+  function openBulkEditor(kind){
+    if(!selectedFiltered.length) return;
+    const first=tasks.find(t=>t.id===selectedFiltered[0]);
+    const defaults={responsibleId:first?.responsibleId||teams[0]?.id||'',status:first?.status||activeStatuses[0]?.id||'',internalDate:first?.internalDate||'',postDate:first?.postDate||''};
+    setBulkEdit(kind);
+    setBulkValue(defaults[kind]||'');
+  }
+  function bulkLabel(kind){
+    return kind==='responsibleId'?'responsável':kind==='status'?'status':kind==='internalDate'?'prazo':'data do post';
+  }
+  function applyBulkEdit(){
+    if(!bulkEdit||!selectedFiltered.length) return;
+    if(!bulkValue && ['responsibleId','status'].includes(bulkEdit)) return alert('Escolha uma opção antes de aplicar.');
+    const selectedName = bulkEdit==='responsibleId'
+      ? (teams.find(u=>u.id===bulkValue)?.name||'responsável')
+      : bulkEdit==='status'
+        ? (activeStatuses.find(s=>s.id===bulkValue)?.name||'status')
+        : fmtDate(bulkValue);
+    const logText = bulkEdit==='responsibleId'
+      ? `Responsável alterado em massa para ${selectedName}.`
+      : bulkEdit==='status'
+        ? `Status alterado em massa para ${selectedName}.`
+        : bulkEdit==='internalDate'
+          ? `Prazo alterado em massa para ${selectedName}.`
+          : `Data do post alterada em massa para ${selectedName}.`;
+    setTasks(prev=>prev.map(t=>{
+      if(!selectedFiltered.includes(t.id)) return t;
+      const patch={};
+      patch[bulkEdit]=bulkValue;
+      return addBulkLog({...t,...patch}, logText);
+    }));
+    setBulkEdit(null);
+    setBulkValue('');
+    clearSelected();
+  }
+  const totalArchived=tasks.filter(t=>t.archived).length;
+  return <section><h1>Tarefas</h1><p>Visão rápida das tarefas atribuídas e filtradas.</p><div className="filters tasks-filters"><label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="date">Prazo</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label><label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>{isAdmin&&<label className="toggle-archived tasks-archive-toggle"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span>Mostrar arquivadas{totalArchived?` (${totalArchived})`:''}</span></label>}</div>{isAdmin&&<div className="panel task-bulk-panel"><div className="task-bulk-left"><label className="task-select-all"><input type="checkbox" checked={filtered.length>0 && filtered.every(t=>selected.includes(t.id))} onChange={selectAllVisible}/><span></span></label><small>{selectedFiltered.length} selecionada(s)</small></div><div className="task-bulk-actions task-bulk-edit-actions"><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('responsibleId')}>Responsável</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('status')}>Status</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('internalDate')}>Prazo</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('postDate')}>Data</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(true)}>Arquivar</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(false)}>Desarquivar</button><button disabled={!selectedFiltered.length} onClick={bulkDuplicate}>Duplicar</button><button className="danger" disabled={!selectedFiltered.length} onClick={bulkDelete}>Excluir</button></div></div>}{bulkEdit&&<div className="modal-bg"><div className="modal bulk-edit-modal"><h2>Alterar {bulkLabel(bulkEdit)}</h2><p>{selectedFiltered.length} tarefa(s) selecionada(s).</p>{bulkEdit==='responsibleId'&&<label>Novo responsável<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}{bulkEdit==='status'&&<label>Novo status<div className="status-select">{statusDot(activeStatuses.find(s=>s.id===bulkValue))}<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{activeStatuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>}{bulkEdit==='internalDate'&&<label>Novo prazo<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}{bulkEdit==='postDate'&&<label>Nova data do post<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}<div className="modal-actions"><button onClick={()=>{setBulkEdit(null);setBulkValue('')}}>Cancelar</button><button className="primary" onClick={applyBulkEdit}>Aplicar</button></div></div></div>}<div className="tasks-board" style={{display:'flex',flexDirection:'column',gap:16}}>{Object.entries(groups).length?Object.entries(groups).map(([group,items])=><div className="panel task-group" style={{width:'100%'}} key={group}><h2>{group}<small>{items.length}</small></h2>{items.map(t=>{const c=companies.find(x=>x.id===t.companyId);const r=users.find(x=>x.id===t.responsibleId);return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>{isAdmin&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>}<button className={'task-row priority-'+priorityClass(t.internalDate)} onClick={()=>open(t.id)}><b>{t.title}{t.archived?' • Arquivada':''}</b><span>{c?.name} • {statusById[t.status]?.name} • Prazo: {fmtDate(t.internalDate)} • {priorityText(t.internalDate)}</span><span className="avatars"><AvatarMini value={c?.logo} label={c?.name}/><AvatarMini value={r?.avatar} label={r?.name}/></span></button></div>})}</div>):<div className="panel"><p className="muted-note">Nenhuma tarefa encontrada.</p></div>}</div></section>
 }
 function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
   const [view,setView]=useState('month'),[selectedDay,setSelectedDay]=useState(todayStr()),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'),[status,setStatus]=useState('all'),[archivedOnly,setArchivedOnly]=useState(false); 
@@ -1296,12 +1408,12 @@ function WeeklyTemplateEditor({company,users,save,cancel}){
   const [weeklyTemplate,setWeeklyTemplate]=useState(company.weeklyTemplate||[]);
   const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
   function updateTemplate(id,patch){ setWeeklyTemplate(weeklyTemplate.map(item=>item.id===id?{...item,...patch}:item)); }
-  function addTemplateItem(){ setWeeklyTemplate([...weeklyTemplate,{ id:crypto.randomUUID(), type:TASK_TYPES[0], quantity:1, responsibleId:teams[0]?.id||'', postDay:0, internalOffset:1, copyInstructions:'', editorInstructions:'' }]); }
+  function addTemplateItem(){ setWeeklyTemplate([...weeklyTemplate,{ id:safeUUID(), type:TASK_TYPES[0], quantity:1, responsibleId:teams[0]?.id||'', postDay:0, internalOffset:1, copyInstructions:'', editorInstructions:'' }]); }
   function removeTemplateItem(id){ setWeeklyTemplate(weeklyTemplate.filter(item=>item.id!==id)); }
   return <div className="modal-bg"><div className="modal company-modal"><div className="section-header"><div><h2>Template semanal</h2><p>{company.name}</p></div><button type="button" onClick={addTemplateItem}>+ Linha</button></div>{weeklyTemplate.length?weeklyTemplate.map(item=><div className="panel template-item" key={item.id}><div className="form-two"><label>Tipo<select value={item.type||TASK_TYPES[0]} onChange={e=>updateTemplate(item.id,{type:e.target.value})}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Quantidade<input type="number" min="0" value={item.quantity??1} onChange={e=>updateTemplate(item.id,{quantity:Number(e.target.value)})}/></label></div><div className="form-two"><label>Responsável<select value={item.responsibleId||''} onChange={e=>updateTemplate(item.id,{responsibleId:e.target.value})}><option value="">Padrão do sistema</option>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Dia de postagem<select value={item.postDay??0} onChange={e=>updateTemplate(item.id,{postDay:Number(e.target.value)})}>{WEEK_DAYS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select></label></div><label>Prazo interno<input type="number" min="0" value={item.internalOffset??1} onChange={e=>updateTemplate(item.id,{internalOffset:Number(e.target.value)})}/><small>Quantos dias antes da postagem. Ex: 1 = um dia antes.</small></label><label>Instruções ao copy<textarea value={item.copyInstructions||''} onChange={e=>updateTemplate(item.id,{copyInstructions:e.target.value})} placeholder="Orientações padrão para o copy desta linha."/></label><label>Instruções ao editor<textarea value={item.editorInstructions||''} onChange={e=>updateTemplate(item.id,{editorInstructions:e.target.value})} placeholder="Orientações padrão para edição/design desta linha."/></label><div className="row-actions"><button type="button" onClick={()=>removeTemplateItem(item.id)}>Remover linha</button></div></div>):<p className="muted-note">Nenhuma linha de template. Clique em + Linha para criar a remessa semanal deste cliente.</p>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={()=>save(company.id,weeklyTemplate)}>Salvar template</button></div></div></div>
 }
 
-function TaskPage({task,tasks=[],companies,users,statuses,types,statusById,updateTask,addLog,back,open,effectiveUser,isAdmin}){ 
+function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusById,updateTask,addLog,back,open,effectiveUser,isAdmin}){ 
   if(!task) return <section><button onClick={back}>Voltar</button><h1>Tarefa não encontrada</h1></section>; 
   const company=companies.find(c=>c.id===task.companyId); 
   const clientTasks=[...(tasks||[])].filter(t=>t.companyId===task.companyId).sort((a,b)=>String(a.postDate||'').localeCompare(String(b.postDate||'')) || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || String(a.title||'').localeCompare(String(b.title||'')));
@@ -1371,7 +1483,7 @@ function TaskPage({task,tasks=[],companies,users,statuses,types,statusById,updat
 
     if(reason){
       patch.extraLogs=[{
-        id:crypto.randomUUID(),
+        id:safeUUID(),
         user:effectiveUser.name,
         userId:effectiveUser.id,
         type:'comment',
@@ -1385,12 +1497,38 @@ function TaskPage({task,tasks=[],companies,users,statuses,types,statusById,updat
     updateTask(task.id,patch,reason?'Marcado como aguardando com comentário.':'Marcado como aguardando.');
   } 
   function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); addLog(task.id,`Aprovação registrada. Artes/vídeos: ${clientForm?.art?'sim':'não'}; Legenda: ${clientForm?.caption?'sim':'não'}.`,'approval',isClient?'client':'internal'); updateTask(task.id,{status:'agendamento'},`${effectiveUser.name} aprovou. Status enviado para agendamento.`); setClientForm(null); } 
-  function requestChange(){ const items=[]; if(clientForm?.artChange) items.push('Alterar arte/vídeo'); if(clientForm?.text) items.push('Alterar texto na arte/vídeo'); if(clientForm?.captionChange) items.push('Alterar legenda'); if(clientForm?.redo) items.push('Refazer o post'); if(!items.length) return alert('Selecione pelo menos uma opção de alteração.'); const desc=String(clientForm?.description||'').trim(); if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.'); const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`; const entry={id:crypto.randomUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:now(),text,resolved:false}; updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]}); setClientForm(null); }
+  function requestChange(){ const items=[]; if(clientForm?.artChange) items.push('Alterar arte/vídeo'); if(clientForm?.text) items.push('Alterar texto na arte/vídeo'); if(clientForm?.captionChange) items.push('Alterar legenda'); if(clientForm?.redo) items.push('Refazer o post'); if(!items.length) return alert('Selecione pelo menos uma opção de alteração.'); const desc=String(clientForm?.description||'').trim(); if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.'); const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`; const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:now(),text,resolved:false}; updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]}); setClientForm(null); }
   function reopenFromApproval(){ const nextStatus=task.previousWorkStatus||'edicao'; updateTask(task.id,{status:nextStatus,startedAt:now(),startedById:effectiveUser.id,timerHeartbeatAt:now()},`Tarefa reaberta para ${statusById[nextStatus]?.name||nextStatus}.`); }
   function reviewAgain(){ updateTask(task.id,{status:'aprovacao'},'Cliente voltou para revisão.'); } 
+  function duplicateTaskFromDetail(){
+    if(!isAdmin || !setTasks || !task) return;
+    const createdAt=now();
+    const cloned={
+      ...task,
+      id:safeUUID(),
+      title:`${task.title||'Tarefa'} (cópia)`,
+      archived:false,
+      startedAt:null,
+      startedById:null,
+      timerHeartbeatAt:null,
+      logs:[...(task.logs||[]),{id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:createdAt,text:'Tarefa duplicada pelo admin.'}],
+      comments:[],
+      createdAt,
+      updatedAt:createdAt
+    };
+    setTasks(prev=>[...prev,cloned]);
+    alert('Tarefa duplicada.');
+  }
+  function deleteTaskFromDetail(){
+    if(!isAdmin || !setTasks || !task) return;
+    const typed=prompt('Digite EXCLUIR para apagar permanentemente esta tarefa.');
+    if(typed!=='EXCLUIR') return;
+    setTasks(prev=>prev.filter(t=>t.id!==task.id));
+    back();
+  }
   function addComment(){ if(!comment.trim()) return; addLog(task.id,comment,'comment',isClient?'client':'internal'); setComment(''); }
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
-  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left"><div className="task-title">{isAdmin?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{!isClient&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div><div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]}/>{links.length>1&&<div className="slide-controls"><button onClick={()=>setSlide(Math.max(0,slide-1))}>‹</button><button onClick={()=>setSlide(Math.min(links.length-1,slide+1))}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div><div className="content-fields">{!isClient&&<>{isAdmin?<><label>Instruções ao copy<textarea value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/></label><label>Instruções ao editor<textarea value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/></label></>:<><ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/><ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/></>}</>}{(!isTeam || showTeamProtected || isClient)&&<><label>Copy<textarea disabled={isClient||isTeam} value={task.copy} onChange={e=>updateTask(task.id,{copy:e.target.value})}/></label><label>Legenda<textarea disabled={isClient||isTeam} value={task.caption} onChange={e=>updateTask(task.id,{caption:e.target.value})}/></label>{!isClient&&<label>Links de visualização<textarea disabled={false} value={task.materialLinks} onChange={e=>updateTask(task.id,{materialLinks:e.target.value})}/></label>}</>}</div></div><aside className="task-side">{!isClient&&<div className="panel panel-config"><h2>Configurações</h2><label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!isAdmin} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!isAdmin} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label><label>Tipo<select disabled={!isAdmin} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!isAdmin} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label><label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!isAdmin} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label><label>Data do post<input disabled={!isAdmin} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label></div>}{(isAdmin||showTeamProtected)&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button>}{(isClient||isAdmin)&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {isClient&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2><div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(l.text)}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{!isClient&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
+  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left"><div className="task-title">{isAdmin?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{!isClient&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div><div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]}/>{links.length>1&&<div className="slide-controls"><button onClick={()=>setSlide(Math.max(0,slide-1))}>‹</button><button onClick={()=>setSlide(Math.min(links.length-1,slide+1))}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div><div className="content-fields">{!isClient&&<>{isAdmin?<><label>Instruções ao copy<textarea value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/></label><label>Instruções ao editor<textarea value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/></label></>:<><ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/><ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/></>}</>}{(!isTeam || showTeamProtected || isClient)&&<><label>Copy<textarea disabled={isClient||isTeam} value={task.copy} onChange={e=>updateTask(task.id,{copy:e.target.value})}/></label><label>Legenda<textarea disabled={isClient||isTeam} value={task.caption} onChange={e=>updateTask(task.id,{caption:e.target.value})}/></label>{!isClient&&<label>Links de visualização<textarea disabled={false} value={task.materialLinks} onChange={e=>updateTask(task.id,{materialLinks:e.target.value})}/></label>}</>}</div></div><aside className="task-side">{!isClient&&<div className="panel panel-config"><h2>Configurações</h2><label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!isAdmin} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!isAdmin} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label><label>Tipo<select disabled={!isAdmin} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!isAdmin} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label><label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!isAdmin} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label><label>Data do post<input disabled={!isAdmin} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label></div>}{(isAdmin||showTeamProtected)&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{(isClient||isAdmin)&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {isClient&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2><div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(l.text)}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{!isClient&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6c-1.7-1.9-4.4-2-6.2-.3L12 6.7 9.4 4.3C7.6 2.6 4.9 2.7 3.2 4.6c-1.8 2-1.6 5.1.4 7l8.4 7.8 8.4-7.8c2-1.9 2.2-5 .4-7Z"/></svg>
@@ -1430,7 +1568,7 @@ function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[]
   const sortedCompanies=sortEntities(visibleCompanies,sort,c=>c.name);
   function save(c){
     const exists=companies.some(x=>x.id===c.id);
-    const data={...c,id:c.id||slug(c.name)||crypto.randomUUID(),createdAt:c.createdAt||now(),active:c.active!==false};
+    const data={...c,id:c.id||slug(c.name)||safeUUID(),createdAt:c.createdAt||now(),active:c.active!==false};
     setCompanies(exists?companies.map(x=>x.id===data.id?data:x):[...companies,data]);
     setEditing(null);
   }
@@ -1481,7 +1619,7 @@ function ClientUsersPage({users,setUsers,companies,statuses}){
       if(isSupabaseConfigured && !exists){
         data=await createAuthBackedAppUser(data);
       } else {
-        data={...data,id:data.id||crypto.randomUUID()};
+        data={...data,id:data.id||safeUUID()};
       }
       setUsers(exists?users.map(x=>x.id===data.id?data:x):[...users,data]);
       setEditing(null);
@@ -1524,7 +1662,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
       if(isSupabaseConfigured && !exists){
         data=await createAuthBackedAppUser(data);
       } else {
-        data={...data,id:data.id||crypto.randomUUID()};
+        data={...data,id:data.id||safeUUID()};
       }
       setUsers(exists?users.map(x=>x.id===data.id?data:x):[...users,data]);
       setEditing(null);
@@ -3377,5 +3515,532 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style65);
   }
   style65.textContent = ARGOS_ROUND65_LOGIN_INPUTS_CENTERED_CSS;
+}
+
+const ARGOS_ROUND66_TASKS_ARCHIVE_BULK_CSS = `
+.tasks-filters{align-items:end!important;}
+.tasks-archive-toggle{align-self:end!important;margin-bottom:2px!important;}
+.task-bulk-panel{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;margin:16px 0!important;padding:14px 16px!important;}
+.task-bulk-left{display:flex!important;align-items:center!important;gap:12px!important;flex-wrap:wrap!important;}
+.task-select-all{display:flex!important;align-items:center!important;gap:8px!important;margin:0!important;color:#d8d0c0!important;}
+.task-select-all input,.task-row-check{width:16px!important;height:16px!important;margin:0!important;accent-color:#b018d6!important;}
+.task-bulk-actions{display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap!important;justify-content:flex-end!important;}
+.task-bulk-actions button:disabled{opacity:.45!important;cursor:not-allowed!important;}
+.task-bulk-actions .danger{border-color:#ff4d5a!important;color:#ff6b76!important;}
+.task-row-wrap{display:flex!important;align-items:center!important;gap:10px!important;margin:10px 0!important;}
+.task-row-wrap .task-row{flex:1!important;margin:0!important;}
+.task-row-wrap.archived-card .task-row{border-style:dashed!important;}
+@media(max-width:760px){
+  .task-bulk-panel{align-items:stretch!important;flex-direction:column!important;}
+  .task-bulk-left{justify-content:space-between!important;width:100%!important;}
+  .task-bulk-actions{justify-content:flex-start!important;width:100%!important;}
+  .task-bulk-actions button{flex:1 1 calc(50% - 8px)!important;min-width:130px!important;}
+  .task-row-wrap{align-items:flex-start!important;}
+  .task-row-check{margin-top:18px!important;}
+}
+`;
+if (typeof document !== 'undefined') {
+  let style66 = document.getElementById('argos-round66-tasks-archive-bulk');
+  if (!style66) {
+    style66 = document.createElement('style');
+    style66.id = 'argos-round66-tasks-archive-bulk';
+    document.head.appendChild(style66);
+  }
+  style66.textContent = ARGOS_ROUND66_TASKS_ARCHIVE_BULK_CSS;
+}
+
+
+const ARGOS_ROUND67_TASKS_BULK_EDIT_CSS = `
+.task-bulk-edit-actions{gap:8px!important;}
+.bulk-edit-modal{max-width:520px!important;}
+.bulk-edit-modal p{margin-top:-4px!important;color:var(--muted)!important;}
+@media(max-width:760px){
+  .task-bulk-edit-actions button{flex:1 1 calc(50% - 8px)!important;min-width:128px!important;}
+  .bulk-edit-modal{width:calc(100vw - 28px)!important;}
+}
+`;
+if (typeof document !== 'undefined') {
+  let style67 = document.getElementById('argos-round67-tasks-bulk-edit');
+  if (!style67) {
+    style67 = document.createElement('style');
+    style67.id = 'argos-round67-tasks-bulk-edit';
+    document.head.appendChild(style67);
+  }
+  style67.textContent = ARGOS_ROUND67_TASKS_BULK_EDIT_CSS;
+}
+
+
+const ARGOS_ROUND68_BULK_BAR_COMPACT_CSS = `
+/* Round 68: barra de ações em massa mais compacta e sem texto "Selecionar visíveis" */
+.task-bulk-bar,
+.bulk-actions-bar,
+.tasks-bulk-bar,
+.mass-actions-bar,
+.admin-bulk-actions,
+.selection-toolbar {
+  padding:14px 16px!important;
+  min-height:auto!important;
+}
+
+/* Deixa o bloco do selecionar visíveis mais discreto */
+.task-bulk-bar label,
+.bulk-actions-bar label,
+.tasks-bulk-bar label,
+.mass-actions-bar label,
+.admin-bulk-actions label,
+.selection-toolbar label {
+  margin:0!important;
+  gap:8px!important;
+  align-items:center!important;
+}
+
+/* Remove o texto abaixo do checkbox sem esconder o checkbox */
+.task-bulk-bar label small,
+.task-bulk-bar label span:not(:has(input)),
+.bulk-actions-bar label small,
+.bulk-actions-bar label span:not(:has(input)),
+.tasks-bulk-bar label small,
+.tasks-bulk-bar label span:not(:has(input)),
+.mass-actions-bar label small,
+.mass-actions-bar label span:not(:has(input)),
+.admin-bulk-actions label small,
+.admin-bulk-actions label span:not(:has(input)),
+.selection-toolbar label small,
+.selection-toolbar label span:not(:has(input)) {
+  display:none!important;
+}
+
+/* Quando o texto for node direto em label, reduz a área para o checkbox não virar card */
+.task-bulk-bar .bulk-select-all,
+.bulk-actions-bar .bulk-select-all,
+.tasks-bulk-bar .bulk-select-all,
+.mass-actions-bar .bulk-select-all,
+.admin-bulk-actions .bulk-select-all,
+.selection-toolbar .bulk-select-all {
+  width:auto!important;
+  min-width:auto!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+}
+
+/* Checkbox da barra menor e sem cara de bloco gigante */
+.task-bulk-bar input[type="checkbox"],
+.bulk-actions-bar input[type="checkbox"],
+.tasks-bulk-bar input[type="checkbox"],
+.mass-actions-bar input[type="checkbox"],
+.admin-bulk-actions input[type="checkbox"],
+.selection-toolbar input[type="checkbox"] {
+  width:16px!important;
+  height:16px!important;
+  margin:0!important;
+  flex:0 0 auto!important;
+}
+
+/* Contador mais discreto */
+.task-bulk-bar .selected-count,
+.bulk-actions-bar .selected-count,
+.tasks-bulk-bar .selected-count,
+.mass-actions-bar .selected-count,
+.admin-bulk-actions .selected-count,
+.selection-toolbar .selected-count {
+  font-size:12px!important;
+  opacity:.75!important;
+}
+
+/* Botões um pouco menores */
+.task-bulk-bar button,
+.bulk-actions-bar button,
+.tasks-bulk-bar button,
+.mass-actions-bar button,
+.admin-bulk-actions button,
+.selection-toolbar button {
+  padding:9px 13px!important;
+  min-height:38px!important;
+}
+
+/* Mobile: barra quebra bem, sem virar trambolho */
+@media(max-width:760px){
+  .task-bulk-bar,
+  .bulk-actions-bar,
+  .tasks-bulk-bar,
+  .mass-actions-bar,
+  .admin-bulk-actions,
+  .selection-toolbar {
+    padding:12px!important;
+    gap:10px!important;
+  }
+
+  .task-bulk-bar button,
+  .bulk-actions-bar button,
+  .tasks-bulk-bar button,
+  .mass-actions-bar button,
+  .admin-bulk-actions button,
+  .selection-toolbar button {
+    padding:8px 11px!important;
+    min-height:36px!important;
+    font-size:13px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style68 = document.getElementById('argos-round68-bulk-bar-compact');
+  if (!style68) {
+    style68 = document.createElement('style');
+    style68.id = 'argos-round68-bulk-bar-compact';
+    document.head.appendChild(style68);
+  }
+  style68.textContent = ARGOS_ROUND68_BULK_BAR_COMPACT_CSS;
+}
+
+
+const ARGOS_ROUND70_BULK_CHECKBOX_ALIGNMENT_CSS = `
+/* Round 70: alinha melhor o checkbox da barra de ações em massa.
+   Mantém o filtro de período padrão como estava. */
+
+/* Desktop: checkbox e contador na mesma linha, alinhados ao centro */
+.task-bulk-bar,
+.bulk-actions-bar,
+.tasks-bulk-bar,
+.mass-actions-bar,
+.admin-bulk-actions,
+.selection-toolbar {
+  align-items:center!important;
+}
+
+.task-bulk-bar > :first-child,
+.bulk-actions-bar > :first-child,
+.tasks-bulk-bar > :first-child,
+.mass-actions-bar > :first-child,
+.admin-bulk-actions > :first-child,
+.selection-toolbar > :first-child {
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  min-height:38px!important;
+}
+
+.task-bulk-bar input[type="checkbox"],
+.bulk-actions-bar input[type="checkbox"],
+.tasks-bulk-bar input[type="checkbox"],
+.mass-actions-bar input[type="checkbox"],
+.admin-bulk-actions input[type="checkbox"],
+.selection-toolbar input[type="checkbox"] {
+  width:16px!important;
+  height:16px!important;
+  margin:0!important;
+  position:relative!important;
+  top:0!important;
+  flex:0 0 auto!important;
+}
+
+/* Mobile: checkbox pequeno, alinhado exatamente na coluna dos botões da esquerda */
+@media(max-width:760px){
+  .task-bulk-bar,
+  .bulk-actions-bar,
+  .tasks-bulk-bar,
+  .mass-actions-bar,
+  .admin-bulk-actions,
+  .selection-toolbar {
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:10px!important;
+    padding:16px!important;
+    align-items:center!important;
+  }
+
+  .task-bulk-bar > :first-child,
+  .bulk-actions-bar > :first-child,
+  .tasks-bulk-bar > :first-child,
+  .mass-actions-bar > :first-child,
+  .admin-bulk-actions > :first-child,
+  .selection-toolbar > :first-child {
+    grid-column:1 / 2!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:100%!important;
+    min-height:36px!important;
+    padding:0!important;
+    margin:0!important;
+  }
+
+  .task-bulk-bar input[type="checkbox"],
+  .bulk-actions-bar input[type="checkbox"],
+  .tasks-bulk-bar input[type="checkbox"],
+  .mass-actions-bar input[type="checkbox"],
+  .admin-bulk-actions input[type="checkbox"],
+  .selection-toolbar input[type="checkbox"] {
+    width:16px!important;
+    height:16px!important;
+    min-width:16px!important;
+    min-height:16px!important;
+    max-width:16px!important;
+    max-height:16px!important;
+    margin:0!important;
+    transform:none!important;
+  }
+
+  .task-bulk-bar .selected-count,
+  .bulk-actions-bar .selected-count,
+  .tasks-bulk-bar .selected-count,
+  .mass-actions-bar .selected-count,
+  .admin-bulk-actions .selected-count,
+  .selection-toolbar .selected-count {
+    grid-column:2 / 3!important;
+    justify-self:end!important;
+    align-self:center!important;
+    font-size:12px!important;
+    opacity:.75!important;
+    margin:0!important;
+  }
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style70 = document.getElementById('argos-round70-bulk-checkbox-alignment');
+  if (!style70) {
+    style70 = document.createElement('style');
+    style70.id = 'argos-round70-bulk-checkbox-alignment';
+    document.head.appendChild(style70);
+  }
+  style70.textContent = ARGOS_ROUND70_BULK_CHECKBOX_ALIGNMENT_CSS;
+}
+
+
+const ARGOS_ROUND71_BULK_CHECKBOX_REAL_ALIGNMENT_CSS = `
+/* Round 71: mira nos elementos reais da barra em massa:
+   .task-bulk-panel, .task-bulk-left, .task-select-all e .task-bulk-actions */
+
+/* DESKTOP */
+.task-bulk-panel{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:14px!important;
+  padding:12px 16px!important;
+  min-height:64px!important;
+}
+
+.task-bulk-left{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  min-height:40px!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+.task-bulk-left .task-select-all{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:20px!important;
+  height:20px!important;
+  min-width:20px!important;
+  min-height:20px!important;
+  margin:0!important;
+  padding:0!important;
+  line-height:1!important;
+}
+
+.task-bulk-left .task-select-all input[type="checkbox"]{
+  width:16px!important;
+  height:16px!important;
+  min-width:16px!important;
+  min-height:16px!important;
+  max-width:16px!important;
+  max-height:16px!important;
+  margin:0!important;
+  padding:0!important;
+  position:static!important;
+  top:auto!important;
+  left:auto!important;
+  transform:none!important;
+  flex:0 0 16px!important;
+}
+
+.task-bulk-left small{
+  display:flex!important;
+  align-items:center!important;
+  height:20px!important;
+  margin:0!important;
+  padding:0!important;
+  line-height:20px!important;
+  font-size:12px!important;
+  opacity:.78!important;
+}
+
+.task-bulk-actions{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:8px!important;
+  flex-wrap:wrap!important;
+}
+
+/* MOBILE */
+@media(max-width:760px){
+  .task-bulk-panel{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+    padding:14px 16px!important;
+    align-items:stretch!important;
+  }
+
+  .task-bulk-left{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    width:100%!important;
+    min-height:30px!important;
+    gap:10px!important;
+    align-items:center!important;
+    justify-content:stretch!important;
+    padding:0!important;
+    margin:0!important;
+  }
+
+  .task-bulk-left .task-select-all{
+    grid-column:1 / 2!important;
+    justify-self:center!important;
+    align-self:center!important;
+    width:18px!important;
+    height:18px!important;
+    min-width:18px!important;
+    min-height:18px!important;
+    padding:0!important;
+    margin:0!important;
+  }
+
+  .task-bulk-left .task-select-all input[type="checkbox"]{
+    width:16px!important;
+    height:16px!important;
+    min-width:16px!important;
+    min-height:16px!important;
+    max-width:16px!important;
+    max-height:16px!important;
+    margin:0!important;
+    padding:0!important;
+    transform:none!important;
+  }
+
+  .task-bulk-left small{
+    grid-column:2 / 3!important;
+    justify-self:end!important;
+    align-self:center!important;
+    height:20px!important;
+    line-height:20px!important;
+    font-size:12px!important;
+    margin:0!important;
+    padding:0!important;
+  }
+
+  .task-bulk-actions{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+    width:100%!important;
+    justify-content:stretch!important;
+    align-items:stretch!important;
+  }
+
+  .task-bulk-actions button{
+    width:100%!important;
+    min-width:0!important;
+    min-height:38px!important;
+    padding:8px 10px!important;
+    font-size:13px!important;
+  }
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style71 = document.getElementById('argos-round71-bulk-checkbox-real-alignment');
+  if (!style71) {
+    style71 = document.createElement('style');
+    style71.id = 'argos-round71-bulk-checkbox-real-alignment';
+    document.head.appendChild(style71);
+  }
+  style71.textContent = ARGOS_ROUND71_BULK_CHECKBOX_REAL_ALIGNMENT_CSS;
+}
+
+
+const ARGOS_ROUND72_TASK_ADMIN_DUPLICATE_DELETE_CSS = `
+/* Round 72: ações admin dentro da tarefa */
+.admin-task-actions-row{
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  flex-wrap:wrap!important;
+}
+
+.admin-task-actions-row .danger{
+  border-color:rgba(255,77,92,.72)!important;
+  color:#ff5a68!important;
+}
+
+.admin-task-actions-row .danger:hover{
+  background:rgba(255,77,92,.10)!important;
+  border-color:#ff5a68!important;
+}
+
+@media(max-width:760px){
+  .admin-task-actions-row{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:8px!important;
+  }
+
+  .admin-task-actions-row button{
+    width:100%!important;
+  }
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style72 = document.getElementById('argos-round72-task-admin-duplicate-delete');
+  if (!style72) {
+    style72 = document.createElement('style');
+    style72.id = 'argos-round72-task-admin-duplicate-delete';
+    document.head.appendChild(style72);
+  }
+  style72.textContent = ARGOS_ROUND72_TASK_ADMIN_DUPLICATE_DELETE_CSS;
+}
+
+
+const ARGOS_ROUND73_MOBILE_ACTION_UUID_FIX_CSS = `
+/* Round 73: pequenas proteções mobile para modais de ação */
+@media(max-width:760px){
+  .modal-bg{
+    align-items:flex-start!important;
+    overflow:auto!important;
+    padding:18px!important;
+  }
+  .modal{
+    max-height:calc(100vh - 36px)!important;
+    overflow:auto!important;
+  }
+  .bulk-edit-modal .modal-actions,
+  .modal-actions{
+    position:sticky!important;
+    bottom:0!important;
+    background:linear-gradient(to top, rgba(15,16,20,.98), rgba(15,16,20,.86))!important;
+    padding-top:10px!important;
+    z-index:5!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style73 = document.getElementById('argos-round73-mobile-action-uuid-fix');
+  if (!style73) {
+    style73 = document.createElement('style');
+    style73.id = 'argos-round73-mobile-action-uuid-fix';
+    document.head.appendChild(style73);
+  }
+  style73.textContent = ARGOS_ROUND73_MOBILE_ACTION_UUID_FIX_CSS;
 }
 
