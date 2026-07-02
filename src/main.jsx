@@ -899,6 +899,27 @@ function isPortfolioTask(task, statuses){
   const finalStatus = !!status?.final || ['agendamento','pronto','finalizado'].includes(task.status);
   return finalStatus && taskMaterialLinks(task).length > 0;
 }
+
+function normalizedStatusText(task, statuses){
+  const status=(statuses||[]).find(s=>s.id===task?.status);
+  return `${task?.status||''} ${status?.name||''}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+function isScheduledTask(task, statuses){
+  return normalizedStatusText(task,statuses).includes('agend');
+}
+function isFinishedTask(task, statuses){
+  if(isScheduledTask(task,statuses)) return false;
+  const txt=normalizedStatusText(task,statuses);
+  return !!isFinalStatus(statuses, task?.status) || txt.includes('pronto') || txt.includes('finaliz');
+}
+function memberWorkStats(tasks, member, statuses){
+  const assigned=(tasks||[]).filter(t=>!t.archived && t.responsibleId===member?.id);
+  return {
+    assigned: assigned.length,
+    scheduled: assigned.filter(t=>isScheduledTask(t,statuses)).length,
+    finished: assigned.filter(t=>isFinishedTask(t,statuses)).length,
+  };
+}
 function portfolioDateValue(task){
   const raw = task?.postDate || task?.createdAt || task?.internalDate || '';
   const time = raw ? new Date(raw).getTime() : NaN;
@@ -1345,7 +1366,10 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){
   const isAdmin=user.role==='admin'; 
   const activeCompanies=companies.filter(c=>c.active);
   const activeUsers=sortMembersAdminFirst(users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')));
-  const operationalTasks=tasks.filter(t=>activeCompanies.some(c=>c.id===t.companyId) && activeUsers.some(u=>u.id===t.responsibleId));
+  // No Dashboard da equipe, os números precisam considerar todos os posts atribuídos ao membro,
+  // mesmo quando o status ainda não faz parte dos status visíveis dele no Kanban/Tarefas.
+  const dashboardScope = user.role==='team' ? (tasks||[]).filter(t=>t.responsibleId===user.id) : (tasks||[]);
+  const operationalTasks=dashboardScope.filter(t=>activeCompanies.some(c=>c.id===t.companyId) && activeUsers.some(u=>u.id===t.responsibleId));
   const filtered=applyFilters(operationalTasks,{period,from,to,company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,search,showArchived:true}); 
   const alterations=filtered.reduce((a,t)=>a+(t.alterationCount||0),0); const finalized=filtered.filter(t=>isFinalStatus(statuses,t.status)).length; const rework=filtered.length?Math.round(alterations/filtered.length*100):0; const total=filtered.reduce((a,t)=>a+(t.totalEditSeconds||0)+(t.totalAlterSeconds||0),0); 
   return <section><h1>Dashboard</h1><p>Relatório operacional com filtros aplicados em todo o painel.</p><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="dash-zone"><div className="cards quick-cards">{isAdmin&&<Card title="Clientes ativos" value={activeCompanies.length}/>} {user.role==='team'&&<Card title="Quantidade de posts" value={filtered.length}/>}<Card title={user.role==='team'?'Posts finalizados':'Posts no período'} value={user.role==='team'?finalized:filtered.length}/><Card title="Alterações" value={alterations}/><Card title="Taxa de retrabalho" value={`${rework}%`}/></div><div className="cards time-cards"><Card title="Tempo total" value={fmtSec(total)}/><Card title="Média por post" value={fmtSec(avg(filtered.map(t=>(t.totalEditSeconds||0)+(t.totalAlterSeconds||0))))}/><Card title="Média em edição" value={fmtSec(avg(filtered.map(t=>t.totalEditSeconds||0)))}/><Card title="Média em alteração" value={fmtSec(avg(filtered.map(t=>t.totalAlterSeconds||0)))}/></div></div><div className="grid2"><Bar title="Post por Status" rows={statuses.map(s=>[s.name,filtered.filter(t=>t.status===s.id).length,s.color])}/><Bar title="Por tipo" rows={TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c'])}/><Bar title="Por cliente" rows={activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#6ee7b7',c.logo])}/>{isAdmin&&<Bar title="Por membro" rows={activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#c084fc',u.avatar])}/>}</div></section> }
@@ -1356,8 +1380,10 @@ function Bar({title,rows}){
 }
 
 function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
-  const members = sortMembersAdminFirst(users.filter(u=>u.active && (u.role==='admin'||u.role==='team')));
-  const [selectedId,setSelectedId]=useState(()=>viewer?.id || auth?.id || members[0]?.id || '');
+  const baseMembers = sortMembersAdminFirst(users.filter(u=>u.active && (u.role==='admin'||u.role==='team')));
+  const selfId = viewer?.id || auth?.id || '';
+  const members = selfId ? [...baseMembers.filter(u=>u.id===selfId), ...baseMembers.filter(u=>u.id!==selfId)] : baseMembers;
+  const [selectedId,setSelectedId]=useState(()=>selfId || members[0]?.id || '');
   const [page,setPage]=useState(0);
   const selected = members.find(u=>u.id===selectedId) || members[0] || null;
   useEffect(()=>{ if(selected && selected.id!==selectedId) setSelectedId(selected.id); },[selected?.id]);
@@ -1368,6 +1394,7 @@ function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
       .filter(t=>t.responsibleId===selected.id && isPortfolioTask(t,statuses))
       .sort((a,b)=>portfolioDateValue(b)-portfolioDateValue(a));
   },[tasks,statuses,selected?.id]);
+  const selectedStats = useMemo(()=>memberWorkStats(tasks, selected, statuses), [tasks, statuses, selected?.id]);
   const totalPages=Math.max(1, Math.ceil(portfolio.length/12));
   const safePage=Math.min(page,totalPages-1);
   const visiblePosts=portfolio.slice(safePage*12, safePage*12+12);
@@ -1380,8 +1407,8 @@ function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
     <div className="team-hub-hero"><div><h1>Equipe</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div></div>
     <TeamStoriesStrip members={members} selected={selected} tasks={tasks} setSelectedId={setSelectedId}/>
     <div className="team-profile-area">
-      {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} postCount={portfolio.length} canEdit={selected.id===auth?.id} updateOwnSocial={updateOwnSocial}/>} 
-      <div className="team-feed-toolbar"><b>Últimos trabalhos</b>{portfolio.length>0&&<span>{portfolio.length} post(s)</span>}</div>
+      {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} stats={selectedStats} canEdit={selected.id===auth?.id} updateOwnSocial={updateOwnSocial}/>} 
+      <div className="team-feed-toolbar" aria-hidden="true"></div>
       {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t}/>)}</div>:<div className="empty-team-feed inline-empty"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
       {portfolio.length>12&&<div className="team-feed-pager">
         <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
@@ -1427,7 +1454,7 @@ function OwnSocialEditor({user,update}){
   </div>;
 }
 
-function TeamProfileHeader({member,tasks,statuses,postCount,canEdit=false,updateOwnSocial}){
+function TeamProfileHeader({member,tasks,statuses,stats,canEdit=false,updateOwnSocial}){
   const online=isUserOnline(member);
   const activeTask=activeTimerTaskForUser(tasks,member);
   const [editing,setEditing]=useState(false);
@@ -1465,7 +1492,11 @@ function TeamProfileHeader({member,tasks,statuses,postCount,canEdit=false,update
         {canEdit&&!editing&&<button className="profile-gear" type="button" onClick={()=>setEditing(true)} title="Editar recado e Instagram">⚙</button>}
         {editing&&<div className="inline-edit-actions"><button type="button" className="mini-save" onClick={save}>Salvar</button><button type="button" className="mini-cancel" onClick={cancel}>Cancelar</button></div>}
       </div>
-      <div className="team-profile-stats insta-stats"><span><b>{postCount}</b> posts</span></div>
+      <div className="team-profile-stats insta-stats">
+        <span><b>{stats?.assigned||0}</b> atribuídos</span>
+        <span><b>{stats?.scheduled||0}</b> agendados</span>
+        <span><b>{stats?.finished||0}</b> finalizados</span>
+      </div>
       <b className="profile-display-name">{displayName}</b>
       <p className="profile-role-text">{roleText}</p>
       {editing?

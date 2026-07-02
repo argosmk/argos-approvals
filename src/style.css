@@ -873,3 +873,32 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   .inline-social-input.username-inline{width:100%;font-size:16px!important;}
   .inline-edit-actions{width:100%;margin-left:0;margin-top:4px;}
 }
+
+/* ROUND100: ajustes finos do perfil estilo Instagram */
+.insta-name-row{
+  width:100%;
+}
+.profile-gear{
+  margin-left:auto!important;
+}
+.inline-edit-actions{
+  margin-left:auto!important;
+}
+.team-feed-toolbar{
+  border-top:0!important;
+  padding-top:0!important;
+  margin-top:0!important;
+  min-height:0!important;
+  display:none!important;
+}
+.insta-stats{
+  flex-wrap:wrap;
+  gap:18px!important;
+}
+.insta-stats span{
+  white-space:nowrap;
+}
+@media(max-width:760px){
+  .profile-gear{margin-left:6px!important;}
+  .insta-stats{gap:12px!important;font-size:12px!important;}
+}
