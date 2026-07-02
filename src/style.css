@@ -357,3 +357,33 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   .login-card::before{inset:-22px;filter:blur(22px);}
   .login::before{width:680px;height:680px;}
 }
+
+
+/* ROUND90: acabamento premium no login */
+.login-card input:hover:not(:focus){
+  border-color:rgba(225,177,44,.46)!important;
+  box-shadow:0 0 14px rgba(225,177,44,.055)!important;
+}
+.login-card input::placeholder{
+  color:rgba(244,236,219,.38);
+}
+.login-card button::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(120deg, transparent 0%, rgba(255,224,141,.16) 46%, transparent 68%);
+  transform:translateX(-120%);
+  transition:transform .55s ease;
+  pointer-events:none;
+}
+.login-card button:hover:not(:disabled)::before{
+  transform:translateX(120%);
+}
+.login-card button:active:not(:disabled){
+  transform:translateY(0) scale(.99);
+}
+.login-card button:focus-visible{
+  outline:0;
+  border-color:rgba(244,196,48,.86)!important;
+  box-shadow:0 0 0 3px rgba(225,177,44,.12), 0 0 24px rgba(225,177,44,.16)!important;
+}

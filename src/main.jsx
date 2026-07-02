@@ -5,6 +5,20 @@ import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { loadWorkspaceState, saveWorkspaceState } from './services/workspaceStateService';
 
 
+
+function userSortName(user){
+  return String(user?.name || user?.display_name || user?.username || user?.email || '').trim();
+}
+
+function sortMembersAdminFirst(list){
+  return [...(list || [])].sort((a,b)=>{
+    const adminA = a?.role === 'admin' ? 0 : 1;
+    const adminB = b?.role === 'admin' ? 0 : 1;
+    if(adminA !== adminB) return adminA - adminB;
+    return userSortName(a).localeCompare(userSortName(b), 'pt-BR', { sensitivity: 'base' });
+  });
+}
+
 function safeUUID(){
   try{
     if(typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'){
@@ -765,6 +779,8 @@ function avg(arr){ const clean=arr.filter(n=>Number.isFinite(n)); return clean.l
 function slug(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 function driveId(url){ const m = (url||'').match(/\/file\/d\/([^/]+)/) || (url||'').match(/[?&]id=([^&]+)/); return m ? m[1] : ''; }
 function driveDirect(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/uc?export=view&id=${id}` : url; }
+const ARGOS_DEFAULT_LOGO = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MjAgMzAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImdvbGQiIHgxPSIwIiB4Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjYjc4OTI1Ii8+PHN0b3Agb2Zmc2V0PSIwLjUiIHN0b3AtY29sb3I9IiNmM2QyN2EiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM4NDVmMTIiLz48L2xpbmVhckdyYWRpZW50PjxsaW5lYXJHcmFkaWVudCBpZD0ic2lsdmVyIiB4MT0iMCIgeDI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIvPjxzdG9wIG9mZnNldD0iMC40MiIgc3RvcC1jb2xvcj0iI2FlYjRiZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzVjNjQ3MCIvPjwvbGluZWFyR3JhZGllbnQ+PGZpbHRlciBpZD0ic2hhZG93IiB4PSItMzAlIiB5PSItMzAlIiB3aWR0aD0iMTYwJSIgaGVpZ2h0PSIxNjAlIj48ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iMTAiIHN0ZERldmlhdGlvbj0iOCIgZmxvb2QtY29sb3I9IiMwMDAwMDAiIGZsb29kLW9wYWNpdHk9Ii41NSIvPjwvZmlsdGVyPjwvZGVmcz48cmVjdCB3aWR0aD0iNTIwIiBoZWlnaHQ9IjMwMCIgZmlsbD0ibm9uZSIvPjxnIGZpbHRlcj0idXJsKCNzaGFkb3cpIj48cGF0aCBkPSJNMjYwIDM0YTg4IDg4IDAgMCAxIDg2IDcyaC0xOGE3MCA3MCAwIDAgMC0xMzYgMGgtMThhODggODggMCAwIDEgODYtNzJaIiBmaWxsPSJ1cmwoI2dvbGQpIi8+PHBhdGggZD0iTTI2MCA2MiAxNTYgMTc0bDcwLTMyIDM0LTgwWiIgZmlsbD0iI2Y0ZjVmNyIvPjxwYXRoIGQ9Ik0yNjAgNjJ2MTI4bDUyLTc0LTUyLTU0WiIgZmlsbD0iIzlhYTFhYSIvPjxwYXRoIGQ9Ik0yNjAgNjIgMzY0IDE3NGwtNjgtMzItMzYtODBaIiBmaWxsPSIjZGZlM2VhIi8+PHBhdGggZD0iTTIyNiAxNDIgMTU2IDE3NGwxMDQgMjAtMzQtNTJaIiBmaWxsPSIjNjU2Yzc2Ii8+PHBhdGggZD0iTTI5NiAxNDIgMzY0IDE3NGwtMTA0IDIwIDM2LTUyWiIgZmlsbD0iIzQzNDg1MCIvPjwvZz48dGV4dCB4PSIyNjAiIHk9IjI0NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNTgiIGZvbnQtd2VpZ2h0PSI1MDAiIGxldHRlci1zcGFjaW5nPSI1IiBmaWxsPSIjZjZmMWU4Ij5BUkdPUzwvdGV4dD48L3N2Zz4=';
+function argosLogoSrc(value){ return driveDirect(value || ARGOS_DEFAULT_LOGO); }
 function drivePreview(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/file/d/${id}/preview` : url; }
 function priorityClass(date){ if(!date) return 'neutral'; const diff=Math.ceil((dObj(date)-dObj(todayStr()))/86400000); if(diff < 0) return 'late'; if(diff <= 1) return 'hot'; if(diff <= 3) return 'warn'; return 'ok'; }
 function priorityText(date){ const c=priorityClass(date); return c==='late'?'Atrasada':c==='hot'?'Urgente':c==='warn'?'Alta':c==='ok'?'Baixa':'Sem prazo'; }
@@ -1218,7 +1234,7 @@ async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setSt
 function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,cloudError,system}){
   const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [busy,setBusy]=useState(false);
   const cachedSystem = load('argos_system_r18', {});
-  const loginLogo = system?.loginLogo || system?.logo || cachedSystem?.loginLogo || cachedSystem?.logo || '';
+  const loginLogo = system?.loginLogo || system?.logo || cachedSystem?.loginLogo || cachedSystem?.logo || ARGOS_DEFAULT_LOGO;
   const loginTitle = system?.loginTitle || system?.title || cachedSystem?.loginTitle || cachedSystem?.title || 'Painel de Aprovação';
   const loginSubtitle = system?.loginSubtitle || cachedSystem?.loginSubtitle || 'Entre com seu acesso.';
   async function login(){
@@ -1226,7 +1242,7 @@ function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,se
     catch(err){ setCloudError(err.message||'Login inválido.'); }
     finally{ setBusy(false); }
   }
-  return <div className="login"><div className="login-card login-card-brand-fixed" style={{padding:'30px 32px 34px'}}><div className="login-logo-big" style={{width:260,height:150,display:'grid',placeItems:'center',border:'none',borderRadius:0,margin:'-44px auto 34px',overflow:'visible',background:'transparent',boxShadow:'none'}}>{loginLogo?<img src={driveDirect(loginLogo)} style={{width:'100%',height:'100%',objectFit:'contain',objectPosition:'center',display:'block'}}/>:<span>A</span>}</div><h1>{loginTitle}</h1><p>{loginSubtitle}</p>{cloudError&&<div className="cloud-error">{cloudError}</div>}<input value={email} onChange={e=>setEmail(e.target.value)} placeholder="e-mail"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password" onKeyDown={e=>{if(e.key==='Enter')login()}}/><button onClick={login} disabled={busy}>{busy?'Entrando...':'Entrar'}</button></div></div>
+  return <div className="login"><div className="login-card login-card-brand-fixed" style={{padding:'30px 32px 34px'}}><div className="login-logo-big" style={{width:260,height:150,display:'grid',placeItems:'center',border:'none',borderRadius:0,margin:'-44px auto 34px',overflow:'visible',background:'transparent',boxShadow:'none'}}>{loginLogo?<img src={argosLogoSrc(loginLogo)} onError={e=>{ e.currentTarget.src = ARGOS_DEFAULT_LOGO; }} style={{width:'100%',height:'100%',objectFit:'contain',objectPosition:'center',display:'block'}}/>:<span>A</span>}</div><h1>{loginTitle}</h1><p>{loginSubtitle}</p>{cloudError&&<div className="cloud-error">{cloudError}</div>}<input value={email} onChange={e=>setEmail(e.target.value)} placeholder="e-mail"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password" onKeyDown={e=>{if(e.key==='Enter')login()}}/><button onClick={login} disabled={busy}>{busy?'Entrando...':'Entrar'}</button></div></div>
 }
 
 function SetupRequired(){
@@ -1259,7 +1275,7 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],system,
   const clientViewUsers = activeViewUsers.filter(u=>u.role==='client');
   return <aside className="side">
     <div className="brand brand-clean brand-logo-only">
-      <div className="brand-logo">{system?.logo ? <img src={driveDirect(system.logo)}/> : <span>A</span>}</div>
+      <div className="brand-logo"><img src={argosLogoSrc(system?.logo)} onError={e=>{ e.currentTarget.src = ARGOS_DEFAULT_LOGO; }}/></div>
       <small>{system?.title || 'Painel de Aprovação'}</small>
     </div>
     <div className="user-card user-clean"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{roleLabel}</small></div></div>
@@ -1275,11 +1291,11 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){
   const [period,setPeriod]=useState('month'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'); 
   const isAdmin=user.role==='admin'; 
   const activeCompanies=companies.filter(c=>c.active);
-  const activeUsers=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
+  const activeUsers=sortMembersAdminFirst(users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')));
   const operationalTasks=tasks.filter(t=>activeCompanies.some(c=>c.id===t.companyId) && activeUsers.some(u=>u.id===t.responsibleId));
   const filtered=applyFilters(operationalTasks,{period,from,to,company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,search,showArchived:true}); 
   const alterations=filtered.reduce((a,t)=>a+(t.alterationCount||0),0); const finalized=filtered.filter(t=>isFinalStatus(statuses,t.status)).length; const rework=filtered.length?Math.round(alterations/filtered.length*100):0; const total=filtered.reduce((a,t)=>a+(t.totalEditSeconds||0)+(t.totalAlterSeconds||0),0); 
-  return <section><h1>Dashboard</h1><p>Relatório operacional com filtros aplicados em todo o painel.</p><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="dash-zone"><div className="cards quick-cards">{isAdmin&&<Card title="Clientes ativos" value={activeCompanies.length}/>} {user.role==='team'&&<Card title="Quantidade de posts" value={filtered.length}/>}<Card title={user.role==='team'?'Posts finalizados':'Posts no período'} value={user.role==='team'?finalized:filtered.length}/><Card title="Alterações" value={alterations}/><Card title="Taxa de retrabalho" value={`${rework}%`}/></div><div className="cards time-cards"><Card title="Tempo total" value={fmtSec(total)}/><Card title="Média por post" value={fmtSec(avg(filtered.map(t=>(t.totalEditSeconds||0)+(t.totalAlterSeconds||0))))}/><Card title="Média em edição" value={fmtSec(avg(filtered.map(t=>t.totalEditSeconds||0)))}/><Card title="Média em alteração" value={fmtSec(avg(filtered.map(t=>t.totalAlterSeconds||0)))}/></div></div><div className="grid2"><Bar title="Post por Status" rows={statuses.map(s=>[s.name,filtered.filter(t=>t.status===s.id).length,s.color])}/><Bar title="Por tipo" rows={TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c'])}/><Bar title="Por cliente" rows={activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#6ee7b7',c.logo])}/>{isAdmin&&<Bar title="Por funcionário" rows={activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#c084fc',u.avatar])}/>}</div></section> }
+  return <section><h1>Dashboard</h1><p>Relatório operacional com filtros aplicados em todo o painel.</p><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="dash-zone"><div className="cards quick-cards">{isAdmin&&<Card title="Clientes ativos" value={activeCompanies.length}/>} {user.role==='team'&&<Card title="Quantidade de posts" value={filtered.length}/>}<Card title={user.role==='team'?'Posts finalizados':'Posts no período'} value={user.role==='team'?finalized:filtered.length}/><Card title="Alterações" value={alterations}/><Card title="Taxa de retrabalho" value={`${rework}%`}/></div><div className="cards time-cards"><Card title="Tempo total" value={fmtSec(total)}/><Card title="Média por post" value={fmtSec(avg(filtered.map(t=>(t.totalEditSeconds||0)+(t.totalAlterSeconds||0))))}/><Card title="Média em edição" value={fmtSec(avg(filtered.map(t=>t.totalEditSeconds||0)))}/><Card title="Média em alteração" value={fmtSec(avg(filtered.map(t=>t.totalAlterSeconds||0)))}/></div></div><div className="grid2"><Bar title="Post por Status" rows={statuses.map(s=>[s.name,filtered.filter(t=>t.status===s.id).length,s.color])}/><Bar title="Por tipo" rows={TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c'])}/><Bar title="Por cliente" rows={activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#6ee7b7',c.logo])}/>{isAdmin&&<Bar title="Por membro" rows={activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#c084fc',u.avatar])}/>}</div></section> }
 function Card({title,value}){ return <div className="card"><small>{title}</small><b>{value}</b></div> }
 function Bar({title,rows}){
   const max=Math.max(1,...rows.map(r=>r[1]));
