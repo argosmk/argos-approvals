@@ -5082,3 +5082,49 @@ if (typeof document !== 'undefined') {
   }
   style85.textContent = ARGOS_ROUND85_USERS_AUTH_EDGE_FIX_CSS;
 }
+
+const ARGOS_ROUND93_MOBILE_LOGIN_LOGO_REBALANCE_CSS = `
+/* Round 93: desfaz a logo gigante no mobile.
+   Mantém a logo carregando, mas com proporção elegante de tela de login. */
+@media (max-width:760px){
+  .login .login-card.login-card-brand-fixed{
+    padding:34px 26px 32px!important;
+  }
+
+  .login .login-card.login-card-brand-fixed .login-logo-big,
+  .login .login-card .login-logo-big{
+    width:132px!important;
+    height:82px!important;
+    margin:0 auto 22px!important;
+  }
+
+  .login .login-card.login-card-brand-fixed .login-logo-big img,
+  .login .login-card .login-logo-big img{
+    width:100%!important;
+    height:100%!important;
+    max-width:100%!important;
+    max-height:100%!important;
+    object-fit:contain!important;
+    object-position:center!important;
+    transform:none!important;
+  }
+
+  .login .login-card.login-card-brand-fixed h1{
+    margin-top:0!important;
+    margin-bottom:18px!important;
+  }
+
+  .login .login-card.login-card-brand-fixed p{
+    margin-bottom:30px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style93 = document.getElementById('argos-round93-mobile-login-logo-rebalance');
+  if (!style93) {
+    style93 = document.createElement('style');
+    style93.id = 'argos-round93-mobile-login-logo-rebalance';
+    document.head.appendChild(style93);
+  }
+  style93.textContent = ARGOS_ROUND93_MOBILE_LOGIN_LOGO_REBALANCE_CSS;
+}
