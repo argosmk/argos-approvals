@@ -1192,11 +1192,21 @@ function App(){
         workspaceMetaRef.current.applyingRemote=true;
         applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
         workspaceMetaRef.current.applyingRemote=false;
-        workspaceMetaRef.current.updatedAt=record.updatedAt;
-        workspaceMetaRef.current.basePayload=clonePayload(remotePayload);
-        workspaceMetaRef.current.lastSavedSignature=hasLocalChanges ? payloadSignature(remotePayload) : payloadSignature(nextPayload);
+        if(hasLocalChanges){
+          setSaveStatus('Mudanças recebidas. Salvando merge...');
+          const saved=await saveWorkspaceState(auth.organizationId,nextPayload,record.updatedAt);
+          if(saved?.conflict) throw new Error('Conflito durante sincronização. Tentando novamente.');
+          const savedPayload=normalizeWorkspacePayload(saved?.payload || nextPayload);
+          workspaceMetaRef.current.updatedAt=saved?.updatedAt || record.updatedAt;
+          workspaceMetaRef.current.basePayload=clonePayload(savedPayload);
+          workspaceMetaRef.current.lastSavedSignature=payloadSignature(savedPayload);
+        }else{
+          workspaceMetaRef.current.updatedAt=record.updatedAt;
+          workspaceMetaRef.current.basePayload=clonePayload(remotePayload);
+          workspaceMetaRef.current.lastSavedSignature=payloadSignature(nextPayload);
+          setSaveStatus('Sincronizado');
+        }
         setCloudError('');
-        setSaveStatus(hasLocalChanges?'Mudanças recebidas. Salvando merge...':'Sincronizado');
       }catch(err){
         console.error(err);
       }
@@ -2289,7 +2299,9 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   }
   function canEditNotifications(u){ return !(u.role==='admin' && currentUser?.id && u.id!==currentUser.id); }
   function toggleNotif(id){ setOpenNotif(prev=>({...prev,[id]:!prev[id]})); }
-  function updateUserPrefs(userId,patch){ setUsers(users.map(x=>x.id===userId?{...x,...patch}:x)); }
+  function updateUserPrefs(userId,patch){
+    setUsers(prev=>prev.map(x=>x.id===userId?{...x,...(typeof patch==='function'?patch(x):patch)}:x));
+  }
   async function save(u){
     const role=u.role||'team';
     const exists=users.some(x=>x.id===u.id);
@@ -2344,9 +2356,9 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
         <div className="notification-prefs-grid">
           <div><h3>Eventos</h3><div className="checks one-col compact-checks-v3">{events.map(ev=>{
             const cur=u.notificationPrefs||events;
-            return <label key={ev}><input type="checkbox" disabled={!canEdit} checked={cur.includes(ev)} onChange={e=>{if(!canEdit) return; const next=e.target.checked?[...new Set([...cur,ev])]:cur.filter(x=>x!==ev); updateUserPrefs(u.id,{notificationPrefs:next});}}/>{ev}</label>
+            return <label key={ev}><input type="checkbox" disabled={!canEdit} checked={cur.includes(ev)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; updateUserPrefs(u.id,(current)=>{ const currentPrefs=current.notificationPrefs||events; const next=checked?[...new Set([...currentPrefs,ev])]:currentPrefs.filter(x=>x!==ev); return {notificationPrefs:next}; });}}/>{ev}</label>
           })}</div></div>
-          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" disabled={!canEdit} checked={(u.notificationStatusPrefs?.[st.id]??true)} onChange={e=>{if(!canEdit) return; const cur=u.notificationStatusPrefs||{}; updateUserPrefs(u.id,{notificationStatusPrefs:{...cur,[st.id]:e.target.checked}});}}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
+          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" disabled={!canEdit} checked={(u.notificationStatusPrefs?.[st.id]??true)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; updateUserPrefs(u.id,(current)=>({notificationStatusPrefs:{...(current.notificationStatusPrefs||{}),[st.id]:checked}}));}}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
         </div>
       </div>}
     </div>
@@ -2430,8 +2442,8 @@ function NotificationSettings({users,setUsers,statuses,currentUser=null}){
       {isOpen&&<>
         {!canEdit&&<p className="muted admin-lock-note">Notificações de outro admin não podem ser alteradas.</p>}
         <div className="notification-prefs-grid" style={{display:'grid',gridTemplateColumns:'minmax(280px,1fr) minmax(280px,1fr)',gap:28,alignItems:'start'}}>
-          <div><h3>Eventos</h3><div className="checks one-col">{events.map(ev=><label key={ev}><input type="checkbox" disabled={!canEdit} checked={(u.notificationPrefs||events).includes(ev)} onChange={e=>{if(!canEdit) return; const cur=u.notificationPrefs||events; const next=e.target.checked?[...new Set([...cur,ev])]:cur.filter(x=>x!==ev); setUsers(users.map(x=>x.id===u.id?{...x,notificationPrefs:next}:x));}}/>{ev}</label>)}</div></div>
-          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list">{statuses.map(st=><label key={st.id}><input type="checkbox" disabled={!canEdit} checked={(u.notificationStatusPrefs?.[st.id]??true)} onChange={e=>{if(!canEdit) return; const cur=u.notificationStatusPrefs||{}; setUsers(users.map(x=>x.id===u.id?{...x,notificationStatusPrefs:{...cur,[st.id]:e.target.checked}}:x));}}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
+          <div><h3>Eventos</h3><div className="checks one-col">{events.map(ev=><label key={ev}><input type="checkbox" disabled={!canEdit} checked={(u.notificationPrefs||events).includes(ev)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; setUsers(prev=>prev.map(x=>{ if(x.id!==u.id) return x; const cur=x.notificationPrefs||events; const next=checked?[...new Set([...cur,ev])]:cur.filter(item=>item!==ev); return {...x,notificationPrefs:next}; }));}}/>{ev}</label>)}</div></div>
+          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list">{statuses.map(st=><label key={st.id}><input type="checkbox" disabled={!canEdit} checked={(u.notificationStatusPrefs?.[st.id]??true)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; setUsers(prev=>prev.map(x=>x.id===u.id?{...x,notificationStatusPrefs:{...(x.notificationStatusPrefs||{}),[st.id]:checked}}:x));}}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
         </div>
       </>}
     </div>
