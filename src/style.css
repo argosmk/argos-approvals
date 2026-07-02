@@ -269,3 +269,91 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
 .history-row em{font-style:normal;color:var(--muted);font-size:11px;white-space:nowrap}
 .comment-log.resolved p{text-decoration:line-through;color:var(--muted)}
 .comment-log.resolved{opacity:.72}
+
+/* Round 89: glow dourado premium na tela de login */
+.login{
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(225,177,44,.085), transparent 34%),
+    radial-gradient(circle at 50% 120%, rgba(225,177,44,.045), transparent 32%),
+    var(--bg);
+}
+.login::before{
+  content:"";
+  position:absolute;
+  width:min(760px,92vw);
+  height:min(760px,92vw);
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(circle, rgba(225,177,44,.16) 0%, rgba(225,177,44,.10) 24%, rgba(225,177,44,.045) 45%, transparent 68%);
+  filter:blur(26px);
+  opacity:.9;
+  pointer-events:none;
+}
+.login-card{
+  position:relative;
+  z-index:1;
+  isolation:isolate;
+  overflow:visible;
+  background:linear-gradient(180deg, rgba(18,19,23,.96), rgba(11,12,15,.96))!important;
+  border-color:rgba(225,177,44,.34)!important;
+  box-shadow:
+    0 28px 80px rgba(0,0,0,.68),
+    0 0 0 1px rgba(255,214,111,.035),
+    inset 0 1px 0 rgba(255,255,255,.045)!important;
+}
+.login-card::before{
+  content:"";
+  position:absolute;
+  inset:-34px;
+  border-radius:30px;
+  background:radial-gradient(circle at center, rgba(225,177,44,.28) 0%, rgba(225,177,44,.16) 26%, rgba(225,177,44,.07) 48%, transparent 72%);
+  filter:blur(28px);
+  z-index:-2;
+  pointer-events:none;
+}
+.login-card::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:linear-gradient(135deg, rgba(255,224,141,.22), transparent 34%, rgba(225,177,44,.10) 100%);
+  opacity:.75;
+  z-index:-1;
+  pointer-events:none;
+  mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  padding:1px;
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+}
+.login-card input{
+  border-color:rgba(225,177,44,.30)!important;
+  background:rgba(4,5,7,.92)!important;
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.login-card input:focus{
+  border-color:rgba(244,196,48,.72)!important;
+  box-shadow:0 0 0 3px rgba(225,177,44,.09), 0 0 18px rgba(225,177,44,.10)!important;
+}
+.login-card button{
+  position:relative;
+  overflow:hidden;
+  border-color:rgba(225,177,44,.38)!important;
+  background:linear-gradient(180deg, rgba(17,17,20,.96), rgba(8,8,10,.96))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+.login-card button:hover:not(:disabled){
+  border-color:rgba(244,196,48,.78)!important;
+  box-shadow:0 0 22px rgba(225,177,44,.14), inset 0 1px 0 rgba(255,255,255,.06)!important;
+  transform:translateY(-1px);
+}
+.login-card .login-logo-big{
+  filter:drop-shadow(0 0 20px rgba(225,177,44,.22));
+}
+@media(max-width:760px){
+  .login-card::before{inset:-22px;filter:blur(22px);}
+  .login::before{width:680px;height:680px;}
+}
