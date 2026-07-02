@@ -910,6 +910,18 @@ function socialUsernameLabel(user){
   return raw.startsWith('@') ? raw : '@' + raw;
 }
 
+function looksLikeEmail(value){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value||'').trim());
+}
+function safeMemberName(user){
+  const candidates = [user?.name, user?.display_name, user?.displayName, user?.role==='admin'?'Admin':'Membro'];
+  const found = candidates.map(x=>String(x||'').trim()).find(x=>x && !looksLikeEmail(x));
+  return found || (user?.role==='admin'?'Admin':'Membro');
+}
+function safeMemberSubtitle(user){
+  return socialUsernameLabel(user) || user?.title || (user?.role==='admin'?'Administrador':'Membro');
+}
+
 function entityCreatedValue(item, index){
   const raw = item.createdAt || item.entryDate || '';
   const t = raw ? new Date(raw).getTime() : NaN;
@@ -1365,34 +1377,34 @@ function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
   }
   if(!members.length) return <section><h1>Equipe</h1><p>Nenhum membro ativo encontrado.</p></section>;
   return <section className="team-hub">
-    <div className="team-hub-hero"><div><h1>Equipe</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div></div>
-    <div className="team-hub-layout">
-      <aside className="team-hub-sidebar panel">
-        <h2>Membros</h2>
-        <div className="team-member-list">{members.map(m=>{
-          const online=isUserOnline(m);
-          const activeTask=activeTimerTaskForUser(tasks,m);
-          const instagram=socialUsernameLabel(m);
-          return <button key={m.id} className={'team-member-card '+(selected?.id===m.id?'selected':'')} onClick={()=>setSelectedId(m.id)}>
-            <span className={'presence-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={m.avatar} label={m.name}/></span>
-            <span className="member-card-text"><b>{m.name}</b><small>{instagram || (m.title || (m.role==='admin'?'Administrador':'Membro'))}</small></span>
-            {activeTask&&<span className="member-work-dot">●</span>}
-          </button>
-        })}</div>
-        <OwnSocialEditor user={users.find(u=>u.id===auth?.id)} update={updateOwnSocial}/>
-      </aside>
-      <div className="team-profile-area">
-        {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} postCount={portfolio.length}/>}
-        <div className="team-feed-toolbar"><b>Últimos trabalhos</b><span>{portfolio.length} post(s)</span></div>
-        {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t}/>)}</div>:<div className="panel empty-team-feed"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
-        <div className="team-feed-pager">
-          <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
-          <span>Página {safePage+1} de {totalPages}</span>
-          <button disabled={safePage>=totalPages-1} onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))}>Próximos →</button>
-        </div>
+    <div className="team-hub-hero"><div><h1>Equipe</h1><p>Presença, recados e vitrine dos últimos trabalhos finalizados.</p></div><OwnSocialEditor user={users.find(u=>u.id===auth?.id)} update={updateOwnSocial}/></div>
+    <TeamStoriesStrip members={members} selected={selected} tasks={tasks} setSelectedId={setSelectedId}/>
+    <div className="team-profile-area">
+      {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} postCount={portfolio.length}/>} 
+      <div className="team-feed-toolbar"><b>Últimos trabalhos</b><span>{portfolio.length} post(s)</span></div>
+      {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t}/>)}</div>:<div className="panel empty-team-feed"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
+      <div className="team-feed-pager">
+        <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
+        <span>Página {safePage+1} de {totalPages}</span>
+        <button disabled={safePage>=totalPages-1} onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))}>Próximos →</button>
       </div>
     </div>
   </section>;
+}
+
+function TeamStoriesStrip({members,selected,tasks,setSelectedId}){
+  return <div className="team-stories-strip panel" aria-label="Membros da equipe">
+    {members.map(m=>{
+      const online=isUserOnline(m);
+      const activeTask=activeTimerTaskForUser(tasks,m);
+      const selectedClass=selected?.id===m.id?'selected':'';
+      return <button key={m.id} className={'team-story '+selectedClass} onClick={()=>setSelectedId(m.id)} title={safeMemberName(m)}>
+        <span className={'team-story-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={m.avatar} label={safeMemberName(m)}/></span>
+        <span>{socialUsernameLabel(m).replace(/^@/,'') || safeMemberName(m)}</span>
+        {activeTask&&<i>●</i>}
+      </button>
+    })}
+  </div>;
 }
 
 function OwnSocialEditor({user,update}){
@@ -1420,11 +1432,12 @@ function TeamProfileHeader({member,tasks,statuses,postCount}){
   const activeTask=activeTimerTaskForUser(tasks,member);
   const instagram=socialUsernameLabel(member);
   const workTitle=activeTask?.title || '';
+  const displayName=safeMemberName(member);
   return <div className="team-profile-header panel">
-    <div className={'team-profile-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={member.avatar} label={member.name}/></div>
+    <div className={'team-profile-avatar '+(online?'online':'offline')+' '+(activeTask?'working':'')}><AvatarMini value={member.avatar} label={displayName}/></div>
     <div className="team-profile-main">
-      <div className="team-profile-name-row"><h2>{instagram || member.name}</h2><span className={'presence-pill '+(online?'on':'off')}>{online?'Online':'Offline'}</span>{activeTask&&<span className="presence-pill working">Em trabalho</span>}</div>
-      <b>{member.name}</b>
+      <div className="team-profile-name-row"><h2>{instagram || displayName}</h2><span className={'presence-pill '+(online?'on':'off')}>{online?'Online':'Offline'}</span>{activeTask&&<span className="presence-pill working">Em trabalho</span>}</div>
+      <b>{displayName}</b>
       <p>{member.title || (member.role==='admin'?'Administrador':'Membro')}</p>
       {(member.socialStatus||member.statusMessage)&&<div className="team-status-bubble">{member.socialStatus||member.statusMessage}</div>}
       {activeTask&&<small className="team-work-note">Timer ativo: {workTitle}</small>}
