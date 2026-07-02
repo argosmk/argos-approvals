@@ -8,7 +8,7 @@ import { loadWorkspaceState, saveWorkspaceState } from './services/workspaceStat
 function safeUUID(){
   try{
     if(typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'){
-      return safeUUID();
+      return crypto.randomUUID();
     }
     if(typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function'){
       const bytes = new Uint8Array(16);
@@ -629,68 +629,96 @@ function profileToAppUser(profile, authUser){
 function mergeProfileWithWorkspaceUser(profile, payload){
   const existing = (payload?.users||[]).find(u=>u.id===profile?.id) || {};
   const merged = {
-    ...existing,
     ...profile,
-    companyIds: profile?.companyIds || existing.companyIds || [],
-    visibleStatuses: (profile?.visibleStatuses&&profile.visibleStatuses.length) ? profile.visibleStatuses : (existing.visibleStatuses || profile?.visibleStatuses || []),
-    notificationPrefs: (profile?.notificationPrefs&&profile.notificationPrefs.length) ? profile.notificationPrefs : (existing.notificationPrefs || profile?.notificationPrefs || NOTIFICATION_EVENTS),
-    notificationStatusPrefs: Object.keys(profile?.notificationStatusPrefs||{}).length ? profile.notificationStatusPrefs : (existing.notificationStatusPrefs || profile?.notificationStatusPrefs || {}),
+    ...existing,
+    id: profile?.id || existing.id,
+    organizationId: profile?.organizationId || existing.organizationId,
+    companyIds: existing.companyIds || profile?.companyIds || [],
+    visibleStatuses: (existing.visibleStatuses&&existing.visibleStatuses.length) ? existing.visibleStatuses : (profile?.visibleStatuses || []),
+    notificationPrefs: (existing.notificationPrefs&&existing.notificationPrefs.length) ? existing.notificationPrefs : (profile?.notificationPrefs || NOTIFICATION_EVENTS),
+    notificationStatusPrefs: Object.keys(existing.notificationStatusPrefs||{}).length ? existing.notificationStatusPrefs : (profile?.notificationStatusPrefs || {}),
     createdAt: existing.createdAt || profile?.createdAt || now(),
   };
   return merged;
 }
 async function createAuthBackedAppUser(draft){
-  if(!isSupabaseConfigured) return draft;
-  const payload={
-    name: draft.name,
-    email: draft.email,
-    password: draft.password,
-    role: draft.role,
-    title: draft.title || '',
-    active: draft.active ?? true,
-    avatar: draft.avatar || '',
-    companyIds: draft.companyIds || [],
-    visibleStatuses: draft.visibleStatuses || [],
-    notificationPrefs: draft.notificationPrefs || NOTIFICATION_EVENTS,
-    notificationStatusPrefs: draft.notificationStatusPrefs || {},
-  };
-  const { data, error } = await supabase.functions.invoke('create-app-user', { body: payload });
-  if(error) throw error;
-  if(data?.error) throw new Error(data.error);
-  if(!data?.user?.id) throw new Error('A função criou o usuário, mas não retornou o ID.');
-  return {
-    ...draft,
-    ...data.user,
-    email: data.user.email || draft.email,
-    username: data.user.username || draft.email,
-    password: '',
-    companyIds: data.user.companyIds || draft.companyIds || [],
-    visibleStatuses: data.user.visibleStatuses || draft.visibleStatuses || [],
-    notificationPrefs: data.user.notificationPrefs || draft.notificationPrefs || NOTIFICATION_EVENTS,
-    notificationStatusPrefs: data.user.notificationStatusPrefs || draft.notificationStatusPrefs || {},
-    organizationId: data.user.organizationId || draft.organizationId,
-    createdAt: draft.createdAt || now(),
-  };
+  // Compatibilidade interna: versões antigas chamavam create-app-user.
+  // A partir da round87, toda criação passa pela manage-app-user.
+  return createManagedAppUser(draft);
 }
 
+
 async function updateAuthBackedAppUserProfile(draft){
+  // Melhor esforço: o workspace é a fonte principal do painel.
+  // O update direto em profiles pode falhar por RLS ao editar outros usuários,
+  // então nunca deixamos isso quebrar a tela de usuários.
   if(!isSupabaseConfigured || !draft?.id) return draft;
-  const patch={
-    display_name: draft.name || '',
-    username: draft.email || draft.username || '',
-    role: draft.role || 'team',
-    title: draft.title || '',
-    active: draft.active !== false,
-    avatar_url: draft.avatar || '',
-    visible_statuses: draft.visibleStatuses || [],
-    notification_prefs: {
-      events: draft.notificationPrefs || NOTIFICATION_EVENTS,
-      statuses: draft.notificationStatusPrefs || {}
-    }
-  };
-  const { error } = await supabase.from('profiles').update(patch).eq('id', draft.id);
-  if(error) throw error;
+  try{
+    const patch={
+      display_name: draft.name || '',
+      role: draft.role || 'team',
+      title: draft.title || '',
+      active: draft.active !== false,
+      avatar_url: draft.avatar || '',
+      visible_statuses: draft.visibleStatuses || [],
+      notification_prefs: {
+        events: draft.notificationPrefs || NOTIFICATION_EVENTS,
+        statuses: draft.notificationStatusPrefs || {}
+      }
+    };
+    // Evita mexer em username/email aqui. Alterar login/senha de usuário Auth
+    // deve ser outra rotina administrativa, não edição simples do card.
+    const { error } = await supabase.from('profiles').update(patch).eq('id', draft.id);
+    if(error) console.warn('Profile update ignored:', error.message || error);
+  }catch(err){
+    console.warn('Profile update ignored:', err?.message || err);
+  }
   return draft;
+}
+
+
+async function manageAppUser(action, payload={}){
+  if(!isSupabaseConfigured) throw new Error('Supabase não configurado.');
+  const { data, error } = await supabase.functions.invoke('manage-app-user', { body:{ action, ...payload } });
+  if(error) throw error;
+  if(data?.error) throw new Error(data.error);
+  return data;
+}
+
+async function createManagedAppUser(draft){
+  if(!isSupabaseConfigured) return {...draft,id:draft.id||safeUUID()};
+  const payload={
+    email:String(draft.email||'').trim(),
+    password:String(draft.password||'').trim(),
+    name:draft.name||draft.email,
+    role:draft.role||'team',
+    title:draft.title||'',
+    companyIds:draft.companyIds||[],
+    avatar:draft.avatar||'',
+    active:draft.active!==false,
+    visibleStatuses:draft.visibleStatuses||[],
+    notificationPrefs:draft.notificationPrefs||NOTIFICATION_EVENTS,
+    notificationStatusPrefs:draft.notificationStatusPrefs||{}
+  };
+  if(!payload.email) throw new Error('Informe o login/e-mail do usuário.');
+  if(!payload.password) throw new Error('Informe a senha inicial do usuário.');
+
+  const result=await manageAppUser('create', { user:payload });
+  return result.user || payload;
+}
+
+async function deleteManagedAppUser(user){
+  if(!isSupabaseConfigured || !user?.id) return true;
+  const result=await manageAppUser('delete', { user:{ id:user.id, email:user.email } });
+  return result?.ok!==false;
+}
+
+async function resetManagedAppUserPassword(user, password){
+  if(!isSupabaseConfigured || !user?.id) return true;
+  const clean=String(password||'').trim();
+  if(!clean) throw new Error('Informe uma nova senha.');
+  const result=await manageAppUser('reset_password', { user:{ id:user.id, email:user.email, password:clean } });
+  return result?.ok!==false;
 }
 
 async function fetchCurrentProfile(session){
@@ -1736,17 +1764,23 @@ function ClientUsersPage({users,setUsers,companies,statuses}){
     setUsers(users.map(x=>x.id===u.id?{...x,active:false}:x));
     setEditing(null);
   }
-  function excludeClient(u){
-    if(!confirm(`Excluir permanentemente o responsável "${u.name}"? Essa ação remove o cadastro do painel.`)) return;
-    setUsers(users.filter(x=>x.id!==u.id));
-    setEditing(null);
+  async function excludeClient(u){
+    if(!confirm(`Excluir permanentemente o responsável "${u.name}"? Isso deve remover o cadastro do painel e o acesso no Supabase Auth.`)) return;
+    try{
+      if(isSupabaseConfigured) await deleteManagedAppUser(u);
+      setUsers(users.filter(x=>x.id!==u.id));
+      setEditing(null);
+    }catch(err){
+      console.error(err);
+      alert('Não foi possível excluir o acesso no Supabase Auth. Instale/atualize a Edge Function manage-app-user e tente novamente. Erro: '+(err.message||err));
+    }
   }
   async function save(u){
     const exists=users.some(x=>x.id===u.id);
     try{
       let data={...u,role:'client',createdAt:u.createdAt||now(),visibleStatuses:u.visibleStatuses||CLIENT_DEFAULT,active:u.active!==false};
       if(isSupabaseConfigured && !exists){
-        data=await createAuthBackedAppUser(data);
+        data=await createManagedAppUser(data);
       } else {
         data={...data,id:data.id||safeUUID()};
         if(isSupabaseConfigured && exists) data=await updateAuthBackedAppUserProfile(data);
@@ -1758,7 +1792,31 @@ function ClientUsersPage({users,setUsers,companies,statuses}){
       alert('Não foi possível criar o acesso deste responsável: '+(err.message||err));
     }
   }
-  return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button></div></div>)}</div>{editing&&<UserEditor u={editing} companies={companies} statuses={statuses} save={save} cancel={()=>setEditing(null)} clientMode onArchive={archiveClient} onDelete={excludeClient}/>}</div>
+  async function resetPassword(u){
+    const password=prompt(`Nova senha para ${u.name}:`);
+    if(password===null) return;
+    try{
+      await resetManagedAppUserPassword(u,password);
+      alert('Senha atualizada no Supabase Auth.');
+    }catch(err){
+      console.error(err);
+      alert('Não foi possível redefinir a senha. Instale/atualize a Edge Function manage-app-user. Erro: '+(err.message||err));
+    }
+  }
+  async function repairAccess(u){
+    try{
+      const data=await repairExistingUserAuthAccess({...u,role:'client'});
+      const fixed={...u,...data,id:u.id||data.id,role:'client',active:u.active!==false};
+      setUsers(users.map(x=>x.id===u.id?fixed:x));
+      setEditing(null);
+      alert('Acesso criado/reparado. Teste o login com o e-mail e senha preenchidos.');
+    }catch(err){
+      console.error(err);
+      const msg=String(err?.message||err||'Não foi possível reparar o acesso.');
+      alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
+    }
+  }
+  return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button></div></div>)}</div>{editing&&<UserEditor u={editing} companies={companies} statuses={statuses} save={save} cancel={()=>setEditing(null)} clientMode onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>}</div>
 }
 function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   const [editing,setEditing]=useState(null);
@@ -1768,18 +1826,26 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived || u.active!==false));
   const sortedPeople=sortEntities(people,sort,u=>u.name);
   const events=NOTIFICATION_EVENTS;
-  function archiveTeamUser(u){
+  async function archiveTeamUser(u){
     if(u.id===currentUser?.id) return alert('Você não pode arquivar seu próprio usuário.');
-    if(u.active===false){ setUsers(users.map(x=>x.id===u.id?{...x,active:true}:x)); setEditing(null); return; }
-    if(!confirm(`Arquivar o usuário "${u.name}"?`)) return;
-    setUsers(users.map(x=>x.id===u.id?{...x,active:false}:x));
+    const nextActive = u.active===false;
+    if(!nextActive && !confirm(`Arquivar o usuário "${u.name}"?`)) return;
+    const next={...u,active:nextActive};
+    try{ if(isSupabaseConfigured) await updateAuthBackedAppUserProfile(next); }catch(err){ console.warn(err); }
+    setUsers(users.map(x=>x.id===u.id?next:x));
     setEditing(null);
   }
-  function excludeTeamUser(u){
-    if(u.role==='admin') return alert('Admins não podem ser excluídos. Arquive apenas se necessário.');
-    if(!confirm(`Excluir permanentemente o usuário "${u.name}"? Essa ação remove o cadastro do painel.`)) return;
-    setUsers(users.filter(x=>x.id!==u.id));
-    setEditing(null);
+  async function excludeTeamUser(u){
+    if(u.id===currentUser?.id) return alert('Você não pode excluir o próprio usuário logado.');
+    if(!confirm(`Excluir permanentemente o usuário "${u.name}"? Isso deve remover o cadastro do painel e o acesso no Supabase Auth.`)) return;
+    try{
+      if(isSupabaseConfigured) await deleteManagedAppUser(u);
+      setUsers(users.filter(x=>x.id!==u.id));
+      setEditing(null);
+    }catch(err){
+      console.error(err);
+      alert('Não foi possível excluir o acesso no Supabase Auth. Instale/atualize a Edge Function manage-app-user e tente novamente. Erro: '+(err.message||err));
+    }
   }
   function canEditNotifications(u){ return !(u.role==='admin' && currentUser?.id && u.id!==currentUser.id); }
   function toggleNotif(id){ setOpenNotif(prev=>({...prev,[id]:!prev[id]})); }
@@ -1790,7 +1856,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
     try{
       let data={...u,role,createdAt:u.createdAt||now(),visibleStatuses:role==='admin'?[]:(u.visibleStatuses||TEAM_DEFAULT),active:u.active!==false};
       if(isSupabaseConfigured && !exists){
-        data=await createAuthBackedAppUser(data);
+        data=await createManagedAppUser(data);
       } else {
         data={...data,id:data.id||safeUUID()};
         if(isSupabaseConfigured && exists) data=await updateAuthBackedAppUserProfile(data);
@@ -1800,6 +1866,31 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
     }catch(err){
       console.error(err);
       alert('Não foi possível criar o acesso deste usuário: '+(err.message||err));
+    }
+  }
+  async function resetPassword(u){
+    const password=prompt(`Nova senha para ${u.name}:`);
+    if(password===null) return;
+    try{
+      await resetManagedAppUserPassword(u,password);
+      alert('Senha atualizada no Supabase Auth.');
+    }catch(err){
+      console.error(err);
+      alert('Não foi possível redefinir a senha. Instale/atualize a Edge Function manage-app-user. Erro: '+(err.message||err));
+    }
+  }
+  async function repairAccess(u){
+    try{
+      const role=u.role||'team';
+      const data=await repairExistingUserAuthAccess({...u,role});
+      const fixed={...u,...data,id:u.id||data.id,role,active:u.active!==false};
+      setUsers(users.map(x=>x.id===u.id?fixed:x));
+      setEditing(null);
+      alert('Acesso criado/reparado. Teste o login com o e-mail e senha preenchidos.');
+    }catch(err){
+      console.error(err);
+      const msg=String(err?.message||err||'Não foi possível reparar o acesso.');
+      alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
   return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=>{
@@ -1819,15 +1910,15 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
         </div>
       </div>}
     </div>
-  })}</div>{editing&&<UserEditor u={editing} statuses={statuses} save={save} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser}/>}</div>
+  })}</div>{editing&&<UserEditor u={editing} statuses={statuses} save={save} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>}</div>
 }
 function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
   const [f,setF]=useState(c);
   const set=(k,v)=>setF(prev=>({...prev,[k]:v}));
   const isExisting=!!f.id;
-  return <div className="modal-bg"><div className="modal"><h2>Empresa</h2><label>Nome<input value={f.name} onChange={e=>set('name',e.target.value)}/></label><label>Instagram<input value={f.instagram} onChange={e=>set('instagram',e.target.value)}/></label><label>Logo ou link de imagem<input value={f.logo} onChange={e=>set('logo',e.target.value)} placeholder="Inicial, URL pública ou link do Drive"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),`companies/${f.id||slug(f.name)||'pending'}`)}/></label><label>Entrada<input type="date" value={f.entryDate||''} onChange={e=>set('entryDate',e.target.value)}/></label>{isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Use arquivar para esconder sem perder histórico. Excluir remove o cadastro do painel.</p><div className="danger-zone-actions"><button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar empresa':'Arquivar empresa'}</button><button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir empresa</button></div></div>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div>
+  return <div className="modal-bg"><div className="modal"><h2>Empresa</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Instagram<input value={f.instagram} onChange={e=>set('instagram',e.target.value)}/></label><label>Logo ou link de imagem<input value={f.logo} onChange={e=>set('logo',e.target.value)} placeholder="Inicial, URL pública ou link do Drive"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),`companies/${f.id||slug(f.name)||'pending'}`)}/></label><label>Entrada<input type="date" value={f.entryDate||''} onChange={e=>set('entryDate',e.target.value)}/></label>{isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Use arquivar para esconder sem perder histórico. Excluir remove o cadastro do painel.</p><div className="danger-zone-actions"><button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar empresa':'Arquivar empresa'}</button><button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir empresa</button></div></div>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div>
 }
-function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,currentUser=null,onArchive=null,onDelete=null}){
+function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,currentUser=null,onArchive=null,onDelete=null,onResetPassword=null}){
   const [f,setF]=useState(u);
   const [uploading,setUploading]=useState(false);
   const set=(k,v)=>setF(prev=>({...prev,[k]:v}));
@@ -1835,7 +1926,7 @@ function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,curren
   const editingOtherAdmin = !clientMode && u?.id && u.role==='admin' && currentUser?.id && u.id!==currentUser.id;
   const isExisting=!!f.id;
   const canArchive = isExisting && (!currentUser?.id || f.id!==currentUser.id);
-  const canDelete = (isExisting && clientMode) || (isExisting && f.role!=='admin');
+  const canDelete = isExisting && (!currentUser?.id || f.id!==currentUser.id);
   function toggleVisibleStatus(id,checked){
     const current=f.visibleStatuses||[];
     set('visibleStatuses', checked ? [...new Set([...current,id])] : current.filter(x=>x!==id));
@@ -1861,11 +1952,11 @@ function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,curren
   }
   return <div className="modal-bg"><div className="modal"><h2>{clientMode?'Responsável':'Usuário'}</h2>
     {!clientMode&&<label>Tipo de usuário<select value={f.role||'team'} disabled={editingOtherAdmin} onChange={e=>set('role',e.target.value)}><option value="team">Equipe</option><option value="admin">Admin</option></select>{editingOtherAdmin&&<small>Permissões de outro admin não podem ser alteradas.</small>}</label>}
-    <label>Nome<input value={f.name} onChange={e=>set('name',e.target.value)}/></label>
+    <label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label>
     <label>Cargo<input value={f.title||''} onChange={e=>set('title',e.target.value)} placeholder={clientMode?'Responsável':'Designer, Editor, Admin...'}/></label>
-    <label>Login<input value={f.email} onChange={e=>set('email',e.target.value)}/></label>
-    <label>Senha<input value={f.password} onChange={e=>set('password',e.target.value)}/></label>
-    <label>Foto/avatar<input value={f.avatar} onChange={e=>set('avatar',e.target.value)} placeholder="Inicial, URL ou upload"/><input type="file" accept="image/*" onChange={uploadUserAvatar}/>{uploading&&<small>Enviando imagem...</small>}</label>
+    <label>Login<input disabled={isExisting} value={f.email||''} onChange={e=>set('email',e.target.value)}/><small className="profile-save-note">Depois de criado, o login fica travado para não desalinhar com o Supabase Auth.</small></label>
+    <label>Senha<input disabled={isExisting} value={isExisting?'••••••••':(f.password||'')} onChange={e=>set('password',e.target.value)}/><small className="profile-save-note">Para usuário já criado, use o botão Redefinir senha.</small></label>{isExisting&&onResetPassword&&<button type="button" className="auth-secondary-action" onClick={()=>onResetPassword(f)}>Redefinir senha</button>}
+    <label>Foto/avatar<input value={f.avatar||''} onChange={e=>set('avatar',e.target.value)} placeholder="Inicial, URL ou upload"/><input type="file" accept="image/*" onChange={uploadUserAvatar}/>{uploading&&<small>Enviando imagem...</small>}</label>
     {clientMode&&<><h3>Empresas vinculadas</h3><div className="arg-linked-company-list-v2">{companies.map(c=><label className="arg-linked-company-row-v2" key={c.id}><input type="checkbox" checked={(f.companyIds||[]).includes(c.id)} onChange={e=>set('companyIds',e.target.checked?[...(f.companyIds||[]),c.id]:(f.companyIds||[]).filter(x=>x!==c.id))}/><AvatarMini value={c.logo} label={c.name}/><span>{c.name}</span></label>)}</div></>}
     {!isAdminRole&&<><h3>Status visíveis</h3><StatusVisibilityChecks statuses={statuses} selected={f.visibleStatuses||[]} onToggle={toggleVisibleStatus}/></>}
     {isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Arquivar esconde o cadastro sem apagar histórico. Excluir remove do painel.</p><div className="danger-zone-actions">{canArchive?<button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar usuário':'Arquivar usuário'}</button>:<button disabled>Arquivar usuário</button>}{canDelete?<button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir usuário</button>:<button className="danger-button" disabled>Excluir usuário</button>}</div>{!canArchive&&<small>Você não pode arquivar seu próprio usuário.</small>}{isAdminRole&&<small>Admins não podem ser excluídos.</small>}</div>}
@@ -1906,7 +1997,7 @@ function NotificationSettings({users,setUsers,statuses,currentUser=null}){
     </div>
   })}</div></div>
 }
-function StatusEditor({s,save,cancel}){ const [f,setF]=useState(s); const set=(k,v)=>setF({...f,[k]:v}); return <div className="modal-bg"><div className="modal"><h2>Status</h2><label>Nome<input value={f.name} onChange={e=>set('name',e.target.value)}/></label><label>Cor<input type="color" value={f.color} onChange={e=>set('color',e.target.value)}/></label><label><input type="checkbox" checked={f.active} onChange={e=>set('active',e.target.checked)}/> Ativo</label><label><input type="checkbox" checked={f.final} onChange={e=>set('final',e.target.checked)}/> Conta como finalizado</label><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div> }
+function StatusEditor({s,save,cancel}){ const [f,setF]=useState(s); const set=(k,v)=>setF({...f,[k]:v}); return <div className="modal-bg"><div className="modal"><h2>Status</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Cor<input type="color" value={f.color} onChange={e=>set('color',e.target.value)}/></label><label><input type="checkbox" checked={f.active} onChange={e=>set('active',e.target.checked)}/> Ativo</label><label><input type="checkbox" checked={f.final} onChange={e=>set('final',e.target.checked)}/> Conta como finalizado</label><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div> }
 
 function GeneralSettings({system,setSystem,reset}){
   const [f,setF]=useState(system||{logo:'',title:'Painel de Aprovação'});
@@ -4874,3 +4965,101 @@ if (typeof document !== 'undefined') {
   style79.textContent = ARGOS_ROUND79_PLANNING_KPIS_CORRECT_LAYOUT_CSS;
 }
 
+
+const ARGOS_ROUND80_USERS_SAVE_STABLE_CSS = `
+/* Round 80: notas discretas no editor de usuários */
+.profile-save-note{
+  display:block!important;
+  margin-top:5px!important;
+  opacity:.58!important;
+  font-size:11px!important;
+  line-height:1.35!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style80 = document.getElementById('argos-round80-users-save-stable');
+  if (!style80) {
+    style80 = document.createElement('style');
+    style80.id = 'argos-round80-users-save-stable';
+    document.head.appendChild(style80);
+  }
+  style80.textContent = ARGOS_ROUND80_USERS_SAVE_STABLE_CSS;
+}
+
+
+const ARGOS_ROUND81_REPAIR_AUTH_ACCESS_CSS = `
+.auth-repair-box{
+  margin:18px 0!important;
+  padding:16px!important;
+  border-radius:16px!important;
+  border:1px solid rgba(225,177,44,.32)!important;
+  background:rgba(225,177,44,.06)!important;
+}
+.auth-repair-box h3{ margin:0 0 6px!important; }
+.auth-repair-box p{ margin:0 0 10px!important; opacity:.74!important; line-height:1.45!important; }
+.auth-repair-box small{ display:block!important; margin-top:8px!important; opacity:.62!important; line-height:1.35!important; }
+`;
+if (typeof document !== 'undefined') {
+  let style81 = document.getElementById('argos-round81-repair-auth-access');
+  if (!style81) {
+    style81 = document.createElement('style');
+    style81.id = 'argos-round81-repair-auth-access';
+    document.head.appendChild(style81);
+  }
+  style81.textContent = ARGOS_ROUND81_REPAIR_AUTH_ACCESS_CSS;
+}
+
+
+const ARGOS_ROUND83_USERS_CLEANUP_MODE_CSS = `
+/* Round 83: modo limpeza de usuários.
+   Reparo de Auth removido para evitar duplicações acidentais. */
+.auth-repair-box{
+  display:none!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style83 = document.getElementById('argos-round83-users-cleanup-mode');
+  if (!style83) {
+    style83 = document.createElement('style');
+    style83.id = 'argos-round83-users-cleanup-mode';
+    document.head.appendChild(style83);
+  }
+  style83.textContent = ARGOS_ROUND83_USERS_CLEANUP_MODE_CSS;
+}
+
+
+const ARGOS_ROUND84_USERS_AUTH_STABLE_CSS = `
+.auth-secondary-action{
+  align-self:flex-start!important;
+  margin:-4px 0 10px!important;
+  border-color:rgba(225,177,44,.45)!important;
+}
+.modal input:disabled{
+  opacity:.68!important;
+  cursor:not-allowed!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style84 = document.getElementById('argos-round84-users-auth-stable');
+  if (!style84) {
+    style84 = document.createElement('style');
+    style84.id = 'argos-round84-users-auth-stable';
+    document.head.appendChild(style84);
+  }
+  style84.textContent = ARGOS_ROUND84_USERS_AUTH_STABLE_CSS;
+}
+
+
+
+const ARGOS_ROUND85_USERS_AUTH_EDGE_FIX_CSS = `
+/* Round 87: Edge Functions saneadas. create-app-user virou compatibilidade e manage-app-user é a fonte da verdade. */
+`;
+if (typeof document !== 'undefined') {
+  let style85 = document.getElementById('argos-round85-users-auth-edge-fix');
+  if (!style85) {
+    style85 = document.createElement('style');
+    style85.id = 'argos-round85-users-auth-edge-fix';
+    document.head.appendChild(style85);
+  }
+  style85.textContent = ARGOS_ROUND85_USERS_AUTH_EDGE_FIX_CSS;
+}
