@@ -622,10 +622,10 @@ const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
 const NOTIFICATION_EVENTS = ['Comentário na tarefa','Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Prazo vencido','Prazo hoje','Tarefa reaberta'];
 const NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
 function wantsNotification(user, event, statusId){
-  const prefs=user.notificationPrefs||NOTIFICATION_EVENTS;
   const statusPrefs=user.notificationStatusPrefs||{};
+  if(statusId && (event==='Alteração de status' || event==='Status da tarefa')) return (statusPrefs[statusId]??true);
+  const prefs=user.notificationPrefs||NOTIFICATION_EVENTS;
   if(!prefs.includes(event)) return false;
-  if(event==='Alteração de status' && statusId) return (statusPrefs[statusId]??true);
   return true;
 }
 
@@ -1516,7 +1516,7 @@ function App(){
         });
 
         eventText=statusText;
-        eventName='Alteração de status';
+        eventName='Status da tarefa';
         eventStatus=patch.status;
       }
 
@@ -2751,9 +2751,16 @@ function GeneralSettings({system,setSystem,reset}){
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
   const [tab,setTab]=useState('open'); 
-  const list=notifications.filter(n=>(!n.userId||n.userId===user.id)).filter(n=>tab==='done'?n.done:!n.done); 
-  function done(id){ setNotifications(notifications.map(n=>n.id===id?{...n,done:true}:n)); } 
-  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  const userNotifications=notifications.filter(n=>(!n.userId||n.userId===user.id));
+  const doneCount=userNotifications.filter(n=>n.done && n.userId===user.id).length;
+  const list=userNotifications.filter(n=>tab==='done'?n.done:!n.done); 
+  function done(id){ setNotifications(notifications.map(n=>n.id===id?{...n,done:true}:n)); }
+  function clearDone(){
+    if(!doneCount) return;
+    if(!confirm(`Limpar ${doneCount} notificação(ões) concluída(s)?`)) return;
+    setNotifications(notifications.filter(n=>!(n.done && n.userId===user.id)));
+  }
+  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&doneCount>0&&<button className="danger" onClick={clearDone}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
 }
 
 
