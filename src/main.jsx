@@ -624,6 +624,8 @@ const NOTIFICATION_EVENTS = NOTIFICATION_VISIBLE_EVENTS;
 const BLOCKED_NOTIFICATION_EVENTS = new Set(['Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Tarefa reaberta']);
 const SYSTEM_NOISE_PATTERNS = [/timer/i,/tarefa acessada/i,/inatividade/i,/fechar a tela/i,/sair da tarefa/i,/trocar de tarefa/i];
 function isSystemNoise(text=''){ return SYSTEM_NOISE_PATTERNS.some(rx=>rx.test(String(text||''))); }
+const LOG_NOISE_PATTERNS = [/timer/i,/tarefa acessada/i,/inatividade/i,/fechar a tela/i,/sair da tarefa/i,/trocar de tarefa/i,/campo/i,/copy/i,/legenda/i,/links? de visualiza/i,/instruções/i,/instrucoes/i];
+function isLogNoise(text=''){ return LOG_NOISE_PATTERNS.some(rx=>rx.test(String(text||''))); }
 function wantsNotification(user, event, statusId){
   if(!user?.active || user.role==='client') return false;
   const statusPrefs=user.notificationStatusPrefs||{};
@@ -1450,8 +1452,7 @@ function App(){
         changed = true;
         return {
           ...t,
-          ...patch,
-          logs:[...(t.logs||[]), {id:safeUUID(), user:'Sistema Argos', userId:'system', type:'log', visibility:'internal', at:now(), text:'Timer pausado automaticamente por inatividade.'}]
+          ...patch
         };
       });
       if(changed) setTasks(next);
@@ -1509,19 +1510,27 @@ function App(){
   function updateTask(id, patch, logText){
     const original=tasks.find(t=>t.id===id);
     const statusChanged=!!(original && patch.status && patch.status!==original.status);
-    const statusText=statusChanged ? `Status alterado de ${statusById[original.status]?.name||original.status} para ${statusById[patch.status]?.name||patch.status}.` : '';
     const nextStatusId=statusChanged ? patch.status : null;
 
     setTasks(prevTasks=>prevTasks.map(t=>{
       if(t.id!==id) return t;
 
-      const extraLogs = patch.extraLogs || [];
+      const extraLogs = Array.isArray(patch.extraLogs) ? patch.extraLogs : [];
+      const hasCommentExtraLog = extraLogs.some(l=>l?.type==='comment');
+      const patchOverridesLogs = Object.prototype.hasOwnProperty.call(patch,'logs');
+      const statusLogText = patch.statusLogText;
+      const suppressStatusLog = !!patch.suppressStatusLog || patchOverridesLogs || hasCommentExtraLog;
+
       let next={...t,...patch};
       delete next.extraLogs;
+      delete next.statusLogText;
+      delete next.suppressStatusLog;
 
       let logs=[...(t.logs||[])];
 
       if(patch.responsibleId && patch.responsibleId!==t.responsibleId){
+        const fromUser=users.find(u=>u.id===t.responsibleId)?.name || 'Sem responsável';
+        const toUser=users.find(u=>u.id===patch.responsibleId)?.name || 'Sem responsável';
         logs.push({
           id:safeUUID(),
           user:effectiveUser.name,
@@ -1529,25 +1538,29 @@ function App(){
           type:'log',
           visibility:'internal',
           at:now(),
-          text:'Responsável alterado.'
+          text:`${effectiveUser.name} alterou o responsável de ${fromUser} para ${toUser}`
         });
       }
 
-      if(patch.status && patch.status!==t.status){
+      if(statusChanged){
         if(patch.status==='alteracao' && t.status!=='alteracao') next.alterationCount=(t.alterationCount||0)+1;
 
-        logs.push({
-          id:safeUUID(),
-          user:effectiveUser.name,
-          userId:effectiveUser.id,
-          type:'status',
-          visibility:'internal',
-          at:now(),
-          text:`Status alterado de ${statusById[t.status]?.name||t.status} para ${statusById[patch.status]?.name||patch.status}.`
-        });
+        if(!suppressStatusLog){
+          const fromStatus=statusById[t.status]?.name||t.status;
+          const toStatus=statusById[patch.status]?.name||patch.status;
+          logs.push({
+            id:safeUUID(),
+            user:effectiveUser.name,
+            userId:effectiveUser.id,
+            type:'status',
+            visibility:'internal',
+            at:now(),
+            text:statusLogText || `${effectiveUser.name} alterou de ${fromStatus} para ${toStatus}`
+          });
+        }
       }
 
-      if(logText){
+      if(logText && !statusChanged && !isLogNoise(logText)){
         logs.push({
           id:safeUUID(),
           user:effectiveUser.name,
@@ -1560,14 +1573,16 @@ function App(){
       }
 
       if(extraLogs.length) logs.push(...extraLogs);
-      if(patch.logs) logs = patch.logs;
+      if(patchOverridesLogs) logs = patch.logs;
 
       return {...next,logs};
     }));
 
     if(original && statusChanged){
       const targetTask = {...original, ...patch};
-      notifyTask(targetTask,statusText,'Status da tarefa',nextStatusId,effectiveUser.id);
+      const fromStatus=statusById[original.status]?.name||original.status;
+      const toStatus=statusById[patch.status]?.name||patch.status;
+      notifyTask(targetTask,`Status alterado de ${fromStatus} para ${toStatus}.`,'Status da tarefa',nextStatusId,effectiveUser.id);
     }
   }
 
@@ -2371,7 +2386,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
 
     updateTask(task.id,patch,reason?'Marcado como aguardando com comentário.':'Marcado como aguardando.');
   } 
-  function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); addLog(task.id,`Aprovação registrada. Artes/vídeos: ${clientForm?.art?'sim':'não'}; Legenda: ${clientForm?.caption?'sim':'não'}.`,'approval',isClient?'client':'internal'); updateTask(task.id,{status:'agendamento'},`${effectiveUser.name} aprovou. Status enviado para agendamento.`); setClientForm(null); } 
+  function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); updateTask(task.id,{status:'agendamento',statusLogText:`${effectiveUser.name} aprovou a tarefa`}); setClientForm(null); } 
   function requestChange(){ const items=[]; if(clientForm?.artChange) items.push('Alterar arte/vídeo'); if(clientForm?.text) items.push('Alterar texto na arte/vídeo'); if(clientForm?.captionChange) items.push('Alterar legenda'); if(clientForm?.redo) items.push('Refazer o post'); if(!items.length) return alert('Selecione pelo menos uma opção de alteração.'); const desc=String(clientForm?.description||'').trim(); if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.'); const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`; const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:now(),text,resolved:false}; updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]}); setClientForm(null); }
   function reopenFromApproval(){ const nextStatus=task.previousWorkStatus||'edicao'; updateTask(task.id,{status:nextStatus,startedAt:now(),startedById:effectiveUser.id,timerHeartbeatAt:now()},`Tarefa reaberta para ${statusById[nextStatus]?.name||nextStatus}.`); }
   function reviewAgain(){ updateTask(task.id,{status:'aprovacao'},'Cliente voltou para revisão.'); } 
@@ -2765,9 +2780,16 @@ function GeneralSettings({system,setSystem,reset}){
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
   const [tab,setTab]=useState('open'); 
-  const list=notifications.filter(n=>(!n.userId||n.userId===user.id)).filter(n=>tab==='done'?n.done:!n.done); 
-  function done(id){ setNotifications(notifications.map(n=>n.id===id?{...n,done:true}:n)); } 
-  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  const scoped=notifications.filter(n=>(!n.userId||n.userId===user.id));
+  const list=scoped.filter(n=>tab==='done'?n.done:!n.done); 
+  const doneCount=scoped.filter(n=>n.done).length;
+  function done(id){ setNotifications(prev=>prev.map(n=>n.id===id?{...n,done:true}:n)); }
+  function clearDone(){
+    if(!doneCount) return;
+    if(!confirm(`Limpar ${doneCount} notificação${doneCount===1?' concluída':' concluídas'}?`)) return;
+    setNotifications(prev=>prev.filter(n=>!(n.done && (!n.userId || n.userId===user.id))));
+  }
+  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
 }
 
 
