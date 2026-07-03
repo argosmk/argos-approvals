@@ -5909,3 +5909,73 @@ if (typeof document !== 'undefined') {
   }
   style127.textContent = ARGOS_ROUND127_MEDIA_SURGICAL_CSS;
 }
+
+const ARGOS_ROUND133_MOBILE_PREVIEW_FULLWIDTH_CSS = `
+/* Round133: mobile-only. Aumenta a largura útil da prévia da tarefa sem mexer na lógica do vídeo.
+   Mantém 4:5 pelo aspect-ratio; a altura só cresce como consequência da largura. */
+@media (max-width:760px){
+  .task-page .insta{
+    width:100vw!important;
+    max-width:100vw!important;
+    min-width:0!important;
+    margin-left:calc(50% - 50vw)!important;
+    margin-right:calc(50% - 50vw)!important;
+    box-sizing:border-box!important;
+    border-radius:0!important;
+  }
+
+  .task-page .media-box.adaptive-media-box{
+    width:100%!important;
+    max-width:100%!important;
+    aspect-ratio:4/5!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:hidden!important;
+    background:#151515!important;
+  }
+
+  .task-page .media-box.adaptive-media-box .media-inner,
+  .task-page .media-box.adaptive-media-box .round130-media-preview{
+    width:100%!important;
+    height:100%!important;
+    max-width:none!important;
+    max-height:none!important;
+    overflow:hidden!important;
+    background:#151515!important;
+  }
+
+  .task-page .media-box.adaptive-media-box img.media-fit-image,
+  .task-page .media-box.adaptive-media-box video.media-fit-image,
+  .task-page .media-box.adaptive-media-box .drive-fallback-frame,
+  .task-page .media-box.adaptive-media-box .round130-drive-frame{
+    width:100%!important;
+    height:100%!important;
+    max-width:none!important;
+    max-height:none!important;
+    min-height:0!important;
+    display:block!important;
+    border:0!important;
+    background:#151515!important;
+  }
+
+  .task-page .media-box.adaptive-media-box img.media-fit-image,
+  .task-page .media-box.adaptive-media-box video.media-fit-image{
+    object-fit:cover!important;
+    object-position:center center!important;
+  }
+
+  .task-page .media-box.adaptive-media-box .slide-controls{
+    z-index:40!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style133 = document.getElementById('argos-round133-mobile-preview-fullwidth');
+  if (!style133) {
+    style133 = document.createElement('style');
+    style133.id = 'argos-round133-mobile-preview-fullwidth';
+    document.head.appendChild(style133);
+  }
+  style133.textContent = ARGOS_ROUND133_MOBILE_PREVIEW_FULLWIDTH_CSS;
+}
