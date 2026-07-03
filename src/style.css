@@ -2310,3 +2310,94 @@ html, body, #root {
 .team-feed-media .team-feed-arrows{
   z-index:30!important;
 }
+
+/* Round132: ajuste apenas de palco do iframe Drive.
+   Base: round130 funcionando. Não muda JS nem tentativa de player.
+   Objetivo: dar ao player do Google Drive um espaço real 4:5, sem aperto/zoom/altura herdada,
+   para aumentar a chance dos controles auto-ocultarem em vez de ficarem empilhados/fixos. */
+.insta{
+  width:min(100%,520px)!important;
+  max-width:520px!important;
+  align-self:center!important;
+  overflow:hidden!important;
+}
+.insta .insta-top,
+.insta .insta-icons,
+.insta .insta-caption{
+  width:100%!important;
+  box-sizing:border-box!important;
+}
+.media-box.adaptive-media-box{
+  width:100%!important;
+  aspect-ratio:4/5!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  background:#000!important;
+  position:relative!important;
+}
+.media-box.adaptive-media-box .media-inner,
+.media-box.adaptive-media-box .round130-media-preview{
+  position:relative!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:none!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+.media-box.adaptive-media-box .round130-media-preview img.media-fit-image,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image{
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  display:block!important;
+  margin:0!important;
+  background:#000!important;
+}
+.media-box.adaptive-media-box iframe.drive-fallback-frame,
+.media-box.adaptive-media-box iframe.round130-drive-frame,
+.media-box.adaptive-media-box .round130-media-preview iframe{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:100%!important;
+  min-height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  border:0!important;
+  display:block!important;
+  background:#000!important;
+  transform:none!important;
+  object-fit:initial!important;
+}
+.media-box.adaptive-media-box .slide-controls{
+  z-index:40!important;
+  pointer-events:none!important;
+}
+.media-box.adaptive-media-box .slide-controls button{
+  pointer-events:auto!important;
+}
+@media (max-width:760px){
+  .insta{
+    width:100%!important;
+    max-width:520px!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+  }
+  .media-box.adaptive-media-box{
+    aspect-ratio:4/5!important;
+    height:auto!important;
+    min-height:0!important;
+  }
+}
