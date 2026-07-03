@@ -1348,3 +1348,63 @@ html, body, #root {
     min-width:220px!important;
   }
 }
+
+/* Round119: calendário com um único scroll vertical e filtros sem extrapolar */
+.calendar-layout .legend{
+  max-height:none!important;
+  overflow:visible!important;
+  align-self:start!important;
+}
+
+.calendar-layout{
+  align-items:start!important;
+  overflow:visible!important;
+}
+
+.calendar-main{
+  overflow-x:hidden!important;
+  overflow-y:visible!important;
+}
+
+.calendar-main .week-grid{
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  max-width:100%!important;
+  scrollbar-width:thin!important;
+  scrollbar-color:rgba(255,255,255,.34) transparent!important;
+}
+
+.calendar-main .week-grid::-webkit-scrollbar{height:8px!important;}
+.calendar-main .week-grid::-webkit-scrollbar-track{background:transparent!important;}
+.calendar-main .week-grid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.30)!important;border-radius:999px!important;}
+.calendar-main .week-grid::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.42)!important;}
+
+@media (max-width:860px){
+  .calendar-layout{
+    display:block!important;
+    overflow:visible!important;
+  }
+  .calendar-layout .legend{
+    position:relative!important;
+    top:auto!important;
+    width:100%!important;
+    max-width:100%!important;
+    max-height:none!important;
+    overflow:visible!important;
+    margin-bottom:18px!important;
+    box-sizing:border-box!important;
+  }
+  .calendar-main{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:hidden!important;
+    overflow-y:visible!important;
+  }
+  .calendar-main .week-grid{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    padding-bottom:14px!important;
+  }
+}
