@@ -1152,18 +1152,15 @@ function App(){
     const timer=setTimeout(async()=>{
       try{
         setSaveStatus('Salvando...');
-        let result=await saveWorkspaceState(auth.organizationId, localPayload, workspaceMetaRef.current.updatedAt);
-        let finalPayload=localPayload;
+        const result=await saveWorkspaceState(auth.organizationId, localPayload, workspaceMetaRef.current.updatedAt);
         if(result?.conflict){
-          const remoteRecord=await loadWorkspaceRecord(auth.organizationId);
-          finalPayload=mergeWorkspacePayload(workspaceMetaRef.current.basePayload, localPayload, remoteRecord.payload || EMPTY_CLOUD_STATE);
-          result=await saveWorkspaceState(auth.organizationId, finalPayload, remoteRecord.updatedAt);
-          if(result?.conflict) throw new Error('Outra alteração foi salva ao mesmo tempo. Tentando novamente.');
-          workspaceMetaRef.current.applyingRemote=true;
-          applyWorkspacePayload(finalPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
-          workspaceMetaRef.current.applyingRemote=false;
+          // Round106: não fazemos mais merge automático do workspace_state.
+          // O merge do JSON gigante era a causa de tarefas deletadas voltando, tarefas novas sumindo
+          // e preferências antigas sobrepondo alterações recentes.
+          // Em conflito, bloqueamos a gravação local para não sobrescrever dados novos do banco.
+          throw new Error('Outra pessoa/aba salvou alterações antes de você. Recarregue a página antes de continuar para evitar perda de dados.');
         }
-        const savedPayload=normalizeWorkspacePayload(result?.payload || finalPayload);
+        const savedPayload=normalizeWorkspacePayload(result?.payload || localPayload);
         workspaceMetaRef.current={updatedAt:result?.updatedAt || workspaceMetaRef.current.updatedAt, basePayload:clonePayload(savedPayload), lastSavedSignature:payloadSignature(savedPayload), applyingRemote:false};
         setCloudError(''); setSaveStatus('Salvo');
       }catch(err){
@@ -1176,44 +1173,12 @@ function App(){
     return()=>clearTimeout(timer);
   },[users,companies,statuses,tasks,notifications,system,cloudReady,auth?.organizationId,saveTick]);
 
-  useEffect(()=>{
-    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
-    let cancelled=false;
-    async function pullRemoteChanges(){
-      try{
-        const record=await loadWorkspaceRecord(auth.organizationId);
-        if(cancelled || !record.payload || !record.updatedAt) return;
-        if(record.updatedAt === workspaceMetaRef.current.updatedAt) return;
-        const remotePayload=normalizeWorkspacePayload(record.payload);
-        const currentPayload=normalizeWorkspacePayload({ users, companies, statuses, tasks, notifications, system });
-        const basePayload=workspaceMetaRef.current.basePayload || EMPTY_CLOUD_STATE;
-        const hasLocalChanges=payloadSignature(currentPayload)!==workspaceMetaRef.current.lastSavedSignature;
-        const nextPayload=hasLocalChanges ? mergeWorkspacePayload(basePayload,currentPayload,remotePayload) : remotePayload;
-        workspaceMetaRef.current.applyingRemote=true;
-        applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
-        workspaceMetaRef.current.applyingRemote=false;
-        if(hasLocalChanges){
-          setSaveStatus('Mudanças recebidas. Salvando merge...');
-          const saved=await saveWorkspaceState(auth.organizationId,nextPayload,record.updatedAt);
-          if(saved?.conflict) throw new Error('Conflito durante sincronização. Tentando novamente.');
-          const savedPayload=normalizeWorkspacePayload(saved?.payload || nextPayload);
-          workspaceMetaRef.current.updatedAt=saved?.updatedAt || record.updatedAt;
-          workspaceMetaRef.current.basePayload=clonePayload(savedPayload);
-          workspaceMetaRef.current.lastSavedSignature=payloadSignature(savedPayload);
-        }else{
-          workspaceMetaRef.current.updatedAt=record.updatedAt;
-          workspaceMetaRef.current.basePayload=clonePayload(remotePayload);
-          workspaceMetaRef.current.lastSavedSignature=payloadSignature(nextPayload);
-          setSaveStatus('Sincronizado');
-        }
-        setCloudError('');
-      }catch(err){
-        console.error(err);
-      }
-    }
-    const interval=setInterval(pullRemoteChanges,5000);
-    return()=>{cancelled=true; clearInterval(interval);};
-  },[cloudReady,auth?.organizationId,users,companies,statuses,tasks,notifications,system]);
+  // Round106: o polling/merge remoto do workspace_state foi desativado.
+  // Motivo: o workspace ainda é um JSON grande. Sincronizar e mesclar esse JSON em abas antigas
+  // pode ressuscitar tarefas apagadas, remover tarefas novas e reverter checkboxes.
+  // A presença online continua funcionando abaixo via profiles.last_seen.
+  // Próximo passo estrutural: migrar tarefas/comentários/materiais para tabelas separadas.
+
 
   const setSystem=v=>{setSystemState(v); save('argos_system_r18',v)};
   const setUsers=v=>{
