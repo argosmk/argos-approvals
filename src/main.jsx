@@ -2425,23 +2425,20 @@ function InlinePreviewVideo({src, sources}){
   const sourceList = Array.from(new Set((sources && sources.length ? sources : [src]).filter(Boolean)));
   const [sourceIndex,setSourceIndex] = useState(0);
   const [playing,setPlaying] = useState(false);
-  const [ready,setReady] = useState(false);
   const [error,setError] = useState(false);
 
   const currentSrc = sourceList[sourceIndex] || src;
 
   useEffect(()=>{
     setPlaying(false);
-    setReady(false);
     setError(false);
-    if(!currentSrc) return;
-    const timer = setTimeout(()=>{
-      if(!ready){
-        if(sourceIndex < sourceList.length - 1) setSourceIndex(i=>i+1);
-        else setError(true);
-      }
-    }, 4500);
-    return ()=>clearTimeout(timer);
+    const video = videoRef.current;
+    if(!video || !currentSrc) return;
+    try{
+      video.load();
+      const playPromise = video.play();
+      if(playPromise && typeof playPromise.catch === 'function') playPromise.catch(()=>{});
+    }catch(_err){}
   },[currentSrc]);
 
   function tryNextSource(){
@@ -2461,29 +2458,26 @@ function InlinePreviewVideo({src, sources}){
     }
   }
 
-  return <div className="inline-video-preview clean-video-player">
+  return <div className="inline-video-preview clean-video-player round127-clean-video">
     <video
       ref={videoRef}
       className="media-fit-image"
       playsInline
       webkit-playsinline="true"
+      muted
+      loop
+      autoPlay
       preload="metadata"
       controls={false}
       disablePictureInPicture
       controlsList="nodownload noplaybackrate noremoteplayback nofullscreen"
       src={currentSrc}
-      onClick={toggleVideo}
-      onLoadedMetadata={()=>setReady(true)}
-      onCanPlay={()=>setReady(true)}
       onError={tryNextSource}
       onPlay={()=>setPlaying(true)}
       onPause={()=>setPlaying(false)}
       onEnded={()=>setPlaying(false)}
     />
-    <button type="button" className={(playing?'video-mini-toggle is-playing':'video-mini-toggle')} onClick={toggleVideo} aria-label={playing?'Pausar vídeo':'Reproduzir vídeo'}>
-      {playing?'Ⅱ':'▶'}
-    </button>
-    {!ready&&!error&&<span className="video-loading-note">Carregando vídeo...</span>}
+    {!playing&&<button type="button" className="video-mini-toggle" onClick={toggleVideo} aria-label="Reproduzir vídeo">▶</button>}
     {error&&<a className="video-loading-note video-open-fallback" href={currentSrc || src} target="_blank" rel="noreferrer" onClick={(e)=>e.stopPropagation()}>Abrir vídeo</a>}
   </div>
 }
@@ -2493,7 +2487,12 @@ function DriveAdaptiveMedia({url,canPlay=false}){
   if(canPlay && playDriveVideo){
     return <InlinePreviewVideo sources={[driveDownload(url), driveDirect(url)]} src={driveDownload(url)}/>;
   }
-  if(fallback && !canPlay) return <iframe className="drive-fallback-frame" title="preview" src={drivePreview(url)} allow="fullscreen"/>;
+  if(fallback){
+    return <div className="drive-thumb-wrap drive-thumb-fallback">
+      <img className="media-fit-image" src={driveDirect(url)} onError={(e)=>{e.currentTarget.style.display='none'}} alt="Prévia do material"/>
+      {canPlay&&<button type="button" className="drive-play-btn" onClick={(e)=>{e.preventDefault();e.stopPropagation();setPlayDriveVideo(true)}} aria-label="Reproduzir vídeo">▶</button>}
+    </div>;
+  }
   return <div className="drive-thumb-wrap">
     <img className="media-fit-image" src={driveThumb(url)} onError={()=>setFallback(true)} alt="Prévia do material"/>
     {canPlay&&<button type="button" className="drive-play-btn" onClick={(e)=>{e.preventDefault();e.stopPropagation();setPlayDriveVideo(true)}} aria-label="Reproduzir vídeo">▶</button>}
@@ -2501,7 +2500,7 @@ function DriveAdaptiveMedia({url,canPlay=false}){
 }
 function Media({url,type=''}){ 
   const direct=driveDirect(url); const lower=(url||'').toLowerCase(); const isImg=/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(lower); const isVid=/\.(mp4|webm|mov)(\?|$)/.test(lower); const isDrive=(url||'').includes('drive.google.com'); const isVideoType=/vídeo|video|reels/i.test(String(type||''));
-  return <div className="media-inner clean-media-preview">{isDrive?<DriveAdaptiveMedia url={url} canPlay={isVideoType}/>:isVid?<InlinePreviewVideo src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div> 
+  return <div className="media-inner clean-media-preview">{isDrive?<DriveAdaptiveMedia url={url} canPlay={isVideoType || isVid}/>:isVid?<InlinePreviewVideo src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div> 
 }
 function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[],setUsers=()=>{}}){
   const [editing,setEditing]=useState(null);
@@ -5899,4 +5898,80 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style93);
   }
   style93.textContent = ARGOS_ROUND93_MOBILE_LOGIN_LOGO_REBALANCE_CSS;
+}
+
+
+const ARGOS_ROUND127_MEDIA_SURGICAL_CSS = `
+/* Round 127: volta o comportamento estável do vídeo da round43 sem mexer no resto */
+.media-box.adaptive-media-box .media-inner,
+.media-box.adaptive-media-box .inline-video-preview,
+.media-box.adaptive-media-box .drive-thumb-wrap{
+  position:relative!important;
+}
+
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-panel,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-enclosure,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-overlay-play-button,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-start-playback-button,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-play-button,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-timeline,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-current-time-display,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-time-remaining-display,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-mute-button,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-volume-slider,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-fullscreen-button{
+  display:none!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+.media-box.adaptive-media-box video.media-fit-image{
+  pointer-events:none!important;
+}
+
+.media-box.adaptive-media-box .round127-clean-video .video-mini-toggle,
+.media-box.adaptive-media-box .drive-play-btn{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  z-index:6!important;
+  width:44px!important;
+  height:44px!important;
+  border-radius:999px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  background:rgba(0,0,0,.42)!important;
+  border:1px solid rgba(255,255,255,.48)!important;
+  color:#fff!important;
+  font-size:18px!important;
+  line-height:1!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+}
+
+.media-box.adaptive-media-box .slide-controls{
+  z-index:9!important;
+  pointer-events:none!important;
+}
+
+.media-box.adaptive-media-box .slide-controls button{
+  pointer-events:auto!important;
+}
+
+.media-box.adaptive-media-box .video-loading-note{
+  display:none!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style127 = document.getElementById('argos-round127-media-surgical');
+  if (!style127) {
+    style127 = document.createElement('style');
+    style127.id = 'argos-round127-media-surgical';
+    document.head.appendChild(style127);
+  }
+  style127.textContent = ARGOS_ROUND127_MEDIA_SURGICAL_CSS;
 }
