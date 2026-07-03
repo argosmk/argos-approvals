@@ -1808,3 +1808,111 @@ html, body, #root {
   cursor:pointer!important;
   background:#000!important;
 }
+
+/* Round123: correções mobile, vídeo e planejamento sem mexer no motor */
+@media (max-width:760px){
+  .mobile-side-bar{
+    justify-content:center!important;
+  }
+  .mobile-brand-mini strong{
+    left:50%!important;
+    transform:translate(-50%,-50%)!important;
+    text-align:center!important;
+  }
+  .side-drawer{
+    padding-top:0!important;
+    gap:8px!important;
+  }
+  .side-drawer > .brand,
+  .side-drawer .brand.brand-clean,
+  .side-drawer .brand.brand-logo-only{
+    display:none!important;
+    height:0!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:0!important;
+    overflow:hidden!important;
+  }
+  .side-drawer .user-card{
+    margin-top:0!important;
+  }
+  .side.mobile-open .side-drawer-shade{
+    display:block!important;
+    pointer-events:auto!important;
+  }
+}
+
+/* Portfólios: selecionado muda só o nome; online continua com aro verde */
+.team-story.selected .team-story-avatar.online,
+.team-story.active .team-story-avatar.online{
+  background:linear-gradient(135deg,#22c55e,#16a34a)!important;
+  box-shadow:none!important;
+}
+.team-story.selected .team-story-avatar.offline,
+.team-story.active .team-story-avatar.offline{
+  background:rgba(255,255,255,.14)!important;
+  box-shadow:none!important;
+}
+.team-story.selected .team-story-avatar.working,
+.team-story.active .team-story-avatar.working{
+  box-shadow:none!important;
+}
+.team-story.selected .team-story-name,
+.team-story.active .team-story-name,
+.team-story.selected > span:last-of-type{
+  color:var(--gold)!important;
+}
+
+/* Vídeo: permitir play sem voltar controles extras em imagens */
+.clean-media-preview video.media-fit-image,
+.media-box.adaptive-media-box .media-inner.clean-media-preview video.media-fit-image,
+.media-box.adaptive-media-box video.media-fit-image{
+  pointer-events:auto!important;
+}
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-panel,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-enclosure,
+.media-box.adaptive-media-box video.media-fit-image::-webkit-media-controls-overlay-play-button{
+  display:flex!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+.drive-thumb-wrap{
+  position:relative!important;
+  width:100%!important;
+  height:100%!important;
+  display:grid!important;
+  place-items:center!important;
+}
+.drive-thumb-wrap > img{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+.drive-play-btn{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  width:54px!important;
+  height:54px!important;
+  min-width:54px!important;
+  min-height:54px!important;
+  border-radius:999px!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  border:1px solid rgba(255,255,255,.35)!important;
+  background:rgba(0,0,0,.56)!important;
+  color:#fff!important;
+  font-size:22px!important;
+  line-height:1!important;
+  text-align:center!important;
+  backdrop-filter:blur(4px)!important;
+  -webkit-backdrop-filter:blur(4px)!important;
+  z-index:5!important;
+}
+.drive-play-btn:hover{
+  background:rgba(0,0,0,.72)!important;
+  border-color:rgba(255,255,255,.6)!important;
+}
