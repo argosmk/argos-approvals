@@ -619,19 +619,13 @@ const DEFAULT_STATUS = [
 ];
 const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
-const NOTIFICATION_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
-const STATUS_NOTIFICATION_EVENT = 'Status da tarefa';
+const NOTIFICATION_EVENTS = ['Comentário na tarefa','Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Prazo vencido','Prazo hoje','Tarefa reaberta'];
 function wantsNotification(user, event, statusId){
   const prefs=user.notificationPrefs||NOTIFICATION_EVENTS;
   const statusPrefs=user.notificationStatusPrefs||{};
-  if((event===STATUS_NOTIFICATION_EVENT || event==='Alteração de status') && statusId) return (statusPrefs[statusId]??true);
-  return prefs.includes(event);
-}
-function actorName(user){
-  return user?.name || user?.display_name || user?.username || user?.email || 'Alguém';
-}
-function shouldSkipOperationalLog(text){
-  return /timer|tarefa acessada|acessou a tarefa|abriu a tarefa|saiu da tarefa|inacessada|heartbeat/i.test(String(text||''));
+  if(!prefs.includes(event)) return false;
+  if(event==='Alteração de status' && statusId) return (statusPrefs[statusId]??true);
+  return true;
 }
 
 const seedCompanies = [
@@ -962,7 +956,7 @@ const seedTasks = rawTasks.map((t,i)=>({
   copy:'Copy do post para aprovação quando necessário.',
   caption:'Legenda com quebras de linha preservadas.\n\nChamada principal aqui.\nCTA no final.',
   materialLinks:'',
-  logs:[{id:'log'+i, user:'Argos Admin', userId:'admin', type:'log', visibility:'internal', at:new Date().toISOString(), text:`${actorName(auth)} criou a tarefa`}]
+  logs:[{id:'log'+i, user:'Argos Admin', userId:'admin', type:'log', visibility:'internal', at:new Date().toISOString(), text:'Tarefa criada.'}]
 }));
 
 function load(key, fallback){ try { return JSON.parse(localStorage.getItem(key)) || fallback } catch { return fallback } }
@@ -1442,7 +1436,8 @@ function App(){
         changed = true;
         return {
           ...t,
-          ...patch
+          ...patch,
+          logs:[...(t.logs||[]), {id:safeUUID(), user:'Sistema Argos', userId:'system', type:'log', visibility:'internal', at:now(), text:'Timer pausado automaticamente por inatividade.'}]
         };
       });
       if(changed) setTasks(next);
@@ -1474,53 +1469,19 @@ function App(){
   function openCreate(){ const firstResponsible=users.find(u=>u.active&&(u.role==='team'||u.role==='admin')); setForm({ title:'', companyId:companies.find(c=>c.active)?.id||'', responsibleId:firstResponsible?.id||'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:'', internalDate:'', copyInstructions:'', editorInstructions:'', copy:'', caption:'', materialLinks:'' }); setCreateOpen(true); }
   function createTask(){
     if(!form.title||!form.companyId||!form.responsibleId||!form.type||!form.status){ alert('Preencha os campos principais.'); return; }
-    const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:`${actorName(auth)} criou a tarefa`}] };
+    const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
     setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null);
   }
   function notifyTask(task,text,event,statusId=null){
     if(!task) return;
-    const recipients = users
-      .filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
+    const recipients = users.filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
       .filter(u=>u.id!==effectiveUser.id)
       .filter(u=>wantsNotification(u,event,statusId));
     if(recipients.length) setNotifications([...recipients.map(u=>({id:safeUUID(),taskId:task.id,userId:u.id,text:`${task.title}: ${text}`,at:now(),done:false,event,statusId})),...notifications]);
   }
-
-  useEffect(()=>{
-    if(!cloudReady || !auth?.id) return;
-    const today=todayStr();
-    setNotifications(prev=>{
-      const known=new Set((prev||[]).map(n=>n.dueKey).filter(Boolean));
-      const additions=[];
-      (tasks||[]).forEach(task=>{
-        if(!task || task.archived || !task.internalDate) return;
-        let event='', text='';
-        if(task.internalDate===today){
-          event='Prazo hoje';
-          text=`Prazo hoje (${fmtDate(task.internalDate)})`;
-        } else if(task.internalDate<today){
-          event='Prazo vencido';
-          text=`Prazo vencido (${fmtDate(task.internalDate)})`;
-        }
-        if(!event) return;
-        users
-          .filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
-          .filter(u=>wantsNotification(u,event,task.status))
-          .forEach(u=>{
-            const dueKey=`${event}:${task.id}:${u.id}`;
-            if(known.has(dueKey)) return;
-            known.add(dueKey);
-            additions.push({id:safeUUID(),taskId:task.id,userId:u.id,text:`${task.title}: ${text}`,at:now(),done:false,event,statusId:task.status,dueKey});
-          });
-      });
-      return additions.length ? [...additions,...prev] : prev;
-    });
-  },[cloudReady,auth?.id,tasks,users]);
-
-  function updateTask(id, patch, logText, options={}){
+  function updateTask(id, patch, logText){
     const original=tasks.find(t=>t.id===id);
     let eventText='', eventName='', eventStatus=null;
-    const actionOptions = {...(options||{}), ...(patch.__action||{})};
 
     setTasks(prevTasks=>prevTasks.map(t=>{
       if(t.id!==id) return t;
@@ -1528,64 +1489,37 @@ function App(){
       const extraLogs = patch.extraLogs || [];
       let next={...t,...patch};
       delete next.extraLogs;
-      delete next.__action;
 
-      let logs=Array.isArray(patch.logs) ? [...patch.logs] : [...(t.logs||[])];
-      delete next.logs;
+      let logs=[...(t.logs||[])];
 
-      const who=actorName(effectiveUser);
+      if(patch.logs) return {...next, logs:patch.logs};
 
       if(patch.responsibleId && patch.responsibleId!==t.responsibleId){
-        const fromUser=users.find(u=>u.id===t.responsibleId)?.name || 'sem responsável';
-        const toUser=users.find(u=>u.id===patch.responsibleId)?.name || 'sem responsável';
-        logs.push({
-          id:safeUUID(),
-          user:effectiveUser.name,
-          userId:effectiveUser.id,
-          type:'log',
-          visibility:'internal',
-          at:now(),
-          text:`${who} alterou o responsável de ${fromUser} para ${toUser}`
-        });
-      }
-
-      if(patch.internalDate !== undefined && patch.internalDate !== t.internalDate){
-        logs.push({
-          id:safeUUID(),
-          user:effectiveUser.name,
-          userId:effectiveUser.id,
-          type:'log',
-          visibility:'internal',
-          at:now(),
-          text:`${who} alterou o prazo de ${fmtDate(t.internalDate)} para ${fmtDate(patch.internalDate)}`
-        });
+        eventText='Responsável alterado.';
+        eventName='Mudança de responsável';
       }
 
       if(patch.status && patch.status!==t.status){
         if(patch.status==='alteracao' && t.status!=='alteracao') next.alterationCount=(t.alterationCount||0)+1;
 
-        const fromStatus=statusById[t.status]?.name||t.status;
-        const toStatus=statusById[patch.status]?.name||patch.status;
-        const statusText=actionOptions.statusLogText || `${who} alterou de ${fromStatus} para ${toStatus}`;
+        const statusText=`Status alterado de ${statusById[t.status]?.name||t.status} para ${statusById[patch.status]?.name||patch.status}.`;
 
-        if(!actionOptions.suppressStatusLog){
-          logs.push({
-            id:safeUUID(),
-            user:effectiveUser.name,
-            userId:effectiveUser.id,
-            type:'status',
-            visibility:'internal',
-            at:now(),
-            text:statusText
-          });
-        }
+        logs.push({
+          id:safeUUID(),
+          user:effectiveUser.name,
+          userId:effectiveUser.id,
+          type:'status',
+          visibility:'internal',
+          at:now(),
+          text:statusText
+        });
 
         eventText=statusText;
-        eventName=STATUS_NOTIFICATION_EVENT;
+        eventName='Alteração de status';
         eventStatus=patch.status;
       }
 
-      if(logText && !shouldSkipOperationalLog(logText) && !actionOptions.suppressLogText){
+      if(logText){
         logs.push({
           id:safeUUID(),
           user:effectiveUser.name,
@@ -1604,18 +1538,29 @@ function App(){
 
     if(original){
       const targetTask = {...original, ...patch};
-      delete targetTask.__action;
-      delete targetTask.extraLogs;
 
       if(eventName) notifyTask(targetTask,eventText,eventName,eventStatus);
+
+      if(logText){
+        const ev=logText.includes('aprov')
+          ? 'Aprovação do cliente'
+          : logText.includes('alteração')
+            ? 'Solicitação de alteração'
+            : logText.includes('reaberta')
+              ? 'Tarefa reaberta'
+              : 'Comentário na tarefa';
+
+        notifyTask(targetTask,logText,ev,eventStatus);
+      }
     }
   }
 
   function addLog(id,text,type='comment',visibility='internal'){
-    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility,at:now(),text,resolved:false};
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:now(),text,resolved:false};
     setTasks(prev=>prev.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     const task=tasks.find(t=>t.id===id);
-    notifyTask(task,text,'Comentário na tarefa',task?.status);
+    const event = type==='change' ? 'Solicitação de alteração' : type==='approval' ? 'Aprovação do cliente' : 'Comentário na tarefa';
+    notifyTask(task,text,event,task?.status);
   }
 
   function createWeeklyTasks(companyId, weekStart, force=false){
@@ -2378,13 +2323,13 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
       const returnStatus = task.blockedFrom || task.previousWorkStatus || 'edicao';
       patch.status = returnStatus;
       patch.blockedFrom = null;
-      updateTask(task.id,patch);
+      updateTask(task.id,patch,`Tarefa reaberta para ${statusById[returnStatus]?.name||returnStatus}.`);
       return;
     }
-    updateTask(task.id,patch);
+    updateTask(task.id,patch,'Tarefa acessada.');
   } 
-  function sendApproval(){ const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0; const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'aprovacao',previousWorkStatus:task.status}; if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed; else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed; updateTask(task.id,patch); } 
-  function returnToCopy(){ const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0; const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'copy',previousWorkStatus:task.status}; if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed; else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed; updateTask(task.id,patch); } 
+  function sendApproval(){ const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0; const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'aprovacao',previousWorkStatus:task.status}; if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed; else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed; updateTask(task.id,patch,'Enviado para aprovação.'); } 
+  function returnToCopy(){ const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0; const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'copy',previousWorkStatus:task.status}; if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed; else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed; updateTask(task.id,patch,'Tarefa retornada para copy.'); } 
   function markWaiting(){
     const rawReason=prompt('Motivo do aguardando:');
     if(rawReason===null) return;
@@ -2409,12 +2354,12 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
       }];
     }
 
-    updateTask(task.id,{...patch,__action:{suppressStatusLog:!!reason}});
+    updateTask(task.id,patch,reason?'Marcado como aguardando com comentário.':'Marcado como aguardando.');
   } 
-  function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); updateTask(task.id,{status:'agendamento',__action:{statusLogText:`${actorName(effectiveUser)} aprovou a tarefa`}}); setClientForm(null); } 
-  function requestChange(){ const items=[]; if(clientForm?.artChange) items.push('Alterar arte/vídeo'); if(clientForm?.text) items.push('Alterar texto na arte/vídeo'); if(clientForm?.captionChange) items.push('Alterar legenda'); if(clientForm?.redo) items.push('Refazer o post'); if(!items.length) return alert('Selecione pelo menos uma opção de alteração.'); const desc=String(clientForm?.description||'').trim(); if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.'); const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`; const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:now(),text,resolved:false}; updateTask(task.id,{status:'alteracao',logs:[...(task.logs||[]),entry],__action:{suppressStatusLog:true}}); setClientForm(null); }
-  function reopenFromApproval(){ const nextStatus=task.previousWorkStatus||'edicao'; updateTask(task.id,{status:nextStatus,startedAt:now(),startedById:effectiveUser.id,timerHeartbeatAt:now()}); }
-  function reviewAgain(){ updateTask(task.id,{status:'aprovacao'}); } 
+  function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); addLog(task.id,`Aprovação registrada. Artes/vídeos: ${clientForm?.art?'sim':'não'}; Legenda: ${clientForm?.caption?'sim':'não'}.`,'approval',isClient?'client':'internal'); updateTask(task.id,{status:'agendamento'},`${effectiveUser.name} aprovou. Status enviado para agendamento.`); setClientForm(null); } 
+  function requestChange(){ const items=[]; if(clientForm?.artChange) items.push('Alterar arte/vídeo'); if(clientForm?.text) items.push('Alterar texto na arte/vídeo'); if(clientForm?.captionChange) items.push('Alterar legenda'); if(clientForm?.redo) items.push('Refazer o post'); if(!items.length) return alert('Selecione pelo menos uma opção de alteração.'); const desc=String(clientForm?.description||'').trim(); if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.'); const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`; const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:now(),text,resolved:false}; updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]}); setClientForm(null); }
+  function reopenFromApproval(){ const nextStatus=task.previousWorkStatus||'edicao'; updateTask(task.id,{status:nextStatus,startedAt:now(),startedById:effectiveUser.id,timerHeartbeatAt:now()},`Tarefa reaberta para ${statusById[nextStatus]?.name||nextStatus}.`); }
+  function reviewAgain(){ updateTask(task.id,{status:'aprovacao'},'Cliente voltou para revisão.'); } 
   async function copyTaskLink(){
     const url=taskShareUrl(task.id);
     try{
