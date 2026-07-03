@@ -1623,8 +1623,10 @@ function App(){
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
-      <>
-        <div className={selectedTask ? 'main-under-task' : ''}>
+      {selectedTask ? (
+        <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
+      ) : (
+        <>
           <div className="top-actions">
             <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={openTaskRoute}/>
             {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
@@ -1637,15 +1639,8 @@ function App(){
           {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
           {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
           {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} user={effectiveUser} auth={auth}/>} 
-        </div>
-        {selectedTask && <div className="task-route-overlay" role="dialog" aria-modal="true">
-          <div className="task-route-shade" onClick={closeTaskRoute}></div>
-          <div className="task-route-card">
-            <button className="task-route-x" onClick={closeTaskRoute} aria-label="Fechar tarefa">×</button>
-            <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
-          </div>
-        </div>}
-      </>
+        </>
+      )}
     </main>
     {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)}/>} 
   </div>
