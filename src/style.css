@@ -1239,3 +1239,64 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   .profile-gear{top:2px!important;right:0!important;}
   .team-profile-name-row,.insta-name-row{padding-right:46px!important;}
 }
+
+/* Round117: confina o scroll horizontal do calendário à área principal */
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.main {
+  overflow-x: hidden;
+}
+
+.calendar-layout {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.calendar-main {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 16px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(225,177,44,.38) transparent;
+}
+
+.calendar-main::-webkit-scrollbar {
+  height: 8px;
+}
+
+.calendar-main::-webkit-scrollbar-thumb {
+  background: rgba(225,177,44,.35);
+  border-radius: 999px;
+}
+
+.calendar-main .week-grid {
+  width: max-content;
+  min-width: 100%;
+}
+
+.calendar-main .month,
+.calendar-main .day-list {
+  min-width: 100%;
+}
+
+@media (max-width: 860px) {
+  .calendar-layout {
+    overflow: visible;
+  }
+
+  .calendar-main {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .calendar-main .week-grid {
+    width: max-content;
+    min-width: calc(7 * 220px + 60px);
+  }
+}
