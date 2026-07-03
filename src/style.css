@@ -2248,3 +2248,65 @@ html, body, #root {
 .team-feed-media .team-feed-arrows button{
   pointer-events: auto !important;
 }
+
+/* Round130: restauração cirúrgica do preview de mídia baseada na round43.
+   Mantém tamanho atual do card, remove tentativas recentes de vídeo direto do Drive
+   e evita que controles nativos gigantes apareçam em vídeos diretos. */
+.media-box.adaptive-media-box .round130-media-preview,
+.team-feed-media .round130-media-preview{
+  position:relative!important;
+  width:100%!important;
+  height:100%!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+.media-box.adaptive-media-box .round130-media-preview img.media-fit-image,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image,
+.team-feed-media .round130-media-preview img.media-fit-image,
+.team-feed-media .round130-media-preview video.media-fit-image{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  margin:0!important;
+  background:#000!important;
+}
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image,
+.team-feed-media .round130-media-preview video.media-fit-image{
+  pointer-events:none!important;
+}
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-panel,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-enclosure,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-overlay-play-button,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-start-playback-button,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-play-button,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-timeline,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-current-time-display,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-time-remaining-display,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-mute-button,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-volume-slider,
+.media-box.adaptive-media-box .round130-media-preview video.media-fit-image::-webkit-media-controls-fullscreen-button{
+  display:none!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+.media-box.adaptive-media-box .round130-drive-frame,
+.team-feed-media .round130-drive-frame{
+  width:100%!important;
+  height:100%!important;
+  border:0!important;
+  display:block!important;
+  background:#000!important;
+}
+/* Se aparecer overlay de abrir material herdado de versões antigas, não mostra dentro da prévia. */
+.media-box.adaptive-media-box .media-open-overlay,
+.team-feed-media .media-open-overlay{
+  display:none!important;
+}
+.media-box.adaptive-media-box .slide-controls,
+.team-feed-media .team-feed-arrows{
+  z-index:30!important;
+}

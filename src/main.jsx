@@ -2420,80 +2420,21 @@ function ClientApprovalForm({form,setForm,approve,requestChange,statusById}){
   }
   return <div className="client-actions"><h3>Aprovar</h3><label><input type="checkbox" checked={!!f.art} onChange={e=>F('art',e.target.checked)}/> Artes/vídeos aprovados</label><label><input type="checkbox" checked={!!f.caption} onChange={e=>F('caption',e.target.checked)}/> Legenda aprovada</label><button style={buttonStyle('agendamento')} onClick={approve}>Aprovar</button><h3>Solicitar alteração</h3><label><input type="checkbox" checked={!!f.artChange} onChange={e=>F('artChange',e.target.checked)}/> Alterar arte/vídeo</label><label><input type="checkbox" checked={!!f.text} onChange={e=>F('text',e.target.checked)}/> Alterar texto na arte/vídeo</label><label><input type="checkbox" checked={!!f.captionChange} onChange={e=>F('captionChange',e.target.checked)}/> Alterar legenda</label><label><input type="checkbox" checked={!!f.redo} onChange={e=>toggleRedo(e.target.checked)}/> <span className="danger-text">Refazer o post</span></label><textarea value={f.description||''} onChange={e=>F('description',e.target.value)} placeholder="Descreva as alterações que você gostaria de aplicar"/><button style={canRequest?buttonStyle('alteracao'):undefined} disabled={!canRequest} onClick={requestChange}>Solicitar alteração</button>{hasChange&&!canRequest&&<small>Descreva o motivo para liberar a solicitação.</small>}</div> 
 }
-function InlinePreviewVideo({src, sources, poster}){
-  const videoRef = useRef(null);
-  const sourceList = Array.from(new Set((sources && sources.length ? sources : [src]).filter(Boolean)));
-  const [sourceIndex,setSourceIndex] = useState(0);
-  const [needsTap,setNeedsTap] = useState(false);
-  const [error,setError] = useState(false);
-  const currentSrc = sourceList[sourceIndex] || src;
-
-  useEffect(()=>{
-    setNeedsTap(false);
-    setError(false);
-    const video = videoRef.current;
-    if(!video || !currentSrc) return;
-    try{
-      video.pause();
-      video.load();
-      const t=setTimeout(()=>{
-        video.play().catch(()=>setNeedsTap(true));
-      }, 120);
-      return ()=>clearTimeout(t);
-    }catch(_err){ setNeedsTap(true); }
-  },[currentSrc]);
-
-  function tryNextSource(){
-    if(sourceIndex < sourceList.length - 1) setSourceIndex(i=>i+1);
-    else setError(true);
-  }
-
-  function playVideo(e){
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-    const video = videoRef.current;
-    if(!video || error) return;
-    video.muted = true;
-    video.play().then(()=>setNeedsTap(false)).catch(()=>setNeedsTap(true));
-  }
-
-  return <div className="inline-video-preview clean-video-player round129-clean-video">
-    <video
-      ref={videoRef}
-      className="media-fit-image"
-      playsInline
-      webkit-playsinline="true"
-      muted
-      loop
-      autoPlay
-      preload="metadata"
-      poster={poster||''}
-      controls={false}
-      disablePictureInPicture
-      controlsList="nodownload noplaybackrate noremoteplayback nofullscreen"
-      src={currentSrc}
-      onCanPlay={()=>{ const v=videoRef.current; if(v) v.play().catch(()=>setNeedsTap(true)); }}
-      onError={tryNextSource}
-    />
-    {needsTap&&!error&&<button type="button" className="video-mini-toggle" onClick={playVideo} aria-label="Reproduzir vídeo">▶</button>}
-    {error&&<a className="video-loading-note video-open-fallback" href={currentSrc || src} target="_blank" rel="noreferrer" onClick={(e)=>e.stopPropagation()}>Abrir vídeo</a>}
-  </div>
-}
 function DriveAdaptiveMedia({url}){
-  const [mode,setMode]=useState('image');
-  const id=driveId(url);
-  if(mode==='video'){
-    return <InlinePreviewVideo sources={[driveDirect(url), driveDownload(url)]} src={driveDirect(url)} poster={id?driveThumb(url):''}/>;
-  }
-  return <img className="media-fit-image" src={driveDirect(url)} onError={()=>setMode('video')} alt="Prévia do material"/>;
+  const [fallback,setFallback]=useState(false);
+  // Round130: rollback cirúrgico para o comportamento estável da round43.
+  // Drive primeiro tenta renderizar como prévia direta; se falhar, cai para o preview do próprio Drive.
+  // Não decide pelo tipo do post e não força player direto do Drive, que estava gerando tela cinza/interrogação.
+  if(fallback) return <iframe className="drive-fallback-frame round130-drive-frame" title="preview" src={drivePreview(url)} allow="autoplay; fullscreen"/>;
+  return <img className="media-fit-image" src={driveDirect(url)} onError={()=>setFallback(true)} alt="Prévia do material"/>;
 }
-function Media({url,type='',slide=0,total=1}){
+function Media({url}){ 
   const direct=driveDirect(url);
   const lower=(url||'').toLowerCase();
   const isImg=/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(lower);
   const isVid=/\.(mp4|webm|mov)(\?|$)/.test(lower);
   const isDrive=(url||'').includes('drive.google.com');
-  return <div className="media-inner clean-media-preview round129-media-preview">{isDrive?<DriveAdaptiveMedia url={url}/>:isVid?<InlinePreviewVideo src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div>
+  return <div className="media-inner round130-media-preview">{isDrive?<DriveAdaptiveMedia url={url}/>:isVid?<video className="media-fit-image" muted playsInline loop autoPlay src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<a className="media-open outside" target="_blank" href={url}>Abrir material</a>}</div> 
 }
 function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[],setUsers=()=>{}}){
   const [editing,setEditing]=useState(null);
