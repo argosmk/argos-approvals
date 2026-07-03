@@ -7,6 +7,51 @@ import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 
 
+const ROUTE_SCREEN_ALIASES = {
+  '': 'dashboard',
+  '/': 'dashboard',
+  dashboard: 'dashboard',
+  notifications: 'notifications',
+  planning: 'planning',
+  calendar: 'calendar',
+  kanban: 'kanban',
+  tasks: 'tasks',
+  portfolios: 'teamhub',
+  portfolio: 'teamhub',
+  teamhub: 'teamhub',
+  settings: 'settings',
+};
+const SCREEN_TO_ROUTE = {
+  dashboard: 'dashboard',
+  notifications: 'notifications',
+  planning: 'planning',
+  calendar: 'calendar',
+  kanban: 'kanban',
+  tasks: 'tasks',
+  teamhub: 'portfolios',
+  settings: 'settings',
+};
+function parseAppRoute(){
+  const raw = (typeof window !== 'undefined' ? window.location.hash : '') || '';
+  const clean = raw.replace(/^#/, '').replace(/^\/?/, '');
+  const parts = clean.split('/').filter(Boolean).map(x=>decodeURIComponent(x));
+  if(parts[0] === 'task' && parts[1]) return { screen: 'tasks', taskId: parts[1] };
+  const key = parts[0] || 'dashboard';
+  return { screen: ROUTE_SCREEN_ALIASES[key] || 'dashboard', taskId: null };
+}
+function taskShareUrl(taskId){
+  if(typeof window === 'undefined') return `#/task/${encodeURIComponent(taskId)}`;
+  return `${window.location.origin}${window.location.pathname}#/task/${encodeURIComponent(taskId)}`;
+}
+function setAppRoute(route){
+  if(typeof window === 'undefined') return;
+  const next = route?.taskId
+    ? `#/task/${encodeURIComponent(route.taskId)}`
+    : `#/${SCREEN_TO_ROUTE[route?.screen || 'dashboard'] || 'dashboard'}`;
+  if(window.location.hash !== next) window.location.hash = next;
+}
+
+
 
 function userSortName(user){
   return String(user?.name || user?.display_name || user?.username || user?.email || '').trim();
@@ -1152,8 +1197,9 @@ function App(){
   const [statuses,setStatusesState]=useState(()=>load('argos_statuses_r8', DEFAULT_STATUS));
   const [tasks,setTasksState]=useState(()=>load('argos_tasks_r8', seedTasks));
   const [notifications,setNotificationsState]=useState(()=>load('argos_notifications_r9', []));
-  const [auth,setAuth]=useState(null); const [viewAs,setViewAs]=useState(null); const [screen,setScreen]=useState('dashboard');
-  const [selectedTask,setSelectedTask]=useState(null); const [createOpen,setCreateOpen]=useState(false); const [form,setForm]=useState(null);
+  const initialRoute=parseAppRoute();
+  const [auth,setAuth]=useState(null); const [viewAs,setViewAs]=useState(null); const [screen,setScreen]=useState(initialRoute.screen || 'dashboard');
+  const [selectedTask,setSelectedTask]=useState(initialRoute.taskId || null); const [createOpen,setCreateOpen]=useState(false); const [form,setForm]=useState(null);
   const [globalSearch,setGlobalSearch]=useState('');
   const [system,setSystemState]=useState(()=>load('argos_system_r18', { logo:'', title:'Painel de Aprovação' }));
   const [cloudLoading,setCloudLoading]=useState(isSupabaseConfigured);
@@ -1166,6 +1212,17 @@ function App(){
   const taskSyncBusyRef=useRef(false);
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
+
+  useEffect(()=>{
+    const syncRoute=()=>{
+      const route=parseAppRoute();
+      setScreen(route.screen || 'dashboard');
+      setSelectedTask(route.taskId || null);
+    };
+    syncRoute();
+    window.addEventListener('hashchange', syncRoute);
+    return ()=>window.removeEventListener('hashchange', syncRoute);
+  },[]);
 
   useEffect(()=>{
     if(!isSupabaseConfigured) return;
@@ -1548,25 +1605,47 @@ function App(){
   const navClient=[['calendar','Calendário']];
   const nav=isAdmin?navAdmin:(effectiveUser.role==='team'?navTeam:navClient);
   const activeScreen = nav.some(([id])=>id===screen) ? screen : nav[0][0];
+  function navigateScreen(nextScreen){
+    setSelectedTask(null);
+    setScreen(nextScreen);
+    setAppRoute({screen: nextScreen});
+  }
+  function openTaskRoute(taskId){
+    if(!taskId) return;
+    setSelectedTask(taskId);
+    setAppRoute({taskId});
+  }
+  function closeTaskRoute(){
+    setSelectedTask(null);
+    setAppRoute({screen: activeScreen});
+  }
   return <div className="app">
-    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={setScreen} setAuth={setAuth}/>
+    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
-      {selectedTask ? <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={()=>setSelectedTask(null)} open={setSelectedTask} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
-      : <>
-        <div className="top-actions">
-          <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={setSelectedTask}/>
-          {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
+      <>
+        <div className={selectedTask ? 'main-under-task' : ''}>
+          <div className="top-actions">
+            <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={openTaskRoute}/>
+            {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
+          </div>
+          {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
+          {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser}/>}
+          {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
+          {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute}/>} 
+          {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
+          {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
+          {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
+          {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} user={effectiveUser} auth={auth}/>} 
         </div>
-        {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
-        {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser}/>}
-        {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask}/>} 
-        {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={setSelectedTask}/>} 
-        {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask} search=""/>} 
-        {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask} search=""/>} 
-        {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
-        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={setSelectedTask} tasks={tasks} user={effectiveUser} auth={auth}/>}
-      </>}
+        {selectedTask && <div className="task-route-overlay" role="dialog" aria-modal="true">
+          <div className="task-route-shade" onClick={closeTaskRoute}></div>
+          <div className="task-route-card">
+            <button className="task-route-x" onClick={closeTaskRoute} aria-label="Fechar tarefa">×</button>
+            <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
+          </div>
+        </div>}
+      </>
     </main>
     {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)}/>} 
   </div>
@@ -2217,6 +2296,15 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   function requestChange(){ const items=[]; if(clientForm?.artChange) items.push('Alterar arte/vídeo'); if(clientForm?.text) items.push('Alterar texto na arte/vídeo'); if(clientForm?.captionChange) items.push('Alterar legenda'); if(clientForm?.redo) items.push('Refazer o post'); if(!items.length) return alert('Selecione pelo menos uma opção de alteração.'); const desc=String(clientForm?.description||'').trim(); if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.'); const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`; const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:now(),text,resolved:false}; updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]}); setClientForm(null); }
   function reopenFromApproval(){ const nextStatus=task.previousWorkStatus||'edicao'; updateTask(task.id,{status:nextStatus,startedAt:now(),startedById:effectiveUser.id,timerHeartbeatAt:now()},`Tarefa reaberta para ${statusById[nextStatus]?.name||nextStatus}.`); }
   function reviewAgain(){ updateTask(task.id,{status:'aprovacao'},'Cliente voltou para revisão.'); } 
+  async function copyTaskLink(){
+    const url=taskShareUrl(task.id);
+    try{
+      await navigator.clipboard.writeText(url);
+      alert('Link da tarefa copiado.');
+    }catch(err){
+      prompt('Copie o link da tarefa:', url);
+    }
+  }
   function duplicateTaskFromDetail(){
     if(!isAdmin || !setTasks || !task) return;
     const createdAt=now();
@@ -2245,7 +2333,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   }
   function addComment(){ if(!comment.trim()) return; addLog(task.id,comment,'comment',isClient?'client':'internal'); setComment(''); }
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
-  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left"><div className="task-title">{isAdmin?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{!isClient&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div><div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]}/>{links.length>1&&<div className="slide-controls"><button onClick={()=>setSlide(Math.max(0,slide-1))}>‹</button><button onClick={()=>setSlide(Math.min(links.length-1,slide+1))}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div><div className="content-fields">{!isClient&&<>{isAdmin?<><label>Instruções ao copy<textarea value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/></label><label>Instruções ao editor<textarea value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/></label></>:<><ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/><ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/></>}</>}{(!isTeam || showTeamProtected || isClient)&&<><label>Copy<textarea disabled={isClient||isTeam} value={task.copy} onChange={e=>updateTask(task.id,{copy:e.target.value})}/></label><label>Legenda<textarea disabled={isClient||isTeam} value={task.caption} onChange={e=>updateTask(task.id,{caption:e.target.value})}/></label>{!isClient&&<label>Links de visualização<textarea disabled={false} value={task.materialLinks} onChange={e=>updateTask(task.id,{materialLinks:e.target.value})}/></label>}</>}</div></div><aside className="task-side">{!isClient&&<div className="panel panel-config"><h2>Configurações</h2><label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!isAdmin} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!isAdmin} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label><label>Tipo<select disabled={!isAdmin} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!isAdmin} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label><label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!isAdmin} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label><label>Data do post<input disabled={!isAdmin} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label></div>}{(isAdmin||showTeamProtected)&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{(isClient||isAdmin)&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {isClient&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2><div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(l.text)}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{!isClient&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
+  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left"><div className="task-title">{isAdmin?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{!isClient&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div><div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]}/>{links.length>1&&<div className="slide-controls"><button onClick={()=>setSlide(Math.max(0,slide-1))}>‹</button><button onClick={()=>setSlide(Math.min(links.length-1,slide+1))}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div><div className="content-fields">{!isClient&&<>{isAdmin?<><label>Instruções ao copy<textarea value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/></label><label>Instruções ao editor<textarea value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/></label></>:<><ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/><ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/></>}</>}{(!isTeam || showTeamProtected || isClient)&&<><label>Copy<textarea disabled={isClient||isTeam} value={task.copy} onChange={e=>updateTask(task.id,{copy:e.target.value})}/></label><label>Legenda<textarea disabled={isClient||isTeam} value={task.caption} onChange={e=>updateTask(task.id,{caption:e.target.value})}/></label>{!isClient&&<label>Links de visualização<textarea disabled={false} value={task.materialLinks} onChange={e=>updateTask(task.id,{materialLinks:e.target.value})}/></label>}</>}</div></div><aside className="task-side">{!isClient&&<div className="panel panel-config"><h2>Configurações</h2><label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!isAdmin} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!isAdmin} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label><label>Tipo<select disabled={!isAdmin} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!isAdmin} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label><label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!isAdmin} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label><label>Data do post<input disabled={!isAdmin} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label></div>}{(isAdmin||showTeamProtected)&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2><button onClick={copyTaskLink}>Copiar link da tarefa</button>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{(isClient||isAdmin)&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {isClient&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2><div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(l.text)}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{!isClient&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6c-1.7-1.9-4.4-2-6.2-.3L12 6.7 9.4 4.3C7.6 2.6 4.9 2.7 3.2 4.6c-1.8 2-1.6 5.1.4 7l8.4 7.8 8.4-7.8c2-1.9 2.2-5 .4-7Z"/></svg>
