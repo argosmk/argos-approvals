@@ -619,29 +619,21 @@ const DEFAULT_STATUS = [
 ];
 const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
-const NOTIFICATION_EVENTS = ['Comentário na tarefa','Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Prazo vencido','Prazo hoje','Tarefa reaberta'];
 const NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
+const NOTIFICATION_EVENTS = NOTIFICATION_VISIBLE_EVENTS;
+const BLOCKED_NOTIFICATION_EVENTS = new Set(['Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Tarefa reaberta']);
+const SYSTEM_NOISE_PATTERNS = [/timer/i,/tarefa acessada/i,/inatividade/i,/fechar a tela/i,/sair da tarefa/i,/trocar de tarefa/i];
+function isSystemNoise(text=''){ return SYSTEM_NOISE_PATTERNS.some(rx=>rx.test(String(text||''))); }
 function wantsNotification(user, event, statusId){
-  const prefs=user.notificationPrefs||NOTIFICATION_EVENTS;
+  if(!user?.active || user.role==='client') return false;
   const statusPrefs=user.notificationStatusPrefs||{};
-  // Status marcado é a regra principal e não depende de evento antigo.
-  if(statusId) return (statusPrefs[statusId]??true);
-  // Eventos antigos continuam existindo apenas por compatibilidade com dados salvos.
-  // Eles não aparecem mais no painel e não podem disparar notificações novas.
+  if(event==='Status da tarefa'){
+    return !!statusId && (statusPrefs[statusId]??true);
+  }
+  if(BLOCKED_NOTIFICATION_EVENTS.has(event)) return false;
   if(!NOTIFICATION_VISIBLE_EVENTS.includes(event)) return false;
+  const prefs=user.notificationPrefs||NOTIFICATION_VISIBLE_EVENTS;
   return prefs.includes(event);
-}
-function isSilentOperationalLog(text=''){
-  const normalized=String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  return [
-    'timer pausado',
-    'timer iniciado',
-    'tarefa acessada',
-    'inatividade',
-    'fechar a tela',
-    'sair da tarefa',
-    'trocar de tarefa'
-  ].some(term=>normalized.includes(term));
 }
 
 const seedCompanies = [
@@ -1409,7 +1401,13 @@ function App(){
       return next;
     });
   };
-  const setNotifications=v=>{setNotificationsState(v); if(!isSupabaseConfigured) save('argos_notifications_r9',v)};
+  const setNotifications=v=>{
+    setNotificationsState(prev=>{
+      const next = typeof v === 'function' ? v(prev) : v;
+      if(!isSupabaseConfigured) save('argos_notifications_r9',next);
+      return next;
+    });
+  };
 
   useEffect(()=>{
     const favicon = system?.favicon || '';
@@ -1488,57 +1486,65 @@ function App(){
     const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
     setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null);
   }
-  function notifyTask(task,text,event,statusId=null){
-    if(!task) return;
-    if(isSilentOperationalLog(text)) return;
-    const recipients = users.filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
-      .filter(u=>u.id!==effectiveUser.id)
+  function notifyTask(task,text,event,statusId=null, actorId=effectiveUser?.id){
+    if(!task || isSystemNoise(text)) return;
+    const recipients = users
+      .filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
+      .filter(u=>u.id!==actorId)
       .filter(u=>wantsNotification(u,event,statusId));
-    if(recipients.length){
-      const createdAt=now();
-      const fresh=recipients.map(u=>({id:safeUUID(),taskId:task.id,userId:u.id,text:`${task.title}: ${text}`,at:createdAt,done:false,event,statusId}));
-      setNotifications(prev=>[...fresh,...prev]);
-    }
+    if(!recipients.length) return;
+    const stamp=now();
+    const created=recipients.map(u=>({
+      id:safeUUID(),
+      taskId:task.id,
+      userId:u.id,
+      text:`${task.title}: ${text}`,
+      at:stamp,
+      done:false,
+      event,
+      statusId
+    }));
+    setNotifications(prev=>[...created,...(Array.isArray(prev)?prev:[])]);
   }
   function updateTask(id, patch, logText){
     const original=tasks.find(t=>t.id===id);
-    let eventText='', eventName='', eventStatus=null;
+    const statusChanged=!!(original && patch.status && patch.status!==original.status);
+    const statusText=statusChanged ? `Status alterado de ${statusById[original.status]?.name||original.status} para ${statusById[patch.status]?.name||patch.status}.` : '';
+    const nextStatusId=statusChanged ? patch.status : null;
 
     setTasks(prevTasks=>prevTasks.map(t=>{
       if(t.id!==id) return t;
 
       const extraLogs = patch.extraLogs || [];
-      const customLogsProvided = Array.isArray(patch.logs);
       let next={...t,...patch};
       delete next.extraLogs;
 
-      let logs=customLogsProvided ? patch.logs : [...(t.logs||[])];
+      let logs=[...(t.logs||[])];
 
       if(patch.responsibleId && patch.responsibleId!==t.responsibleId){
-        eventText='Responsável alterado.';
-        eventName='Mudança de responsável';
+        logs.push({
+          id:safeUUID(),
+          user:effectiveUser.name,
+          userId:effectiveUser.id,
+          type:'log',
+          visibility:'internal',
+          at:now(),
+          text:'Responsável alterado.'
+        });
       }
 
       if(patch.status && patch.status!==t.status){
         if(patch.status==='alteracao' && t.status!=='alteracao') next.alterationCount=(t.alterationCount||0)+1;
 
-        const statusText=`Status alterado de ${statusById[t.status]?.name||t.status} para ${statusById[patch.status]?.name||patch.status}.`;
-
-        if(!customLogsProvided){
-          logs.push({
-            id:safeUUID(),
-            user:effectiveUser.name,
-            userId:effectiveUser.id,
-            type:'status',
-            visibility:'internal',
-            at:now(),
-            text:statusText
-          });
-        }
-
-        eventText=statusText;
-        eventName='Alteração de status';
-        eventStatus=patch.status;
+        logs.push({
+          id:safeUUID(),
+          user:effectiveUser.name,
+          userId:effectiveUser.id,
+          type:'status',
+          visibility:'internal',
+          at:now(),
+          text:`Status alterado de ${statusById[t.status]?.name||t.status} para ${statusById[patch.status]?.name||patch.status}.`
+        });
       }
 
       if(logText){
@@ -1554,26 +1560,14 @@ function App(){
       }
 
       if(extraLogs.length) logs.push(...extraLogs);
+      if(patch.logs) logs = patch.logs;
 
       return {...next,logs};
     }));
 
-    if(original){
+    if(original && statusChanged){
       const targetTask = {...original, ...patch};
-
-      if(eventName) notifyTask(targetTask,eventText,eventName,eventStatus);
-
-      if(logText && !isSilentOperationalLog(logText)){
-        const ev=logText.includes('aprov')
-          ? 'Aprovação do cliente'
-          : logText.includes('alteração')
-            ? 'Solicitação de alteração'
-            : logText.includes('reaberta')
-              ? 'Tarefa reaberta'
-              : 'Comentário na tarefa';
-
-        notifyTask(targetTask,logText,ev,eventStatus);
-      }
+      notifyTask(targetTask,statusText,'Status da tarefa',nextStatusId,effectiveUser.id);
     }
   }
 
@@ -1581,8 +1575,7 @@ function App(){
     const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:now(),text,resolved:false};
     setTasks(prev=>prev.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     const task=tasks.find(t=>t.id===id);
-    const event = type==='change' ? 'Solicitação de alteração' : type==='approval' ? 'Aprovação do cliente' : 'Comentário na tarefa';
-    notifyTask(task,text,event,task?.status);
+    if(type==='comment') notifyTask(task,text,'Comentário na tarefa',task?.status,effectiveUser.id);
   }
 
   function createWeeklyTasks(companyId, weekStart, force=false){
@@ -2772,12 +2765,9 @@ function GeneralSettings({system,setSystem,reset}){
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
   const [tab,setTab]=useState('open'); 
-  const mine=notifications.filter(n=>(!n.userId||n.userId===user.id));
-  const list=mine.filter(n=>tab==='done'?n.done:!n.done); 
-  const doneCount=mine.filter(n=>n.done).length;
-  function done(id){ setNotifications(prev=>prev.map(n=>n.id===id?{...n,done:true}:n)); }
-  function clearDone(){ if(!doneCount) return; if(confirm('Limpar notificações concluídas?')) setNotifications(prev=>prev.filter(n=>!((!n.userId||n.userId===user.id)&&n.done))); }
-  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  const list=notifications.filter(n=>(!n.userId||n.userId===user.id)).filter(n=>tab==='done'?n.done:!n.done); 
+  function done(id){ setNotifications(notifications.map(n=>n.id===id?{...n,done:true}:n)); } 
+  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
 }
 
 
