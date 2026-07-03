@@ -620,6 +620,7 @@ const DEFAULT_STATUS = [
 const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
 const NOTIFICATION_EVENTS = ['Comentário na tarefa','Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Prazo vencido','Prazo hoje','Tarefa reaberta'];
+const NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
 function wantsNotification(user, event, statusId){
   const prefs=user.notificationPrefs||NOTIFICATION_EVENTS;
   const statusPrefs=user.notificationStatusPrefs||{};
@@ -2544,7 +2545,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   const [openNotif,setOpenNotif]=useState({});
   const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived || u.active!==false));
   const sortedPeople=sortEntities(people,sort,u=>u.name);
-  const events=NOTIFICATION_EVENTS;
+  const events=NOTIFICATION_VISIBLE_EVENTS;
   async function archiveTeamUser(u){
     if(u.id===currentUser?.id) return alert('Você não pode arquivar seu próprio usuário.');
     const nextActive = u.active===false;
@@ -2705,7 +2706,7 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
-  const events=NOTIFICATION_EVENTS;
+  const events=NOTIFICATION_VISIBLE_EVENTS;
   const editableUsers=sortEntities(users.filter(u=>u.role!=='client'),'role',u=>u.name);
   const [openIds,setOpenIds]=useState({});
   function toggleOpen(id){ setOpenIds(prev=>({...prev,[id]:!prev[id]})); }
