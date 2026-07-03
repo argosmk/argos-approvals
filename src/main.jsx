@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { loadWorkspaceRecord, saveWorkspaceState } from './services/workspaceStateService';
+import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './services/taskTableService';
 
 
 
@@ -1109,6 +1110,9 @@ function App(){
   const [cloudError,setCloudError]=useState('');
   const [saveTick,setSaveTick]=useState(0);
   const [saveStatus,setSaveStatus]=useState('');
+  const [taskTablesReady,setTaskTablesReady]=useState(false);
+  const taskTablesReadyRef=useRef(false);
+  const taskSyncBusyRef=useRef(false);
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
 
@@ -1142,10 +1146,46 @@ function App(){
     return()=>{alive=false};
   },[]);
 
+  useEffect(()=>{ taskTablesReadyRef.current = taskTablesReady; },[taskTablesReady]);
+
+  useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
+    let alive=true;
+    (async()=>{
+      try{
+        const fromTables = await bootstrapTasksFromTables(auth.organizationId, tasks);
+        if(!alive) return;
+        setTasksState(fromTables);
+        setTaskTablesReady(true);
+        setCloudError('');
+      }catch(err){
+        if(!alive) return;
+        setTaskTablesReady(false);
+        setCloudError(`Tabelas de tarefas ainda não estão prontas: ${err.message||err}`);
+      }
+    })();
+    return ()=>{ alive=false; };
+  },[cloudReady, auth?.organizationId]);
+
+  useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady) return;
+    let alive=true;
+    const interval=setInterval(async()=>{
+      if(taskSyncBusyRef.current) return;
+      try{
+        const latest = await loadTaskRecords(auth.organizationId);
+        if(alive) setTasksState(latest);
+      }catch(err){
+        console.warn('task table refresh failed', err);
+      }
+    },5000);
+    return ()=>{ alive=false; clearInterval(interval); };
+  },[cloudReady, auth?.organizationId, taskTablesReady]);
+
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
     if(workspaceMetaRef.current.applyingRemote) return;
-    const localPayload=normalizeWorkspacePayload({ users, companies, statuses, tasks, notifications, system });
+    const localPayload=normalizeWorkspacePayload({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications, system });
     const localSignature=payloadSignature(localPayload);
     if(localSignature === workspaceMetaRef.current.lastSavedSignature) return;
     if(saveRetryRef.current) clearTimeout(saveRetryRef.current);
@@ -1171,7 +1211,7 @@ function App(){
       }
     },650);
     return()=>clearTimeout(timer);
-  },[users,companies,statuses,tasks,notifications,system,cloudReady,auth?.organizationId,saveTick]);
+  },[users,companies,statuses,notifications,system,cloudReady,auth?.organizationId,saveTick,taskTablesReady]);
 
   // Round106: o polling/merge remoto do workspace_state foi desativado.
   // Motivo: o workspace ainda é um JSON grande. Sincronizar e mesclar esse JSON em abas antigas
@@ -1190,7 +1230,23 @@ function App(){
   };
   const setCompanies=v=>{setCompaniesState(v); if(!isSupabaseConfigured) save('argos_companies_r8',v)};
   const setStatuses=v=>{setStatusesState(v); if(!isSupabaseConfigured) save('argos_statuses_r8',v)};
-  const setTasks=v=>{setTasksState(v); if(!isSupabaseConfigured) save('argos_tasks_r8',v)};
+  const setTasks=v=>{
+    setTasksState(prev=>{
+      const next = typeof v === 'function' ? v(prev) : v;
+      if(isSupabaseConfigured && taskTablesReadyRef.current && auth?.organizationId){
+        taskSyncBusyRef.current = true;
+        syncTaskListDelta(auth.organizationId, prev, next)
+          .catch(err=>{
+            console.error('task table sync failed', err);
+            setCloudError(`Não foi possível salvar tarefa(s): ${err.message||err}`);
+          })
+          .finally(()=>{ taskSyncBusyRef.current = false; });
+      } else if(!isSupabaseConfigured){
+        save('argos_tasks_r8', next);
+      }
+      return next;
+    });
+  };
   const setNotifications=v=>{setNotificationsState(v); if(!isSupabaseConfigured) save('argos_notifications_r9',v)};
 
   useEffect(()=>{
@@ -1263,7 +1319,7 @@ function App(){
   function createTask(){
     if(!form.title||!form.companyId||!form.responsibleId||!form.type||!form.status){ alert('Preencha os campos principais.'); return; }
     const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
-    setTasks([...tasks,t]); setCreateOpen(false); setForm(null);
+    setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null);
   }
   function notifyTask(task,text,event,statusId=null){
     if(!task) return;
@@ -1350,7 +1406,7 @@ function App(){
 
   function addLog(id,text,type='comment',visibility='internal'){
     const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:now(),text,resolved:false};
-    setTasks(tasks.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     const task=tasks.find(t=>t.id===id);
     const event = type==='change' ? 'Solicitação de alteração' : type==='approval' ? 'Aprovação do cliente' : 'Comentário na tarefa';
     notifyTask(task,text,event,task?.status);
@@ -1404,7 +1460,7 @@ function App(){
       }
     });
     if(!created.length){ alert('Nenhuma tarefa foi gerada. Verifique as quantidades do template.'); return; }
-    setTasks([...tasks,...created]);
+    setTasks(prev=>[...prev,...created]);
     alert(`${created.length} tarefa(s) gerada(s) para ${company.name}.`);
   }
   const navAdmin=[['dashboard','Dashboard'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios'],['settings','Configurações']];
