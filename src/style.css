@@ -1570,3 +1570,127 @@ html, body, #root {
     margin-top:0!important;
   }
 }
+
+/* Round121: ajuste fino do menu mobile como drawer à direita, sem cabeçalho duplicado */
+@media (max-width:760px){
+  .side{
+    height:60px!important;
+    max-height:60px!important;
+    overflow:visible!important;
+  }
+
+  .mobile-side-bar{
+    height:60px!important;
+    padding:8px 14px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+  }
+
+  .mobile-brand-mini{
+    display:flex!important;
+    align-items:center!important;
+    gap:9px!important;
+    min-width:0!important;
+    max-width:calc(100vw - 72px)!important;
+  }
+
+  .mobile-brand-mini .brand-logo{
+    width:66px!important;
+    height:26px!important;
+    min-width:66px!important;
+    max-width:66px!important;
+    border:0!important;
+    border-radius:0!important;
+    background:transparent!important;
+    box-shadow:none!important;
+    overflow:visible!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+  }
+
+  .mobile-brand-mini .brand-logo img{
+    width:66px!important;
+    max-width:66px!important;
+    height:26px!important;
+    max-height:26px!important;
+    object-fit:contain!important;
+    object-position:left center!important;
+    display:block!important;
+  }
+
+  .mobile-brand-mini .brand-logo span{
+    font-size:18px!important;
+    line-height:1!important;
+  }
+
+  .mobile-brand-mini strong{
+    font-size:14px!important;
+    line-height:1.05!important;
+    font-weight:760!important;
+    max-width:calc(100vw - 156px)!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+
+  .mobile-menu-toggle{
+    margin-left:auto!important;
+    width:42px!important;
+    height:42px!important;
+    min-width:42px!important;
+    min-height:42px!important;
+    border-radius:12px!important;
+  }
+
+  .side-drawer{
+    top:60px!important;
+    left:auto!important;
+    right:0!important;
+    bottom:0!important;
+    width:min(86vw,330px)!important;
+    max-width:330px!important;
+    height:calc(100vh - 60px)!important;
+    height:calc(100dvh - 60px)!important;
+    transform:translateX(106%)!important;
+    border-right:0!important;
+    border-left:1px solid rgba(255,255,255,.08)!important;
+    box-shadow:-28px 0 80px rgba(0,0,0,.54)!important;
+    padding:14px 12px 18px!important;
+    z-index:122!important;
+  }
+
+  .side.mobile-open .side-drawer{
+    transform:translateX(0)!important;
+  }
+
+  .side-drawer-shade{
+    top:60px!important;
+    left:0!important;
+    right:0!important;
+    bottom:0!important;
+    z-index:121!important;
+    background:rgba(0,0,0,.52)!important;
+    backdrop-filter:blur(2px)!important;
+    -webkit-backdrop-filter:blur(2px)!important;
+  }
+
+  .side-drawer > .brand,
+  .side-drawer .brand.brand-clean,
+  .side-drawer .brand.brand-logo-only{
+    display:none!important;
+    visibility:hidden!important;
+    height:0!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+    overflow:hidden!important;
+  }
+
+  .main{
+    padding-top:78px!important;
+  }
+}
