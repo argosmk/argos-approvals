@@ -985,6 +985,7 @@ function avg(arr){ const clean=arr.filter(n=>Number.isFinite(n)); return clean.l
 function slug(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 function driveId(url){ const m = (url||'').match(/\/file\/d\/([^/]+)/) || (url||'').match(/[?&]id=([^&]+)/); return m ? m[1] : ''; }
 function driveDirect(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/uc?export=view&id=${id}` : url; }
+function driveDownload(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/uc?export=download&id=${id}` : url; }
 function drivePreview(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/file/d/${id}/preview` : url; }
 function driveThumb(url){ if(String(url||'').startsWith('data:')) return url; const id=driveId(url); return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w2000` : driveDirect(url); }
 // Round95: restaura drivePreview usado no fallback de prévia das tarefas.
@@ -2419,11 +2420,34 @@ function ClientApprovalForm({form,setForm,approve,requestChange,statusById}){
   }
   return <div className="client-actions"><h3>Aprovar</h3><label><input type="checkbox" checked={!!f.art} onChange={e=>F('art',e.target.checked)}/> Artes/vídeos aprovados</label><label><input type="checkbox" checked={!!f.caption} onChange={e=>F('caption',e.target.checked)}/> Legenda aprovada</label><button style={buttonStyle('agendamento')} onClick={approve}>Aprovar</button><h3>Solicitar alteração</h3><label><input type="checkbox" checked={!!f.artChange} onChange={e=>F('artChange',e.target.checked)}/> Alterar arte/vídeo</label><label><input type="checkbox" checked={!!f.text} onChange={e=>F('text',e.target.checked)}/> Alterar texto na arte/vídeo</label><label><input type="checkbox" checked={!!f.captionChange} onChange={e=>F('captionChange',e.target.checked)}/> Alterar legenda</label><label><input type="checkbox" checked={!!f.redo} onChange={e=>toggleRedo(e.target.checked)}/> <span className="danger-text">Refazer o post</span></label><textarea value={f.description||''} onChange={e=>F('description',e.target.value)} placeholder="Descreva as alterações que você gostaria de aplicar"/><button style={canRequest?buttonStyle('alteracao'):undefined} disabled={!canRequest} onClick={requestChange}>Solicitar alteração</button>{hasChange&&!canRequest&&<small>Descreva o motivo para liberar a solicitação.</small>}</div> 
 }
-function InlinePreviewVideo({src}){
+function InlinePreviewVideo({src, sources}){
   const videoRef = useRef(null);
+  const sourceList = Array.from(new Set((sources && sources.length ? sources : [src]).filter(Boolean)));
+  const [sourceIndex,setSourceIndex] = useState(0);
   const [playing,setPlaying] = useState(false);
   const [ready,setReady] = useState(false);
   const [error,setError] = useState(false);
+
+  const currentSrc = sourceList[sourceIndex] || src;
+
+  useEffect(()=>{
+    setPlaying(false);
+    setReady(false);
+    setError(false);
+    if(!currentSrc) return;
+    const timer = setTimeout(()=>{
+      if(!ready){
+        if(sourceIndex < sourceList.length - 1) setSourceIndex(i=>i+1);
+        else setError(true);
+      }
+    }, 4500);
+    return ()=>clearTimeout(timer);
+  },[currentSrc]);
+
+  function tryNextSource(){
+    if(sourceIndex < sourceList.length - 1) setSourceIndex(i=>i+1);
+    else setError(true);
+  }
 
   function toggleVideo(e){
     e?.preventDefault?.();
@@ -2431,13 +2455,13 @@ function InlinePreviewVideo({src}){
     const video = videoRef.current;
     if(!video || error) return;
     if(video.paused){
-      video.play().catch(()=>setError(true));
+      video.play().catch(()=>tryNextSource());
     }else{
       video.pause();
     }
   }
 
-  return <div className="inline-video-preview">
+  return <div className="inline-video-preview clean-video-player">
     <video
       ref={videoRef}
       className="media-fit-image"
@@ -2446,12 +2470,12 @@ function InlinePreviewVideo({src}){
       preload="metadata"
       controls={false}
       disablePictureInPicture
-      controlsList="nodownload noplaybackrate noremoteplayback"
-      src={src}
+      controlsList="nodownload noplaybackrate noremoteplayback nofullscreen"
+      src={currentSrc}
       onClick={toggleVideo}
       onLoadedMetadata={()=>setReady(true)}
       onCanPlay={()=>setReady(true)}
-      onError={()=>setError(true)}
+      onError={tryNextSource}
       onPlay={()=>setPlaying(true)}
       onPause={()=>setPlaying(false)}
       onEnded={()=>setPlaying(false)}
@@ -2460,13 +2484,20 @@ function InlinePreviewVideo({src}){
       {playing?'Ⅱ':'▶'}
     </button>
     {!ready&&!error&&<span className="video-loading-note">Carregando vídeo...</span>}
-    {error&&<span className="video-loading-note">Não foi possível reproduzir aqui</span>}
+    {error&&<a className="video-loading-note video-open-fallback" href={currentSrc || src} target="_blank" rel="noreferrer" onClick={(e)=>e.stopPropagation()}>Abrir vídeo</a>}
   </div>
 }
 function DriveAdaptiveMedia({url,canPlay=false}){
   const [fallback,setFallback]=useState(false);
-  if(fallback) return <iframe className="drive-fallback-frame drive-video-frame" title="preview" src={drivePreview(url)} allow="autoplay; fullscreen"/>;
-  return <div className="drive-thumb-wrap"><img className="media-fit-image" src={driveThumb(url)} onError={()=>setFallback(true)} alt="Prévia do material"/>{canPlay&&<button type="button" className="drive-play-btn" onClick={(e)=>{e.preventDefault();e.stopPropagation();setFallback(true)}} aria-label="Reproduzir vídeo">▶</button>}</div>;
+  const [playDriveVideo,setPlayDriveVideo]=useState(false);
+  if(canPlay && playDriveVideo){
+    return <InlinePreviewVideo sources={[driveDownload(url), driveDirect(url)]} src={driveDownload(url)}/>;
+  }
+  if(fallback && !canPlay) return <iframe className="drive-fallback-frame" title="preview" src={drivePreview(url)} allow="fullscreen"/>;
+  return <div className="drive-thumb-wrap">
+    <img className="media-fit-image" src={driveThumb(url)} onError={()=>setFallback(true)} alt="Prévia do material"/>
+    {canPlay&&<button type="button" className="drive-play-btn" onClick={(e)=>{e.preventDefault();e.stopPropagation();setPlayDriveVideo(true)}} aria-label="Reproduzir vídeo">▶</button>}
+  </div>;
 }
 function Media({url,type=''}){ 
   const direct=driveDirect(url); const lower=(url||'').toLowerCase(); const isImg=/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(lower); const isVid=/\.(mp4|webm|mov)(\?|$)/.test(lower); const isDrive=(url||'').includes('drive.google.com'); const isVideoType=/vídeo|video|reels/i.test(String(type||''));

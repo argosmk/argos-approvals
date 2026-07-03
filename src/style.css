@@ -2033,3 +2033,53 @@ html, body, #root {
   display:none!important;
   opacity:0!important;
 }
+
+/* Round126 - Drive video preview without iframe controls */
+.clean-video-player,
+.inline-video-preview.clean-video-player,
+.drive-thumb-wrap{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050505;
+}
+.clean-video-player video.media-fit-image,
+.inline-video-preview.clean-video-player video.media-fit-image,
+.drive-thumb-wrap .media-fit-image{
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block;
+  background: #050505;
+}
+.clean-video-player video::-webkit-media-controls,
+.clean-video-player video::-webkit-media-controls-enclosure,
+.clean-video-player video::-webkit-media-controls-panel,
+.clean-video-player video::-webkit-media-controls-overlay-play-button,
+.clean-video-player video::-webkit-media-controls-play-button,
+.clean-video-player video::-webkit-media-controls-timeline,
+.clean-video-player video::-webkit-media-controls-current-time-display,
+.clean-video-player video::-webkit-media-controls-time-remaining-display,
+.clean-video-player video::-webkit-media-controls-mute-button,
+.clean-video-player video::-webkit-media-controls-volume-slider,
+.clean-video-player video::-webkit-media-controls-fullscreen-button{
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.clean-video-player .video-mini-toggle,
+.drive-thumb-wrap .drive-play-btn{
+  z-index: 8;
+}
+.media-box .slide-controls,
+.portfolio-post .slide-controls,
+.ig-post .slide-controls{
+  z-index: 20 !important;
+  pointer-events: none;
+}
+.media-box .slide-controls button,
+.portfolio-post .slide-controls button,
+.ig-post .slide-controls button{
+  pointer-events: auto;
+}
