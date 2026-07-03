@@ -1042,6 +1042,7 @@ function monthLabel(dateStr){ const d=dObj(dateStr)||dObj(todayStr()); return d.
 function addDays(dateStr, amount){ const d=dObj(dateStr)||dObj(todayStr()); d.setDate(d.getDate()+amount); return d.toISOString().slice(0,10); }
 function addMonths(dateStr, amount){ const d=dObj(dateStr)||dObj(todayStr()); d.setMonth(d.getMonth()+amount); return d.toISOString().slice(0,10); }
 function weekStartStr(dateStr=todayStr()){ const d=dObj(dateStr)||dObj(todayStr()); const day=d.getDay(); const diff=day===0?-6:1-day; d.setDate(d.getDate()+diff); return d.toISOString().slice(0,10); }
+function nextWeekStartStr(dateStr=todayStr()){ return addDays(weekStartStr(dateStr), 7); }
 function weekEndStr(dateStr=todayStr()){ return addDays(weekStartStr(dateStr),6); }
 function weekDayDate(weekStart, offset){ return addDays(weekStart, Number(offset)||0); }
 function linkify(text){
@@ -1227,7 +1228,13 @@ function App(){
     };
     syncRoute();
     window.addEventListener('hashchange', syncRoute);
-    return ()=>window.removeEventListener('hashchange', syncRoute);
+    window.addEventListener('pageshow', syncRoute);
+    window.addEventListener('popstate', syncRoute);
+    return ()=>{
+      window.removeEventListener('hashchange', syncRoute);
+      window.removeEventListener('pageshow', syncRoute);
+      window.removeEventListener('popstate', syncRoute);
+    };
   },[]);
 
   useEffect(()=>{
@@ -1558,6 +1565,9 @@ function App(){
   function createWeeklyTasks(companyId, weekStart, force=false){
     const company=companies.find(c=>c.id===companyId);
     if(!company) return;
+    const currentWeekStart=weekStartStr();
+    const canonicalWeekStart = weekStart <= currentWeekStart ? nextWeekStartStr() : weekStartStr(weekStart);
+    weekStart = canonicalWeekStart;
     const template=(company.weeklyTemplate||[]).filter(item=>Number(item.quantity)>0);
     if(!template.length){ alert('Este cliente ainda não tem template semanal configurado.'); return; }
     const existing=tasks.filter(t=>t.companyId===companyId && t.generatedWeek===weekStart);
@@ -2196,7 +2206,7 @@ function ReadOnlyInstruction({title,text}){
 }
 
 function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open}){
-  const [weekStart,setWeekStart]=useState(weekStartStr());
+  const [weekStart,setWeekStart]=useState(nextWeekStartStr());
   const [editingTemplate,setEditingTemplate]=useState(null);
   const activeCompanies=companies.filter(c=>c.active);
   const weekEnd=weekEndStr(weekStart);
@@ -2212,14 +2222,14 @@ function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open
       const created=tasks.filter(t=>t.companyId===c.id && t.generatedWeek===weekStart).length;
       return expected>0 && created===0;
     });
-    if(!pending.length){ alert('Nenhum cliente pendente para esta semana.'); return; }
+    if(!pending.length){ alert('Nenhum cliente pendente para a próxima semana.'); return; }
     const total=pending.reduce((acc,c)=>acc+(c.weeklyTemplate||[]).reduce((a,item)=>a+(Number(item.quantity)||0),0),0);
     if(!confirm(`Gerar ${total} tarefa(s) para ${pending.length} cliente(s) pendente(s)?`)) return;
     pending.forEach(c=>createWeeklyTasks(c.id,weekStart,false));
   }
   return <section>
     <div className="calendar-titlebar"><div><h1>Planejamento Semanal</h1><p>Gere remessas de tarefas por cliente a partir dos templates configurados.</p></div><button className="primary" onClick={generateAll}>Gerar todos pendentes</button></div>
-    <div className="filters planning-top-filters"><label className="planning-date-filter">Semana começa em<input type="date" value={weekStart} onChange={e=>setWeekStart(weekStartStr(e.target.value))}/></label><div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Total previsto</small><b>{totalExpected}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Já geradas</small><b>{totalCreated}</b></div></div>
+    <div className="filters planning-top-filters"><label className="planning-date-filter">Semana começa em<input type="date" value={weekStart} onChange={e=>{ const picked=weekStartStr(e.target.value); setWeekStart(picked <= weekStartStr() ? nextWeekStartStr() : picked); }}/></label><div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Total previsto</small><b>{totalExpected}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Já geradas</small><b>{totalCreated}</b></div></div>
     <div className="client-grid compact-admin-grid planning-grid" style={{display:'flex',flexDirection:'column',gap:16}}>{activeCompanies.map(c=>{ const template=c.weeklyTemplate||[]; const expected=template.reduce((a,item)=>a+(Number(item.quantity)||0),0); const createdTasks=tasks.filter(t=>t.companyId===c.id && t.generatedWeek===weekStart); const created=createdTasks.length; return <div className="panel planning-card" key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{expected} tarefa(s) previstas • {created} gerada(s)</small></div></div>{template.length?<div className="template-preview">{template.map(item=><small key={item.id||item.type}>{item.quantity||0}× {item.type} • {WEEK_DAYS.find(d=>d.value===Number(item.postDay))?.label||'Segunda'}</small>)}</div>:<p className="muted-note">Sem template semanal configurado.</p>}<div className="row-actions"><button className="primary" disabled={!expected} onClick={()=>createWeeklyTasks(c.id,weekStart,false)}>{created?'Gerar novamente':'Gerar semana'}</button><button onClick={()=>setEditingTemplate(c)}>{template.length?'Editar template':'Criar template'}</button>{createdTasks.length>0&&<button onClick={()=>open(createdTasks[0].id)}>Ver tarefas</button>}</div></div>})}</div>
     {editingTemplate&&<WeeklyTemplateEditor company={editingTemplate} users={users} save={saveTemplate} cancel={()=>setEditingTemplate(null)}/>} 
   </section>
@@ -2396,7 +2406,7 @@ function DriveAdaptiveMedia({url}){
 }
 function Media({url}){ 
   const direct=driveDirect(url); const lower=(url||'').toLowerCase(); const isImg=/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(lower); const isVid=/\.(mp4|webm|mov)(\?|$)/.test(lower); const isDrive=(url||'').includes('drive.google.com'); 
-  return <div className="media-inner clean-media-preview">{isDrive?<DriveAdaptiveMedia url={url}/>:isVid?<video className="media-fit-image" muted playsInline loop autoPlay src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div> 
+  return <div className="media-inner clean-media-preview">{isDrive?<DriveAdaptiveMedia url={url}/>:isVid?<video className="media-fit-image" controls playsInline preload="metadata" src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div> 
 }
 function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[],setUsers=()=>{}}){
   const [editing,setEditing]=useState(null);
