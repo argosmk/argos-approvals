@@ -950,3 +950,100 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   .team-feed-grid{grid-template-columns:1fr !important;gap:16px !important;}
   .team-feed-item{aspect-ratio:4/5 !important;border-radius:12px !important;}
 }
+
+/* Round113: ajustes finos de Portfólios e tarefa */
+.team-hub-hero p{
+  display:none !important;
+}
+.team-stories-strip,
+.team-stories-strip.panel{
+  padding:8px 8px 30px !important;
+  margin-bottom:28px !important;
+  scrollbar-width:none;
+}
+.team-stories-strip::-webkit-scrollbar{display:none}
+.team-profile-area{
+  border-bottom:0 !important;
+  padding-bottom:0 !important;
+  margin-bottom:0 !important;
+}
+.team-profile-header.insta-profile-header,
+.insta-profile-header{
+  margin-bottom:28px !important;
+}
+.team-feed-grid{
+  border-top:1px solid rgba(255,255,255,.08) !important;
+  padding-top:28px !important;
+  margin-top:4px !important;
+}
+.empty-team-feed,
+.empty-team-feed.inline-empty{
+  border-top:1px solid rgba(255,255,255,.08) !important;
+  padding-top:28px !important;
+  margin-top:4px !important;
+}
+.team-feed-item{
+  max-width:320px !important;
+}
+.team-feed-grid .team-feed-item{
+  width:100% !important;
+}
+.team-feed-media .media-open-overlay,
+.team-feed-media .media-open,
+.team-feed-media .outside,
+.team-feed-media .insta-icons{display:none !important;}
+.team-feed-arrows .feed-arrow,
+.team-feed-arrows button{
+  background:rgba(0,0,0,.34) !important;
+  opacity:.7 !important;
+}
+.team-feed-arrows .feed-arrow:hover,
+.team-feed-arrows button:hover{opacity:1 !important;}
+.panel-actions > button:first-of-type{
+  width:auto;
+  justify-content:initial;
+}
+.readonly-instruction{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+.readonly-instruction label{
+  color:var(--muted);
+  font-size:12px;
+}
+.instruction-box.textarea-like{
+  min-height:72px;
+  max-height:220px;
+  overflow:auto;
+  background:#050506;
+  border:1px solid rgba(225,177,44,.35);
+  border-radius:10px;
+  padding:11px 12px;
+  color:var(--text);
+  font-size:13px;
+  line-height:1.5;
+  white-space:pre-wrap;
+}
+.instruction-box.textarea-like a{
+  color:#f6d56a;
+  text-decoration:none;
+  word-break:break-all;
+}
+.instruction-box.textarea-like a:hover{text-decoration:underline;}
+@media (max-width:780px){
+  .team-stories-strip,.team-stories-strip.panel{
+    padding:8px 4px 24px !important;
+    margin-bottom:22px !important;
+  }
+  .team-profile-header.insta-profile-header,
+  .insta-profile-header{
+    margin-bottom:22px !important;
+  }
+  .team-feed-grid,
+  .empty-team-feed,
+  .empty-team-feed.inline-empty{
+    padding-top:20px !important;
+  }
+  .team-feed-item{max-width:none !important;}
+}
