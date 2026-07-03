@@ -2419,14 +2419,52 @@ function ClientApprovalForm({form,setForm,approve,requestChange,statusById}){
   }
   return <div className="client-actions"><h3>Aprovar</h3><label><input type="checkbox" checked={!!f.art} onChange={e=>F('art',e.target.checked)}/> Artes/vídeos aprovados</label><label><input type="checkbox" checked={!!f.caption} onChange={e=>F('caption',e.target.checked)}/> Legenda aprovada</label><button style={buttonStyle('agendamento')} onClick={approve}>Aprovar</button><h3>Solicitar alteração</h3><label><input type="checkbox" checked={!!f.artChange} onChange={e=>F('artChange',e.target.checked)}/> Alterar arte/vídeo</label><label><input type="checkbox" checked={!!f.text} onChange={e=>F('text',e.target.checked)}/> Alterar texto na arte/vídeo</label><label><input type="checkbox" checked={!!f.captionChange} onChange={e=>F('captionChange',e.target.checked)}/> Alterar legenda</label><label><input type="checkbox" checked={!!f.redo} onChange={e=>toggleRedo(e.target.checked)}/> <span className="danger-text">Refazer o post</span></label><textarea value={f.description||''} onChange={e=>F('description',e.target.value)} placeholder="Descreva as alterações que você gostaria de aplicar"/><button style={canRequest?buttonStyle('alteracao'):undefined} disabled={!canRequest} onClick={requestChange}>Solicitar alteração</button>{hasChange&&!canRequest&&<small>Descreva o motivo para liberar a solicitação.</small>}</div> 
 }
+function InlinePreviewVideo({src}){
+  const videoRef = useRef(null);
+  const [playing,setPlaying] = useState(false);
+  const [ready,setReady] = useState(false);
+
+  function toggleVideo(e){
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    const video = videoRef.current;
+    if(!video) return;
+    if(video.paused){
+      video.play().catch(()=>{});
+    }else{
+      video.pause();
+    }
+  }
+
+  return <div className="inline-video-preview">
+    <video
+      ref={videoRef}
+      className="media-fit-image"
+      playsInline
+      webkit-playsinline="true"
+      preload="metadata"
+      src={src}
+      onClick={toggleVideo}
+      onLoadedMetadata={()=>setReady(true)}
+      onPlay={()=>setPlaying(true)}
+      onPause={()=>setPlaying(false)}
+      onEnded={()=>setPlaying(false)}
+    />
+    <button type="button" className={(playing?'video-mini-toggle is-playing':'video-mini-toggle')} onClick={toggleVideo} aria-label={playing?'Pausar vídeo':'Reproduzir vídeo'}>
+      {playing?'Ⅱ':'▶'}
+    </button>
+    {!ready&&<span className="video-loading-note">Carregando vídeo...</span>}
+  </div>
+}
 function DriveAdaptiveMedia({url,canPlay=false}){
   const [fallback,setFallback]=useState(false);
-  if(fallback) return <iframe className="drive-fallback-frame" title="preview" src={drivePreview(url)} allow="autoplay; fullscreen"/>;
+  const direct = driveDirect(url);
+  if(fallback) return canPlay ? <InlinePreviewVideo src={direct}/> : <iframe className="drive-fallback-frame" title="preview" src={drivePreview(url)} allow="autoplay; fullscreen"/>;
   return <div className="drive-thumb-wrap"><img className="media-fit-image" src={driveThumb(url)} onError={()=>setFallback(true)} alt="Prévia do material"/>{canPlay&&<button type="button" className="drive-play-btn" onClick={()=>setFallback(true)} aria-label="Reproduzir vídeo">▶</button>}</div>;
 }
 function Media({url,type=''}){ 
   const direct=driveDirect(url); const lower=(url||'').toLowerCase(); const isImg=/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(lower); const isVid=/\.(mp4|webm|mov)(\?|$)/.test(lower); const isDrive=(url||'').includes('drive.google.com'); const isVideoType=/vídeo|video|reels/i.test(String(type||''));
-  return <div className="media-inner clean-media-preview">{isDrive?<DriveAdaptiveMedia url={url} canPlay={isVideoType}/>:isVid?<video className="media-fit-image" controls playsInline preload="metadata" src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div> 
+  return <div className="media-inner clean-media-preview">{isDrive?<DriveAdaptiveMedia url={url} canPlay={isVideoType}/>:isVid?<InlinePreviewVideo src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div> 
 }
 function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[],setUsers=()=>{}}){
   const [editing,setEditing]=useState(null);
