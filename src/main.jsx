@@ -19,6 +19,8 @@ const ROUTE_SCREEN_ALIASES = {
   portfolios: 'teamhub',
   portfolio: 'teamhub',
   teamhub: 'teamhub',
+  documents: 'documents',
+  docs: 'documents',
   settings: 'settings',
 };
 const SCREEN_TO_ROUTE = {
@@ -29,6 +31,7 @@ const SCREEN_TO_ROUTE = {
   kanban: 'kanban',
   tasks: 'tasks',
   teamhub: 'portfolios',
+  documents: 'documents',
   settings: 'settings',
 };
 function parseAppRoute(){
@@ -91,6 +94,11 @@ function safeUUID(){
 
 
 const ARGOS_UI_POLISH_CSS = `
+.documents-layout{grid-template-columns:minmax(260px,360px) minmax(0,1fr)!important;align-items:start!important;}
+.doc-list-item{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin:0 0 8px;padding:12px;border:1px solid rgba(225,177,44,.24);border-radius:12px;background:rgba(255,255,255,.03);color:inherit;text-align:left;}
+.doc-list-item.active{border-color:#e1b12c;background:rgba(225,177,44,.08);}
+.document-editor textarea.document-content-textarea{min-height:260px;font-family:inherit;line-height:1.55;}
+@media(max-width:760px){.documents-layout{grid-template-columns:1fr!important}.doc-list-item{border-radius:10px}.document-editor textarea.document-content-textarea{min-height:220px}}
 .task-topbar-split{display:grid;grid-template-columns:auto minmax(260px,1fr);align-items:center;gap:12px;margin-bottom:12px;}
 .task-topbar-split .task-nav-actions{justify-self:end;display:flex;gap:8px;flex-wrap:wrap;}
 .task-topbar-split .task-nav-actions button{white-space:nowrap;}
@@ -676,6 +684,7 @@ const EMPTY_CLOUD_STATE = {
   statuses: DEFAULT_STATUS,
   tasks: [],
   notifications: [],
+  documents: [],
   system: { logo:'', title:'Painel de Aprovação' }
 };
 function initials(name){ return String(name||'A').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'A'; }
@@ -752,6 +761,7 @@ function normalizeWorkspacePayload(payload){
     statuses: Array.isArray(p.statuses) && p.statuses.length ? p.statuses : DEFAULT_STATUS,
     tasks: Array.isArray(p.tasks) ? p.tasks : [],
     notifications: Array.isArray(p.notifications) ? p.notifications : [],
+    documents: Array.isArray(p.documents) ? p.documents : [],
     system: p.system || { logo:'', title:'Painel de Aprovação' },
   };
 }
@@ -841,6 +851,7 @@ function mergeWorkspacePayload(basePayload, localPayload, remotePayload){
     statuses: mergeArrayById(base.statuses, local.statuses, remote.statuses, 'statuses'),
     tasks: mergeArrayById(base.tasks, local.tasks, remote.tasks, 'tasks'),
     notifications: mergeArrayById(base.notifications, local.notifications, remote.notifications, 'notifications'),
+    documents: mergeArrayById(base.documents, local.documents, remote.documents, 'documents'),
     system: mergeItem(base.system || {}, local.system || {}, remote.system || {}),
   };
 }
@@ -868,6 +879,7 @@ function applyWorkspacePayload(payload, setters, options={}){
   setters.setStatusesState((p.statuses&&p.statuses.length)?p.statuses:DEFAULT_STATUS);
   setters.setTasksState(p.tasks||[]);
   setters.setNotificationsState(p.notifications||[]);
+  if(setters.setDocumentsState) setters.setDocumentsState(p.documents||[]);
   setters.setSystemState(p.system||{logo:'',title:'Painel de Aprovação'});
   if(!options.skipSystemCache) save('argos_system_r18', p.system||{logo:'',title:'Painel de Aprovação'});
 }
@@ -1214,6 +1226,7 @@ function App(){
   const [statuses,setStatusesState]=useState(()=>load('argos_statuses_r8', DEFAULT_STATUS));
   const [tasks,setTasksState]=useState(()=>load('argos_tasks_r8', seedTasks));
   const [notifications,setNotificationsState]=useState(()=>load('argos_notifications_r9', []));
+  const [documents,setDocumentsState]=useState(()=>load('argos_documents_r1', []));
   const initialRoute=parseAppRoute();
   const [auth,setAuth]=useState(null); const [viewAs,setViewAs]=useState(null); const [screen,setScreen]=useState(initialRoute.screen || 'dashboard');
   const [selectedTask,setSelectedTask]=useState(initialRoute.taskId || null); const [createOpen,setCreateOpen]=useState(false); const [form,setForm]=useState(null);
@@ -1270,7 +1283,7 @@ function App(){
         if(alive){
           setAuth(currentAuth);
           workspaceMetaRef.current={updatedAt:record.updatedAt, basePayload:clonePayload(workspacePayloadForSave(nextPayload)), lastSavedSignature:payloadSignature(workspacePayloadForSave(nextPayload)), applyingRemote:true};
-          applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
+          applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setDocumentsState,setSystemState});
           workspaceMetaRef.current.applyingRemote=false;
           setCloudReady(true); setCloudLoading(false); setCloudError(''); setSaveStatus('Sincronizado');
           if(!record.payload){
@@ -1341,7 +1354,7 @@ function App(){
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
     if(workspaceMetaRef.current.applyingRemote) return;
-    const localPayload=workspacePayloadForSave({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications, system });
+    const localPayload=workspacePayloadForSave({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications, documents, system });
     const localSignature=payloadSignature(localPayload);
     if(localSignature === workspaceMetaRef.current.lastSavedSignature) return;
     if(saveRetryRef.current) clearTimeout(saveRetryRef.current);
@@ -1367,7 +1380,7 @@ function App(){
       }
     },650);
     return()=>clearTimeout(timer);
-  },[users,companies,statuses,notifications,system,cloudReady,auth?.organizationId,saveTick,taskTablesReady]);
+  },[users,companies,statuses,notifications,documents,system,cloudReady,auth?.organizationId,saveTick,taskTablesReady]);
 
   // Round106: o polling/merge remoto do workspace_state foi desativado.
   // Motivo: o workspace ainda é um JSON grande. Sincronizar e mesclar esse JSON em abas antigas
@@ -1407,6 +1420,13 @@ function App(){
     setNotificationsState(prev=>{
       const next = typeof v === 'function' ? v(prev) : v;
       if(!isSupabaseConfigured) save('argos_notifications_r9',next);
+      return next;
+    });
+  };
+  const setDocuments=v=>{
+    setDocumentsState(prev=>{
+      const next = typeof v === 'function' ? v(prev) : v;
+      if(!isSupabaseConfigured) save('argos_documents_r1',next);
       return next;
     });
   };
@@ -1463,7 +1483,7 @@ function App(){
   },[cloudReady,tasks]);
 
   if(cloudLoading) return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Carregando Argos</h1><p>Conectando ao Supabase...</p></div></div>;
-  if(isSupabaseConfigured && !auth) return <CloudLogin setAuth={setAuth} setUsersState={setUsersState} setCompaniesState={setCompaniesState} setStatusesState={setStatusesState} setTasksState={setTasksState} setNotificationsState={setNotificationsState} setSystemState={setSystemState} setCloudReady={setCloudReady} setCloudError={setCloudError} setWorkspaceMeta={(meta)=>{workspaceMetaRef.current=meta}} cloudError={cloudError} system={system}/>;
+  if(isSupabaseConfigured && !auth) return <CloudLogin setAuth={setAuth} setUsersState={setUsersState} setCompaniesState={setCompaniesState} setStatusesState={setStatusesState} setTasksState={setTasksState} setNotificationsState={setNotificationsState} setDocumentsState={setDocumentsState} setSystemState={setSystemState} setCloudReady={setCloudReady} setCloudError={setCloudError} setWorkspaceMeta={(meta)=>{workspaceMetaRef.current=meta}} cloudError={cloudError} system={system}/>;
   if(!auth) return <SetupRequired/>;
   const authUser=users.find(u=>u.id===auth.id)||auth;
   const simulatedUser=viewAs ? (users.find(u=>u.id===viewAs.id)||viewAs) : null;
@@ -1647,7 +1667,7 @@ function App(){
     setTasks(prev=>[...prev,...created]);
     alert(`${created.length} tarefa(s) gerada(s) para ${company.name}.`);
   }
-  const navAdmin=[['dashboard','Dashboard'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios'],['settings','Configurações']];
+  const navAdmin=[['dashboard','Dashboard'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios'],['documents','Documentos'],['settings','Configurações']];
   const navTeam=[['dashboard','Dashboard'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios']];
   const navClient=[['calendar','Calendário']];
   const nav=isAdmin?navAdmin:(effectiveUser.role==='team'?navTeam:navClient);
@@ -1692,6 +1712,7 @@ function App(){
           {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute}/>} 
           {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
           {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
+          {activeScreen==='documents' && isAdmin && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
           {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
           {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} user={effectiveUser} auth={auth}/>} 
         </>
@@ -1701,7 +1722,7 @@ function App(){
   </div>
 }
 
-async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta){
+async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setDocumentsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta){
   const { data } = await supabase.auth.getSession();
   const profile=await fetchCurrentProfile(data.session);
   const record=await loadWorkspaceRecord(profile.organizationId);
@@ -1714,7 +1735,7 @@ async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setSt
   const nextPayload={...payload, users:nextUsers};
   const currentAuth = nextUsers.find(u=>u.id===mergedProfile.id) || mergedProfile;
   setAuth(currentAuth);
-  applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
+  applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setDocumentsState,setSystemState});
   setCloudReady(true); setCloudError('');
   if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:record.updatedAt, basePayload:clonePayload(workspacePayloadForSave(nextPayload)), lastSavedSignature:payloadSignature(workspacePayloadForSave(nextPayload)), applyingRemote:false});
   if(!record.payload){
@@ -1722,14 +1743,14 @@ async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setSt
     if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:savedRecord.updatedAt, basePayload:clonePayload(savedRecord.payload||workspacePayloadForSave(nextPayload)), lastSavedSignature:payloadSignature(savedRecord.payload||workspacePayloadForSave(nextPayload)), applyingRemote:false});
   }
 }
-function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta,cloudError,system}){
+function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setDocumentsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta,cloudError,system}){
   const [email,setEmail]=useState(''); const [pass,setPass]=useState(''); const [busy,setBusy]=useState(false);
   const cachedSystem = load('argos_system_r18', {});
   const loginLogo = system?.loginLogo || system?.logo || cachedSystem?.loginLogo || cachedSystem?.logo || ''; 
   const loginTitle = system?.loginTitle || system?.title || cachedSystem?.loginTitle || cachedSystem?.title || 'Painel de Aprovação';
   const loginSubtitle = system?.loginSubtitle || cachedSystem?.loginSubtitle || 'Entre com seu acesso.';
   async function login(){
-    try{ setBusy(true); setCloudError(''); const { error } = await supabase.auth.signInWithPassword({ email, password: pass }); if(error) throw error; await hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta); }
+    try{ setBusy(true); setCloudError(''); const { error } = await supabase.auth.signInWithPassword({ email, password: pass }); if(error) throw error; await hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setDocumentsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta); }
     catch(err){ setCloudError(err.message||'Login inválido.'); }
     finally{ setBusy(false); }
   }
@@ -1755,6 +1776,7 @@ function NavIcon({id}){
     calendar:<><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/></>,
     kanban:<><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v16M15 4v16M6.5 8h.01M11.5 12h.01M17.5 9h.01"/></>,
     tasks:<><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></>,
+    documents:<><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/><path d="M9 11h6M9 15h6M9 18h4"/></>,
     settings:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1.82V22a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 20.6a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.82-.33H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.4 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1.82V2a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 3.4a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.39.29.73.63 1 1h.09a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1 1z"/></>,
   };
   return <svg className="nav-icon" {...common}>{icons[id] || icons.dashboard}</svg>;
@@ -2786,6 +2808,89 @@ function GeneralSettings({system,setSystem,reset}){
     <div className="danger-zone"><h3>Zona de risco</h3><p>Use esta opção apenas em ambiente de teste ou com certeza absoluta.</p><button onClick={reset}>Resetar demo</button></div>
   </div></div>
 }
+
+
+const DOCUMENT_FOLDERS = ['Clientes','Funcionários','Financeiro','Processos','Modelos','Interno'];
+const DOCUMENT_TYPES = ['Informações gerais','Briefing','Preferências','Acessos','Financeiro do cliente','Pagamento de funcionário','Processo interno','Modelo'];
+function blankDocument(currentUser){
+  return {
+    id:safeUUID(),
+    title:'Novo documento',
+    folder:'Clientes',
+    type:'Informações gerais',
+    linkType:'general',
+    targetId:'',
+    content:'',
+    externalLink:'',
+    monthlyValue:'',
+    billingDay:'',
+    employeeMonthlyCost:'',
+    employeeVariableCost:'',
+    archived:false,
+    createdAt:now(),
+    updatedAt:now(),
+    createdBy:currentUser?.id || '',
+    updatedBy:currentUser?.id || ''
+  };
+}
+function moneyNumber(value){
+  const raw=String(value??'').replace(/\./g,'').replace(',', '.').replace(/[^0-9.-]/g,'');
+  const n=Number(raw);
+  return Number.isFinite(n)?n:0;
+}
+function moneyBR(value){
+  const n=Number(value)||0;
+  try{return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}catch(e){return `R$ ${n.toFixed(2)}`;}
+}
+function currentMonthKey(){ return new Date().toISOString().slice(0,7); }
+function taskMonthKey(task){ return String(task?.postDate || task?.internalDate || '').slice(0,7); }
+function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,currentUser}){
+  const [selected,setSelected]=useState(documents.find(d=>!d.archived)?.id || documents[0]?.id || null);
+  const [folder,setFolder]=useState('all');
+  const [link,setLink]=useState('all');
+  const [q,setQ]=useState('');
+  const visibleDocs=(documents||[]).filter(d=>!d.archived);
+  const filtered=visibleDocs.filter(d=>{
+    if(folder!=='all' && d.folder!==folder) return false;
+    if(link!=='all' && d.linkType!==link) return false;
+    const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name: d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'';
+    const hay=`${d.title} ${d.folder} ${d.type} ${target} ${d.content}`.toLowerCase();
+    return hay.includes((q||'').trim().toLowerCase());
+  });
+  const doc=documents.find(d=>d.id===selected) || filtered[0] || visibleDocs[0] || null;
+  useEffect(()=>{ if(!doc && filtered[0]) setSelected(filtered[0].id); },[documents.length, folder, link, q]);
+  function createDoc(){
+    const next=blankDocument(currentUser);
+    setDocuments(prev=>[next,...(prev||[])]);
+    setSelected(next.id);
+  }
+  function patchDoc(id,patch){
+    setDocuments(prev=>(prev||[]).map(d=>d.id===id?{...d,...patch,updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy}:d));
+  }
+  function archiveDoc(id){
+    if(!confirm('Arquivar este documento?')) return;
+    patchDoc(id,{archived:true});
+    const next=filtered.find(d=>d.id!==id) || visibleDocs.find(d=>d.id!==id);
+    setSelected(next?.id || null);
+  }
+  return <section><div className="section-header"><div><h1>Documentos</h1><p>Base interna para informações de clientes, equipe, processos e finanças leves.</p></div><button className="primary" onClick={createDoc}>+ Novo documento</button></div><div className="filters"><label>Pasta<select value={folder} onChange={e=>setFolder(e.target.value)}><option value="all">Todas</option>{DOCUMENT_FOLDERS.map(f=><option key={f}>{f}</option>)}</select></label><label>Vínculo<select value={link} onChange={e=>setLink(e.target.value)}><option value="all">Todos</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option><option value="general">Geral</option></select></label><label>Pesquisar<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar documento..."/></label></div><div className="grid2 documents-layout"><div className="panel"><h2>Biblioteca</h2>{filtered.length?filtered.map(d=>{const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name:d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'Geral'; return <button key={d.id} className={'doc-list-item '+(doc?.id===d.id?'active':'')} onClick={()=>setSelected(d.id)}><b>{d.title||'Sem título'}</b><small>{d.folder} • {d.type}{target?` • ${target}`:''}</small></button>}):<p className="muted-note">Nenhum documento encontrado.</p>}</div>{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} archiveDoc={archiveDoc} companies={companies} users={users} tasks={tasks} statuses={statuses}/>:<div className="panel"><h2>Nenhum documento</h2><p>Crie um documento para começar.</p></div>}</div></section>
+}
+function DocumentEditor({doc,patchDoc,archiveDoc,companies,users,tasks,statuses}){
+  const targetName=doc.linkType==='company'?companies.find(c=>c.id===doc.targetId)?.name:doc.linkType==='user'?users.find(u=>u.id===doc.targetId)?.name:'Geral';
+  const month=currentMonthKey();
+  const monthTasks=tasks.filter(t=>!t.archived && taskMonthKey(t)===month);
+  const companyTasks=doc.linkType==='company' && doc.targetId ? monthTasks.filter(t=>t.companyId===doc.targetId) : [];
+  const companyFinished=companyTasks.filter(t=>isFinalStatus(statuses,t.status));
+  const employeeTasks=doc.linkType==='user' && doc.targetId ? monthTasks.filter(t=>t.responsibleId===doc.targetId) : [];
+  const employeeFinished=employeeTasks.filter(t=>isFinalStatus(statuses,t.status));
+  const monthly=moneyNumber(doc.monthlyValue);
+  const avgFinished=monthly && companyFinished.length ? monthly/companyFinished.length : 0;
+  const employeeCost=moneyNumber(doc.employeeMonthlyCost);
+  const costPerFinished=employeeCost && employeeFinished.length ? employeeCost/employeeFinished.length : 0;
+  const linkedOptions=doc.linkType==='company'?companies.filter(c=>c.active!==false):doc.linkType==='user'?users.filter(u=>u.active!==false && u.role!=='client'):[];
+  return <div className="panel document-editor"><div className="section-header"><div><h2>{doc.title||'Documento'}</h2><small>{targetName || 'Sem vínculo'} • Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</small></div><button onClick={()=>archiveDoc(doc.id)}>Arquivar</button></div><label>Título<input value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})}/></label><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{DOCUMENT_FOLDERS.map(f=><option key={f}>{f}</option>)}</select></label><label>Tipo<select value={doc.type||'Informações gerais'} onChange={e=>patchDoc(doc.id,{type:e.target.value})}>{DOCUMENT_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="form-two"><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label><label>{doc.linkType==='user'?'Funcionário':doc.linkType==='company'?'Empresa/cliente':'Vínculo'}<select disabled={doc.linkType==='general'} value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div><label>Link externo opcional<input value={doc.externalLink||''} onChange={e=>patchDoc(doc.id,{externalLink:e.target.value})} placeholder="Link de planilha, pasta do Drive, Docs etc."/></label><div className="form-two"><label>Valor mensal do cliente<input value={doc.monthlyValue||''} onChange={e=>patchDoc(doc.id,{monthlyValue:e.target.value})} placeholder="Ex: 1700"/></label><label>Dia de pagamento<input value={doc.billingDay||''} onChange={e=>patchDoc(doc.id,{billingDay:e.target.value})} placeholder="Ex: 10"/></label></div><div className="form-two"><label>Custo mensal do funcionário<input value={doc.employeeMonthlyCost||''} onChange={e=>patchDoc(doc.id,{employeeMonthlyCost:e.target.value})} placeholder="Ex: 1500"/></label><label>Custo variável / observação<input value={doc.employeeVariableCost||''} onChange={e=>patchDoc(doc.id,{employeeVariableCost:e.target.value})} placeholder="Ex: R$ 50 por vídeo"/></label></div>{doc.linkType==='company'&&doc.targetId&&<div className="cards quick-cards"><Card title="Tarefas do mês" value={companyTasks.length}/><Card title="Finalizadas no mês" value={companyFinished.length}/><Card title="Valor mensal" value={moneyBR(monthly)}/><Card title="Média por finalizada" value={avgFinished?moneyBR(avgFinished):'—'}/></div>}{doc.linkType==='user'&&doc.targetId&&<div className="cards quick-cards"><Card title="Tarefas do mês" value={employeeTasks.length}/><Card title="Finalizadas no mês" value={employeeFinished.length}/><Card title="Custo mensal" value={moneyBR(employeeCost)}/><Card title="Custo por finalizada" value={costPerFinished?moneyBR(costPerFinished):'—'}/></div>}<label>Conteúdo do documento<textarea className="document-content-textarea" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Briefing, acessos, preferências, combinados, observações internas..."/></label><small className="muted-note">Primeira versão segura: texto e campos estruturados no Argos, com link externo opcional para Drive/Sheets. Upload e sincronização automática ficam para fases futuras.</small></div>
+}
+
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
   const [tab,setTab]=useState('open'); 
