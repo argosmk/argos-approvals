@@ -2083,3 +2083,75 @@ html, body, #root {
 .ig-post .slide-controls button{
   pointer-events: auto;
 }
+
+/* Round128: vídeo Drive dentro da prévia sem controles nativos e com play próprio */
+.media-box.adaptive-media-box .round128-clean-video,
+.media-box.adaptive-media-box .drive-thumb-wrap{
+  position:relative;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#151515;
+}
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  background:#151515!important;
+  pointer-events:none!important;
+}
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-panel,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-enclosure,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-overlay-play-button,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-start-playback-button,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-play-button,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-timeline,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-current-time-display,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-time-remaining-display,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-mute-button,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-volume-slider,
+.media-box.adaptive-media-box .round128-clean-video video.media-fit-image::-webkit-media-controls-fullscreen-button{
+  display:none!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+.media-box.adaptive-media-box .round128-clean-video .video-mini-toggle,
+.media-box.adaptive-media-box .drive-thumb-wrap .drive-play-btn{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  z-index:8!important;
+  width:54px!important;
+  height:54px!important;
+  border-radius:999px!important;
+  display:grid!important;
+  place-items:center!important;
+  border:1px solid rgba(255,255,255,.65)!important;
+  background:rgba(0,0,0,.38)!important;
+  color:#fff!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.28)!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+}
+.media-box.adaptive-media-box .slide-controls{
+  z-index:12!important;
+  pointer-events:none!important;
+}
+.media-box.adaptive-media-box .slide-controls button{
+  pointer-events:auto!important;
+}
+.media-box.adaptive-media-box .video-loading-note{
+  position:absolute!important;
+  left:50%!important;
+  bottom:18px!important;
+  transform:translateX(-50%)!important;
+  z-index:9!important;
+  max-width:calc(100% - 32px)!important;
+  padding:8px 12px!important;
+  border-radius:999px!important;
+  background:rgba(0,0,0,.62)!important;
+  color:#fff!important;
+  font-size:12px!important;
+}
