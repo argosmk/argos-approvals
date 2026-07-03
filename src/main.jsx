@@ -620,13 +620,25 @@ const DEFAULT_STATUS = [
 const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
 const NOTIFICATION_EVENTS = ['Comentário na tarefa','Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Prazo vencido','Prazo hoje','Tarefa reaberta'];
-const NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
 function wantsNotification(user, event, statusId){
-  const statusPrefs=user.notificationStatusPrefs||{};
-  if(statusId && (event==='Alteração de status' || event==='Status da tarefa')) return (statusPrefs[statusId]??true);
   const prefs=user.notificationPrefs||NOTIFICATION_EVENTS;
-  if(!prefs.includes(event)) return false;
-  return true;
+  const statusPrefs=user.notificationStatusPrefs||{};
+  // Round134B2: status marcado é a regra principal.
+  // Não pode depender do evento antigo "Alteração de status", que saiu do painel.
+  if(statusId) return (statusPrefs[statusId]??true);
+  return prefs.includes(event);
+}
+function isSilentOperationalLog(text=''){
+  const normalized=String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return [
+    'timer pausado',
+    'timer iniciado',
+    'tarefa acessada',
+    'inatividade',
+    'fechar a tela',
+    'sair da tarefa',
+    'trocar de tarefa'
+  ].some(term=>normalized.includes(term));
 }
 
 const seedCompanies = [
@@ -1516,7 +1528,7 @@ function App(){
         });
 
         eventText=statusText;
-        eventName='Status da tarefa';
+        eventName='Alteração de status';
         eventStatus=patch.status;
       }
 
@@ -1542,7 +1554,7 @@ function App(){
 
       if(eventName) notifyTask(targetTask,eventText,eventName,eventStatus);
 
-      if(logText){
+      if(logText && !isSilentOperationalLog(logText)){
         const ev=logText.includes('aprov')
           ? 'Aprovação do cliente'
           : logText.includes('alteração')
@@ -2545,7 +2557,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   const [openNotif,setOpenNotif]=useState({});
   const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived || u.active!==false));
   const sortedPeople=sortEntities(people,sort,u=>u.name);
-  const events=NOTIFICATION_VISIBLE_EVENTS;
+  const events=NOTIFICATION_EVENTS;
   async function archiveTeamUser(u){
     if(u.id===currentUser?.id) return alert('Você não pode arquivar seu próprio usuário.');
     const nextActive = u.active===false;
@@ -2706,7 +2718,7 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
-  const events=NOTIFICATION_VISIBLE_EVENTS;
+  const events=NOTIFICATION_EVENTS;
   const editableUsers=sortEntities(users.filter(u=>u.role!=='client'),'role',u=>u.name);
   const [openIds,setOpenIds]=useState({});
   function toggleOpen(id){ setOpenIds(prev=>({...prev,[id]:!prev[id]})); }
@@ -2751,16 +2763,9 @@ function GeneralSettings({system,setSystem,reset}){
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
   const [tab,setTab]=useState('open'); 
-  const userNotifications=notifications.filter(n=>(!n.userId||n.userId===user.id));
-  const doneCount=userNotifications.filter(n=>n.done && n.userId===user.id).length;
-  const list=userNotifications.filter(n=>tab==='done'?n.done:!n.done); 
-  function done(id){ setNotifications(notifications.map(n=>n.id===id?{...n,done:true}:n)); }
-  function clearDone(){
-    if(!doneCount) return;
-    if(!confirm(`Limpar ${doneCount} notificação(ões) concluída(s)?`)) return;
-    setNotifications(notifications.filter(n=>!(n.done && n.userId===user.id)));
-  }
-  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&doneCount>0&&<button className="danger" onClick={clearDone}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  const list=notifications.filter(n=>(!n.userId||n.userId===user.id)).filter(n=>tab==='done'?n.done:!n.done); 
+  function done(id){ setNotifications(notifications.map(n=>n.id===id?{...n,done:true}:n)); } 
+  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
 }
 
 
@@ -5916,74 +5921,4 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style127);
   }
   style127.textContent = ARGOS_ROUND127_MEDIA_SURGICAL_CSS;
-}
-
-const ARGOS_ROUND133_MOBILE_PREVIEW_FULLWIDTH_CSS = `
-/* Round133: mobile-only. Aumenta a largura útil da prévia da tarefa sem mexer na lógica do vídeo.
-   Mantém 4:5 pelo aspect-ratio; a altura só cresce como consequência da largura. */
-@media (max-width:760px){
-  .task-page .insta{
-    width:100vw!important;
-    max-width:100vw!important;
-    min-width:0!important;
-    margin-left:calc(50% - 50vw)!important;
-    margin-right:calc(50% - 50vw)!important;
-    box-sizing:border-box!important;
-    border-radius:0!important;
-  }
-
-  .task-page .media-box.adaptive-media-box{
-    width:100%!important;
-    max-width:100%!important;
-    aspect-ratio:4/5!important;
-    height:auto!important;
-    min-height:0!important;
-    max-height:none!important;
-    overflow:hidden!important;
-    background:#151515!important;
-  }
-
-  .task-page .media-box.adaptive-media-box .media-inner,
-  .task-page .media-box.adaptive-media-box .round130-media-preview{
-    width:100%!important;
-    height:100%!important;
-    max-width:none!important;
-    max-height:none!important;
-    overflow:hidden!important;
-    background:#151515!important;
-  }
-
-  .task-page .media-box.adaptive-media-box img.media-fit-image,
-  .task-page .media-box.adaptive-media-box video.media-fit-image,
-  .task-page .media-box.adaptive-media-box .drive-fallback-frame,
-  .task-page .media-box.adaptive-media-box .round130-drive-frame{
-    width:100%!important;
-    height:100%!important;
-    max-width:none!important;
-    max-height:none!important;
-    min-height:0!important;
-    display:block!important;
-    border:0!important;
-    background:#151515!important;
-  }
-
-  .task-page .media-box.adaptive-media-box img.media-fit-image,
-  .task-page .media-box.adaptive-media-box video.media-fit-image{
-    object-fit:cover!important;
-    object-position:center center!important;
-  }
-
-  .task-page .media-box.adaptive-media-box .slide-controls{
-    z-index:40!important;
-  }
-}
-`;
-if (typeof document !== 'undefined') {
-  let style133 = document.getElementById('argos-round133-mobile-preview-fullwidth');
-  if (!style133) {
-    style133 = document.createElement('style');
-    style133.id = 'argos-round133-mobile-preview-fullwidth';
-    document.head.appendChild(style133);
-  }
-  style133.textContent = ARGOS_ROUND133_MOBILE_PREVIEW_FULLWIDTH_CSS;
 }
