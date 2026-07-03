@@ -4,6 +4,7 @@ import './style.css';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { loadWorkspaceRecord, saveWorkspaceState } from './services/workspaceStateService';
 import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './services/taskTableService';
+import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 
 
 
@@ -635,9 +636,14 @@ function profileToAppUser(profile, authUser){
     avatar: profile.avatar_url || initials(profile.display_name),
     title: profile.title || (profile.role==='admin'?'Administrador':profile.role==='team'?'Equipe':'Cliente'),
     visibleStatuses: profile.visible_statuses || (profile.role==='team'?TEAM_DEFAULT:(profile.role==='client'?CLIENT_DEFAULT:[])),
-    notificationPrefs: profile.notification_prefs?.events || NOTIFICATION_EVENTS,
-    notificationStatusPrefs: profile.notification_prefs?.statuses || {},
+    notificationPrefs: profile.notification_prefs?.events || undefined,
+    notificationStatusPrefs: profile.notification_prefs?.statuses || undefined,
+    notificationPrefsFromProfile: !!profile.notification_prefs,
     organizationId: profile.organization_id,
+    companyIds: profile.company_ids || [],
+    socialInstagram: profile.social_instagram || '',
+    socialStatus: profile.social_status || '',
+    lastSeenAt: profile.last_seen_at || '',
   };
 }
 
@@ -649,9 +655,13 @@ function mergeProfileWithWorkspaceUser(profile, payload){
     id: profile?.id || existing.id,
     organizationId: profile?.organizationId || existing.organizationId,
     companyIds: existing.companyIds || profile?.companyIds || [],
-    visibleStatuses: (existing.visibleStatuses&&existing.visibleStatuses.length) ? existing.visibleStatuses : (profile?.visibleStatuses || []),
-    notificationPrefs: (existing.notificationPrefs&&existing.notificationPrefs.length) ? existing.notificationPrefs : (profile?.notificationPrefs || NOTIFICATION_EVENTS),
-    notificationStatusPrefs: Object.keys(existing.notificationStatusPrefs||{}).length ? existing.notificationStatusPrefs : (profile?.notificationStatusPrefs || {}),
+    // Round108: campos governados por profiles têm prioridade sobre o workspace_state antigo.
+    visibleStatuses: (profile?.visibleStatuses&&profile.visibleStatuses.length) ? profile.visibleStatuses : (existing.visibleStatuses || []),
+    notificationPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationPrefs || NOTIFICATION_EVENTS) : (existing.notificationPrefs || profile?.notificationPrefs || NOTIFICATION_EVENTS),
+    notificationStatusPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationStatusPrefs || {}) : (existing.notificationStatusPrefs || profile?.notificationStatusPrefs || {}),
+    socialInstagram: profile?.socialInstagram ?? existing.socialInstagram ?? '',
+    socialStatus: profile?.socialStatus ?? existing.socialStatus ?? '',
+    lastSeenAt: profile?.lastSeenAt || existing.lastSeenAt || '',
     createdAt: existing.createdAt || profile?.createdAt || now(),
   };
   return merged;
@@ -661,6 +671,24 @@ function clonePayload(payload){
   try{ return JSON.parse(JSON.stringify(payload || EMPTY_CLOUD_STATE)); }
   catch(e){ return {...EMPTY_CLOUD_STATE}; }
 }
+
+function userForWorkspace(user){
+  // Round108: dados voláteis/individuais agora vivem em profiles.
+  // Não gravamos presença, recado, @instagram nem preferências de notificação no workspace_state,
+  // para uma aba antiga não reverter essas informações.
+  const copy = { ...(user || {}) };
+  delete copy.lastSeenAt;
+  delete copy.last_seen_at;
+  delete copy.socialInstagram;
+  delete copy.socialStatus;
+  delete copy.socialUsername;
+  delete copy.instagramUsername;
+  delete copy.statusMessage;
+  delete copy.notificationPrefs;
+  delete copy.notificationStatusPrefs;
+  return copy;
+}
+
 function normalizeWorkspacePayload(payload){
   const p = payload || EMPTY_CLOUD_STATE;
   return {
@@ -672,6 +700,12 @@ function normalizeWorkspacePayload(payload){
     system: p.system || { logo:'', title:'Painel de Aprovação' },
   };
 }
+
+function workspacePayloadForSave(payload){
+  const p = normalizeWorkspacePayload(payload);
+  return { ...p, users: (p.users || []).map(userForWorkspace) };
+}
+
 function payloadSignature(payload){
   try{ return JSON.stringify(normalizeWorkspacePayload(payload)); }
   catch(e){ return String(Date.now()); }
@@ -755,6 +789,23 @@ function mergeWorkspacePayload(basePayload, localPayload, remotePayload){
     system: mergeItem(base.system || {}, local.system || {}, remote.system || {}),
   };
 }
+
+function mergeProfileRowsIntoUsers(currentUsers=[], profileUsers=[]){
+  if(!Array.isArray(profileUsers) || !profileUsers.length) return currentUsers || [];
+  const profileMap = new Map(profileUsers.filter(Boolean).map(p=>[p.id,p]));
+  const seen = new Set();
+  const merged = (currentUsers || []).map(user=>{
+    const profile = profileMap.get(user.id);
+    if(!profile) return user;
+    seen.add(user.id);
+    return mergeProfileWithWorkspaceUser(profile, { users:[user] });
+  });
+  profileUsers.forEach(profile=>{
+    if(profile?.id && !seen.has(profile.id)) merged.push(mergeProfileWithWorkspaceUser(profile, { users:[] }));
+  });
+  return sortMembersAdminFirst(merged);
+}
+
 function applyWorkspacePayload(payload, setters, options={}){
   const p=normalizeWorkspacePayload(payload);
   setters.setUsersState(p.users||[]);
@@ -1129,16 +1180,21 @@ function App(){
         const payload=normalizeWorkspacePayload(record.payload || EMPTY_CLOUD_STATE);
         const mergedProfile=mergeProfileWithWorkspaceUser(profile,payload);
         if(!mergedProfile?.active){ await supabase.auth.signOut(); throw new Error('Usuário inativo.'); }
-        const nextPayload={...payload, users:[mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)]};
+        let profileUsers=[];
+        try{ profileUsers = await loadOrganizationProfiles(profile.organizationId); }
+        catch(profileErr){ console.warn('profiles refresh ignored:', profileErr?.message || profileErr); }
+        const nextUsers = mergeProfileRowsIntoUsers([mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)], profileUsers);
+        const nextPayload={...payload, users:nextUsers};
+        const currentAuth = nextUsers.find(u=>u.id===mergedProfile.id) || mergedProfile;
         if(alive){
-          setAuth(mergedProfile);
-          workspaceMetaRef.current={updatedAt:record.updatedAt, basePayload:clonePayload(nextPayload), lastSavedSignature:payloadSignature(nextPayload), applyingRemote:true};
+          setAuth(currentAuth);
+          workspaceMetaRef.current={updatedAt:record.updatedAt, basePayload:clonePayload(workspacePayloadForSave(nextPayload)), lastSavedSignature:payloadSignature(workspacePayloadForSave(nextPayload)), applyingRemote:true};
           applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
           workspaceMetaRef.current.applyingRemote=false;
           setCloudReady(true); setCloudLoading(false); setCloudError(''); setSaveStatus('Sincronizado');
           if(!record.payload){
-            const savedRecord=await saveWorkspaceState(profile.organizationId,nextPayload,null);
-            workspaceMetaRef.current={updatedAt:savedRecord.updatedAt, basePayload:clonePayload(savedRecord.payload||nextPayload), lastSavedSignature:payloadSignature(savedRecord.payload||nextPayload), applyingRemote:false};
+            const savedRecord=await saveWorkspaceState(profile.organizationId,workspacePayloadForSave(nextPayload),null);
+            workspaceMetaRef.current={updatedAt:savedRecord.updatedAt, basePayload:clonePayload(savedRecord.payload||workspacePayloadForSave(nextPayload)), lastSavedSignature:payloadSignature(savedRecord.payload||workspacePayloadForSave(nextPayload)), applyingRemote:false};
           }
         }
       }catch(err){ console.error(err); if(alive){ setCloudError(err.message||'Erro ao carregar Supabase.'); setCloudLoading(false); } }
@@ -1184,8 +1240,27 @@ function App(){
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
+    let alive=true;
+    async function refreshProfiles(){
+      try{
+        const profileUsers = await loadOrganizationProfiles(auth.organizationId);
+        if(!alive || !profileUsers.length) return;
+        setUsersState(prev=>mergeProfileRowsIntoUsers(prev, profileUsers));
+        const freshAuth = profileUsers.find(u=>u.id===auth.id);
+        if(freshAuth) setAuth(prev=>prev && prev.id===freshAuth.id ? mergeProfileWithWorkspaceUser(freshAuth,{users:[prev]}) : prev);
+      }catch(err){
+        console.warn('profile refresh ignored:', err?.message || err);
+      }
+    }
+    refreshProfiles();
+    const interval=setInterval(refreshProfiles,30000);
+    return ()=>{ alive=false; clearInterval(interval); };
+  },[cloudReady, auth?.organizationId, auth?.id]);
+
+  useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
     if(workspaceMetaRef.current.applyingRemote) return;
-    const localPayload=normalizeWorkspacePayload({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications, system });
+    const localPayload=workspacePayloadForSave({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications, system });
     const localSignature=payloadSignature(localPayload);
     if(localSignature === workspaceMetaRef.current.lastSavedSignature) return;
     if(saveRetryRef.current) clearTimeout(saveRetryRef.current);
@@ -1263,7 +1338,12 @@ function App(){
     if(!cloudReady || !auth?.id || !['admin','team'].includes(auth.role)) return;
     const touchPresence = () => {
       const stamp = now();
-      setUsers(prev=>prev.map(u=>u.id===auth.id?{...u,lastSeenAt:stamp}:u));
+      // Round108: presença é volátil. Atualiza local + profiles, nunca workspace_state.
+      setUsersState(prev=>prev.map(u=>u.id===auth.id?{...u,lastSeenAt:stamp}:u));
+      setAuth(prev=>prev && prev.id===auth.id ? {...prev,lastSeenAt:stamp} : prev);
+      if(isSupabaseConfigured){
+        updateProfilePresence(auth.id, stamp).catch(err=>console.warn('presence update ignored:', err?.message || err));
+      }
     };
     touchPresence();
     const interval = setInterval(touchPresence, 60000);
@@ -1498,14 +1578,19 @@ async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setSt
   const record=await loadWorkspaceRecord(profile.organizationId);
   const payload=normalizeWorkspacePayload(record.payload || EMPTY_CLOUD_STATE);
   const mergedProfile=mergeProfileWithWorkspaceUser(profile,payload);
-  const nextPayload={...payload, users:[mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)]};
-  setAuth(mergedProfile);
+  let profileUsers=[];
+  try{ profileUsers = await loadOrganizationProfiles(profile.organizationId); }
+  catch(profileErr){ console.warn('profiles refresh ignored:', profileErr?.message || profileErr); }
+  const nextUsers = mergeProfileRowsIntoUsers([mergedProfile, ...(payload.users||[]).filter(u=>u.id!==mergedProfile.id)], profileUsers);
+  const nextPayload={...payload, users:nextUsers};
+  const currentAuth = nextUsers.find(u=>u.id===mergedProfile.id) || mergedProfile;
+  setAuth(currentAuth);
   applyWorkspacePayload(nextPayload,{setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState});
   setCloudReady(true); setCloudError('');
-  if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:record.updatedAt, basePayload:clonePayload(nextPayload), lastSavedSignature:payloadSignature(nextPayload), applyingRemote:false});
+  if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:record.updatedAt, basePayload:clonePayload(workspacePayloadForSave(nextPayload)), lastSavedSignature:payloadSignature(workspacePayloadForSave(nextPayload)), applyingRemote:false});
   if(!record.payload){
-    const savedRecord=await saveWorkspaceState(mergedProfile.organizationId,nextPayload,null);
-    if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:savedRecord.updatedAt, basePayload:clonePayload(savedRecord.payload||nextPayload), lastSavedSignature:payloadSignature(savedRecord.payload||nextPayload), applyingRemote:false});
+    const savedRecord=await saveWorkspaceState(mergedProfile.organizationId,workspacePayloadForSave(nextPayload),null);
+    if(setWorkspaceMeta) setWorkspaceMeta({updatedAt:savedRecord.updatedAt, basePayload:clonePayload(savedRecord.payload||workspacePayloadForSave(nextPayload)), lastSavedSignature:payloadSignature(savedRecord.payload||workspacePayloadForSave(nextPayload)), applyingRemote:false});
   }
 }
 function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta,cloudError,system}){
@@ -1637,6 +1722,10 @@ function TeamHubPage({users,setUsers,tasks,statuses,auth,viewer}){
   function updateOwnSocial(patch){
     if(!auth?.id) return;
     setUsers(prev=>prev.map(u=>u.id===auth.id?{...u,...patch}:u));
+    setAuth(prev=>prev && prev.id===auth.id ? {...prev,...patch} : prev);
+    if(isSupabaseConfigured){
+      updateProfileSocial(auth.id, patch).catch(err=>alert('Não foi possível salvar seu perfil social: '+(err.message||err)));
+    }
   }
   if(!members.length) return <section><h1>Portfólios</h1><p>Nenhum membro ativo encontrado.</p></section>;
   return <section className="team-hub">
@@ -2321,7 +2410,18 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   function canEditNotifications(u){ return !(u.role==='admin' && currentUser?.id && u.id!==currentUser.id); }
   function toggleNotif(id){ setOpenNotif(prev=>({...prev,[id]:!prev[id]})); }
   function updateUserPrefs(userId,patch){
-    setUsers(prev=>prev.map(x=>x.id===userId?{...x,...(typeof patch==='function'?patch(x):patch)}:x));
+    setUsers(prev=>prev.map(x=>{
+      if(x.id!==userId) return x;
+      const patchValue = typeof patch==='function' ? patch(x) : patch;
+      const nextUser = {...x,...patchValue, notificationPrefsFromProfile:true};
+      if(isSupabaseConfigured){
+        updateProfileNotificationPrefs(userId, {
+          notificationPrefs: nextUser.notificationPrefs || events,
+          notificationStatusPrefs: nextUser.notificationStatusPrefs || {}
+        }).catch(err=>alert('Não foi possível salvar notificações no perfil: '+(err.message||err)));
+      }
+      return nextUser;
+    }));
   }
   async function save(u){
     const role=u.role||'team';
