@@ -1177,3 +1177,65 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   }
   .slide-controls button{width:30px!important;height:30px!important;min-height:30px!important;}
 }
+
+/* Round115: recuperar comandos sociais do preview, limpar controles dentro da mídia e corrigir Portfólios */
+.team-hub-hero p{display:none!important;}
+.team-profile-area{position:relative!important;}
+.team-profile-name-row,.insta-name-row{padding-right:56px!important;}
+.profile-gear{
+  position:absolute!important;
+  right:0!important;
+  top:0!important;
+  margin-left:0!important;
+  z-index:5!important;
+}
+.empty-bio-edit{display:none!important;}
+.team-status-bio.empty-status{color:var(--muted)!important;opacity:.72!important;font-style:normal!important;}
+
+/* Mostrar os botões exemplo do Instagram fora da foto, mas manter a foto limpa */
+.insta > .insta-icons,
+.insta .insta-real-icons{
+  display:flex!important;
+}
+.insta .insta-icons svg,
+.insta .insta-real-icons svg{
+  display:block!important;
+}
+.media-inner .media-open,
+.media-open-overlay,
+.team-feed-media .media-open,
+.team-feed-media .media-open-overlay,
+.team-feed-media .insta-icons,
+.team-feed-media .insta-real-icons{
+  display:none!important;
+}
+
+.editable-link-list{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:8px!important;
+  margin-top:8px!important;
+}
+.editable-link-list a{
+  display:inline-flex!important;
+  align-items:center!important;
+  max-width:220px!important;
+  min-height:30px!important;
+  padding:6px 10px!important;
+  border:1px solid rgba(226,183,72,.28)!important;
+  border-radius:999px!important;
+  color:var(--gold)!important;
+  background:rgba(226,183,72,.07)!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  text-decoration:none!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.editable-link-list a:hover{background:rgba(226,183,72,.14)!important;}
+
+@media (max-width:760px){
+  .profile-gear{top:2px!important;right:0!important;}
+  .team-profile-name-row,.insta-name-row{padding-right:46px!important;}
+}
