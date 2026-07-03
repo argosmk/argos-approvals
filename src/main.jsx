@@ -1066,14 +1066,18 @@ function periodMatch(date, period, from, to){
   if(period==='custom') return (!from || d>=dObj(from)) && (!to || d<=dObj(to));
   return true;
 }
+function canUserAccessTask(task, user, statuses){
+  if(!task || !user) return false;
+  if(task.archived) return user.role === 'admin';
+  if(user.role === 'admin') return true;
+  const allowedStatuses = user.visibleStatuses || [];
+  if(!allowedStatuses.includes(task.status)) return false;
+  if(user.role === 'team') return task.responsibleId === user.id;
+  if(user.role === 'client') return (user.companyIds || []).includes(task.companyId);
+  return false;
+}
 function baseVisibleTasks(tasks, user, statuses){
-  const allowed = user.role==='admin' ? statuses.map(s=>s.id) : (user.visibleStatuses||[]);
-  return tasks.filter(t=>{
-    if(!allowed.includes(t.status)) return false;
-    if(user.role==='team' && t.responsibleId!==user.id) return false;
-    if(user.role==='client' && !(user.companyIds||[]).includes(t.companyId)) return false;
-    return true;
-  });
+  return tasks.filter(t=>canUserAccessTask(t, user, statuses));
 }
 function applyFilters(tasks, filters={}){
   return tasks.filter(t=>{
@@ -1211,6 +1215,7 @@ function App(){
   const [taskTablesReady,setTaskTablesReady]=useState(false);
   const taskTablesReadyRef=useRef(false);
   const taskSyncBusyRef=useRef(false);
+  const taskOpenSessionRef=useRef({});
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
 
@@ -1613,6 +1618,7 @@ function App(){
   }
   function openTaskRoute(taskId){
     if(!taskId) return;
+    taskOpenSessionRef.current[taskId] = true;
     setSelectedTask(taskId);
     setAppRoute({taskId});
   }
@@ -1620,12 +1626,19 @@ function App(){
     setSelectedTask(null);
     setAppRoute({screen: activeScreen});
   }
+  const selectedTaskObj = selectedTask ? tasks.find(t=>t.id===selectedTask) : null;
+  const selectedTaskAllowed = selectedTaskObj && (taskOpenSessionRef.current[selectedTask] || canUserAccessTask(selectedTaskObj, effectiveUser, statuses));
+  if(selectedTaskObj && canUserAccessTask(selectedTaskObj, effectiveUser, statuses)){
+    taskOpenSessionRef.current[selectedTask] = true;
+  }
   return <div className="app">
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
       {selectedTask ? (
-        <TaskPage task={tasks.find(t=>t.id===selectedTask)} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
+        selectedTaskObj && selectedTaskAllowed
+          ? <TaskPage task={selectedTaskObj} tasks={tasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
+          : <TaskAccessDenied back={closeTaskRoute}/>
       ) : (
         <>
           <div className="top-actions">
@@ -2209,10 +2222,18 @@ function WeeklyTemplateEditor({company,users,save,cancel}){
   return <div className="modal-bg"><div className="modal company-modal"><div className="section-header"><div><h2>Template semanal</h2><p>{company.name}</p></div><button type="button" onClick={addTemplateItem}>+ Linha</button></div>{weeklyTemplate.length?weeklyTemplate.map(item=><div className="panel template-item" key={item.id}><div className="form-two"><label>Tipo<select value={item.type||TASK_TYPES[0]} onChange={e=>updateTemplate(item.id,{type:e.target.value})}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Quantidade<input type="number" min="0" value={item.quantity??1} onChange={e=>updateTemplate(item.id,{quantity:Number(e.target.value)})}/></label></div><div className="form-two"><label>Responsável<select value={item.responsibleId||''} onChange={e=>updateTemplate(item.id,{responsibleId:e.target.value})}><option value="">Padrão do sistema</option>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Dia de postagem<select value={item.postDay??0} onChange={e=>updateTemplate(item.id,{postDay:Number(e.target.value)})}>{WEEK_DAYS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select></label></div><label>Prazo interno<input type="number" min="0" value={item.internalOffset??1} onChange={e=>updateTemplate(item.id,{internalOffset:Number(e.target.value)})}/><small>Quantos dias antes da postagem. Ex: 1 = um dia antes.</small></label><label>Instruções ao copy<textarea value={item.copyInstructions||''} onChange={e=>updateTemplate(item.id,{copyInstructions:e.target.value})} placeholder="Orientações padrão para o copy desta linha."/></label><label>Instruções ao editor<textarea value={item.editorInstructions||''} onChange={e=>updateTemplate(item.id,{editorInstructions:e.target.value})} placeholder="Orientações padrão para edição/design desta linha."/></label><div className="row-actions"><button type="button" onClick={()=>removeTemplateItem(item.id)}>Remover linha</button></div></div>):<p className="muted-note">Nenhuma linha de template. Clique em + Linha para criar a remessa semanal deste cliente.</p>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={()=>save(company.id,weeklyTemplate)}>Salvar template</button></div></div></div>
 }
 
+function TaskAccessDenied({back}){
+  return <section className="task-access-denied"><button onClick={back}>← Voltar</button><div className="panel"><h1>Acesso não permitido</h1><p>Esta tarefa não está disponível para o seu perfil ou não está mais em um status visível para você.</p></div></section>
+}
+
 function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusById,updateTask,addLog,back,open,effectiveUser,isAdmin}){ 
   if(!task) return <section><button onClick={back}>Voltar</button><h1>Tarefa não encontrada</h1></section>; 
   const company=companies.find(c=>c.id===task.companyId); 
-  const clientTasks=[...(tasks||[])].filter(t=>t.companyId===task.companyId).sort((a,b)=>String(a.postDate||'').localeCompare(String(b.postDate||'')) || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || String(a.title||'').localeCompare(String(b.title||'')));
+  const taskOrderValue = t => String(t.postDate || t.internalDate || t.createdAt || '9999-12-31');
+  const clientTasks=[...(tasks||[])]
+    .filter(t=>t.companyId===task.companyId)
+    .filter(t=>t.id===task.id || canUserAccessTask(t, effectiveUser, statuses))
+    .sort((a,b)=>taskOrderValue(a).localeCompare(taskOrderValue(b)) || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || String(a.title||'').localeCompare(String(b.title||'')));
   const currentClientIndex=clientTasks.findIndex(t=>t.id===task.id);
   const previousClientTask=currentClientIndex>0?clientTasks[currentClientIndex-1]:null;
   const nextClientTask=currentClientIndex>=0&&currentClientIndex<clientTasks.length-1?clientTasks[currentClientIndex+1]:null;
