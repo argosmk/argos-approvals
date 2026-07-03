@@ -1993,3 +1993,43 @@ html, body, #root {
     opacity:0!important;
   }
 }
+
+/* Round125: vídeo sem travar e setas sempre navegáveis */
+.media-box.adaptive-media-box{
+  overflow:hidden!important;
+}
+.media-box.adaptive-media-box .slide-controls{
+  z-index:60!important;
+  pointer-events:none!important;
+}
+.media-box.adaptive-media-box .slide-controls button{
+  position:relative!important;
+  z-index:61!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+.drive-video-frame,
+.drive-fallback-frame.drive-video-frame{
+  width:100%!important;
+  height:100%!important;
+  border:0!important;
+  display:block!important;
+  background:#000!important;
+}
+.inline-video-preview video.media-fit-image{
+  -webkit-user-select:none!important;
+  user-select:none!important;
+}
+.inline-video-preview video.media-fit-image::-webkit-media-controls,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-enclosure,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-panel,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-play-button,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-timeline,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-current-time-display,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-time-remaining-display,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-mute-button,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-volume-slider,
+.inline-video-preview video.media-fit-image::-webkit-media-controls-fullscreen-button{
+  display:none!important;
+  opacity:0!important;
+}
