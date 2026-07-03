@@ -2056,18 +2056,25 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     if(!selectedFiltered.length) return;
     if(!confirm(`Duplicar ${selectedFiltered.length} tarefa(s)?`)) return;
     const source=tasks.filter(t=>selectedFiltered.includes(t.id));
-    const copies=source.map(t=>({
-      ...t,
-      id:safeUUID(),
-      title:`Cópia de ${t.title||'Tarefa'}`,
-      archived:false,
-      startedAt:null,
-      startedById:null,
-      timerHeartbeatAt:null,
-      generatedFromTemplate:false,
-      generatedWeek:'',
-      logs:[...(t.logs||[]),{id:safeUUID(),user:user.name,userId:user.id,type:'log',visibility:'internal',at:now(),text:'Tarefa duplicada.'}]
-    }));
+    const createdAt=now();
+    const copies=source.map(t=>{
+      const newId=safeUUID();
+      return {
+        ...t,
+        id:newId,
+        title:`${t.title||'Tarefa'} (cópia)`,
+        archived:false,
+        startedAt:null,
+        startedById:null,
+        timerHeartbeatAt:null,
+        generatedFromTemplate:false,
+        generatedWeek:'',
+        duplicatedFromTaskId:t.id,
+        createdAt,
+        updatedAt:createdAt,
+        logs:[{id:safeUUID(),user:user.name,userId:user.id,type:'log',visibility:'internal',at:createdAt,text:`${user.name} duplicou esta tarefa a partir de ${taskShareUrl(t.id)}`}]
+      };
+    });
     setTasks(prev=>[...prev,...copies]);
     clearSelected();
   }
@@ -2402,15 +2409,17 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   function duplicateTaskFromDetail(){
     if(!isAdmin || !setTasks || !task) return;
     const createdAt=now();
+    const newId=safeUUID();
     const cloned={
       ...task,
-      id:safeUUID(),
+      id:newId,
       title:`${task.title||'Tarefa'} (cópia)`,
       archived:false,
       startedAt:null,
       startedById:null,
       timerHeartbeatAt:null,
-      logs:[...(task.logs||[]),{id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:createdAt,text:'Tarefa duplicada pelo admin.'}],
+      duplicatedFromTaskId:task.id,
+      logs:[{id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:createdAt,text:`${effectiveUser.name} duplicou esta tarefa a partir de ${taskShareUrl(task.id)}`}],
       comments:[],
       createdAt,
       updatedAt:createdAt
