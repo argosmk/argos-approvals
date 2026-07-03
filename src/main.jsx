@@ -2424,17 +2424,23 @@ function InlinePreviewVideo({src, sources, poster}){
   const videoRef = useRef(null);
   const sourceList = Array.from(new Set((sources && sources.length ? sources : [src]).filter(Boolean)));
   const [sourceIndex,setSourceIndex] = useState(0);
-  const [playing,setPlaying] = useState(false);
+  const [needsTap,setNeedsTap] = useState(false);
   const [error,setError] = useState(false);
-
   const currentSrc = sourceList[sourceIndex] || src;
 
   useEffect(()=>{
-    setPlaying(false);
+    setNeedsTap(false);
     setError(false);
     const video = videoRef.current;
     if(!video || !currentSrc) return;
-    try{ video.pause(); video.load(); }catch(_err){}
+    try{
+      video.pause();
+      video.load();
+      const t=setTimeout(()=>{
+        video.play().catch(()=>setNeedsTap(true));
+      }, 120);
+      return ()=>clearTimeout(t);
+    }catch(_err){ setNeedsTap(true); }
   },[currentSrc]);
 
   function tryNextSource(){
@@ -2447,10 +2453,11 @@ function InlinePreviewVideo({src, sources, poster}){
     e?.stopPropagation?.();
     const video = videoRef.current;
     if(!video || error) return;
-    video.play().catch(()=>tryNextSource());
+    video.muted = true;
+    video.play().then(()=>setNeedsTap(false)).catch(()=>setNeedsTap(true));
   }
 
-  return <div className="inline-video-preview clean-video-player round128-clean-video">
+  return <div className="inline-video-preview clean-video-player round129-clean-video">
     <video
       ref={videoRef}
       className="media-fit-image"
@@ -2458,43 +2465,35 @@ function InlinePreviewVideo({src, sources, poster}){
       webkit-playsinline="true"
       muted
       loop
+      autoPlay
       preload="metadata"
       poster={poster||''}
       controls={false}
       disablePictureInPicture
       controlsList="nodownload noplaybackrate noremoteplayback nofullscreen"
       src={currentSrc}
+      onCanPlay={()=>{ const v=videoRef.current; if(v) v.play().catch(()=>setNeedsTap(true)); }}
       onError={tryNextSource}
-      onPlay={()=>setPlaying(true)}
-      onPause={()=>setPlaying(false)}
-      onEnded={()=>setPlaying(false)}
     />
-    {!playing&&!error&&<button type="button" className="video-mini-toggle" onClick={playVideo} aria-label="Reproduzir vídeo">▶</button>}
-    {error&&<div className="video-loading-note">Não foi possível reproduzir aqui.</div>}
+    {needsTap&&!error&&<button type="button" className="video-mini-toggle" onClick={playVideo} aria-label="Reproduzir vídeo">▶</button>}
+    {error&&<a className="video-loading-note video-open-fallback" href={currentSrc || src} target="_blank" rel="noreferrer" onClick={(e)=>e.stopPropagation()}>Abrir vídeo</a>}
   </div>
 }
-function DriveAdaptiveMedia({url,canPlay=false}){
-  const [fallback,setFallback]=useState(false);
-  const [playDriveVideo,setPlayDriveVideo]=useState(false);
-  const poster=driveThumb(url);
-  if(canPlay && playDriveVideo){
-    return <InlinePreviewVideo sources={[driveDirect(url), driveDownload(url)]} src={driveDirect(url)} poster={poster}/>;
+function DriveAdaptiveMedia({url}){
+  const [mode,setMode]=useState('image');
+  const id=driveId(url);
+  if(mode==='video'){
+    return <InlinePreviewVideo sources={[driveDirect(url), driveDownload(url)]} src={driveDirect(url)} poster={id?driveThumb(url):''}/>;
   }
-  if(fallback){
-    return <div className="drive-thumb-wrap drive-thumb-fallback">
-      <img className="media-fit-image" src={driveDirect(url)} onError={(e)=>{e.currentTarget.style.display='none'}} alt="Prévia do material"/>
-      {canPlay&&<button type="button" className="drive-play-btn" onClick={(e)=>{e.preventDefault();e.stopPropagation();setPlayDriveVideo(true)}} aria-label="Reproduzir vídeo">▶</button>}
-    </div>;
-  }
-  return <div className="drive-thumb-wrap">
-    <img className="media-fit-image" src={poster} onError={()=>setFallback(true)} alt="Prévia do material"/>
-    {canPlay&&<button type="button" className="drive-play-btn" onClick={(e)=>{e.preventDefault();e.stopPropagation();setPlayDriveVideo(true)}} aria-label="Reproduzir vídeo">▶</button>}
-  </div>;
+  return <img className="media-fit-image" src={driveDirect(url)} onError={()=>setMode('video')} alt="Prévia do material"/>;
 }
-function Media({url,type='',slide=0,total=1}){ 
-  const direct=driveDirect(url); const lower=(url||'').toLowerCase(); const isImg=/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(lower); const isVid=/\.(mp4|webm|mov)(\?|$)/.test(lower); const isDrive=(url||'').includes('drive.google.com'); const isVideoType=/vídeo|video|reels/i.test(String(type||''));
-  const canPlayDrive = isDrive && (isVid || (isVideoType && (Number(total||1)<=1 || Number(slide||0)>0)));
-  return <div className="media-inner clean-media-preview">{isDrive?<DriveAdaptiveMedia url={url} canPlay={canPlayDrive}/>:isVid?<InlinePreviewVideo src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div> 
+function Media({url,type='',slide=0,total=1}){
+  const direct=driveDirect(url);
+  const lower=(url||'').toLowerCase();
+  const isImg=/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(lower);
+  const isVid=/\.(mp4|webm|mov)(\?|$)/.test(lower);
+  const isDrive=(url||'').includes('drive.google.com');
+  return <div className="media-inner clean-media-preview round129-media-preview">{isDrive?<DriveAdaptiveMedia url={url}/>:isVid?<InlinePreviewVideo src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<div className="external-material-preview">Material externo</div>}</div>
 }
 function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[],setUsers=()=>{}}){
   const [editing,setEditing]=useState(null);

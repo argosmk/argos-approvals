@@ -2155,3 +2155,96 @@ html, body, #root {
   color:#fff!important;
   font-size:12px!important;
 }
+
+/* Round129: preview de mídia cirúrgico - vídeo inline sem controles nativos gigantes */
+.media-box.adaptive-media-box .round129-media-preview,
+.team-feed-media .round129-media-preview{
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+.media-box.adaptive-media-box .round129-media-preview img.media-fit-image,
+.media-box.adaptive-media-box .round129-media-preview video.media-fit-image,
+.team-feed-media .round129-media-preview img.media-fit-image,
+.team-feed-media .round129-media-preview video.media-fit-image{
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  margin: 0 auto !important;
+  background: #000 !important;
+}
+.media-box.adaptive-media-box .round129-clean-video,
+.team-feed-media .round129-clean-video{
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+.media-box.adaptive-media-box .round129-clean-video video,
+.team-feed-media .round129-clean-video video{
+  pointer-events: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-panel,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-enclosure,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-overlay-play-button,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-start-playback-button,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-play-button,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-timeline,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-current-time-display,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-time-remaining-display,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-mute-button,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-volume-slider,
+.media-box.adaptive-media-box .round129-clean-video video::-webkit-media-controls-fullscreen-button,
+.team-feed-media .round129-clean-video video::-webkit-media-controls,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-panel,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-enclosure,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-overlay-play-button,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-start-playback-button,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-play-button,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-timeline,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-current-time-display,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-time-remaining-display,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-mute-button,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-volume-slider,
+.team-feed-media .round129-clean-video video::-webkit-media-controls-fullscreen-button{
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.media-box.adaptive-media-box .round129-clean-video .video-mini-toggle,
+.team-feed-media .round129-clean-video .video-mini-toggle{
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 8 !important;
+  width: 54px !important;
+  height: 54px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255,255,255,.65) !important;
+  background: rgba(0,0,0,.38) !important;
+  color: #fff !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  padding-left: 3px !important;
+}
+.media-box.adaptive-media-box .slide-controls,
+.team-feed-media .team-feed-arrows{
+  z-index: 20 !important;
+  pointer-events: none !important;
+}
+.media-box.adaptive-media-box .slide-controls button,
+.team-feed-media .team-feed-arrows button{
+  pointer-events: auto !important;
+}
