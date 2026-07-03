@@ -4,7 +4,6 @@ import './style.css';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { loadWorkspaceRecord, saveWorkspaceState } from './services/workspaceStateService';
 import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './services/taskTableService';
-import { bootstrapNotificationsFromTables, loadNotificationRecords, syncNotificationListDelta } from './services/notificationTableService';
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 
 
@@ -575,21 +574,13 @@ const DEFAULT_STATUS = [
 ];
 const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
-const NOTIFICATION_EVENTS = ['Nova tarefa atribuída','Comentário em tarefa minha','Mudança de status em tarefa minha','Tarefa vencendo hoje','Tarefa atrasada'];
-const DEFAULT_NOTIFICATION_PREFS = [...NOTIFICATION_EVENTS];
-function normalizeNotificationEvent(event){
-  if(event==='Comentário na tarefa') return 'Comentário em tarefa minha';
-  if(event==='Alteração de status' || event==='Mudança de responsável' || event==='Aprovação do cliente' || event==='Solicitação de alteração' || event==='Tarefa reaberta') return 'Mudança de status em tarefa minha';
-  if(event==='Prazo hoje') return 'Tarefa vencendo hoje';
-  if(event==='Prazo vencido') return 'Tarefa atrasada';
-  return event;
-}
-function notificationPrefsOf(user){
-  return Array.isArray(user?.notificationPrefs) ? user.notificationPrefs : DEFAULT_NOTIFICATION_PREFS;
-}
-function wantsNotification(user, event){
-  const normalized = normalizeNotificationEvent(event);
-  return notificationPrefsOf(user).includes(normalized);
+const NOTIFICATION_EVENTS = ['Comentário na tarefa','Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Prazo vencido','Prazo hoje','Tarefa reaberta'];
+function wantsNotification(user, event, statusId){
+  const prefs=user.notificationPrefs||NOTIFICATION_EVENTS;
+  const statusPrefs=user.notificationStatusPrefs||{};
+  if(!prefs.includes(event)) return false;
+  if(event==='Alteração de status' && statusId) return (statusPrefs[statusId]??true);
+  return true;
 }
 
 const seedCompanies = [
@@ -645,8 +636,8 @@ function profileToAppUser(profile, authUser){
     avatar: profile.avatar_url || initials(profile.display_name),
     title: profile.title || (profile.role==='admin'?'Administrador':profile.role==='team'?'Equipe':'Cliente'),
     visibleStatuses: profile.visible_statuses || (profile.role==='team'?TEAM_DEFAULT:(profile.role==='client'?CLIENT_DEFAULT:[])),
-    notificationPrefs: Array.isArray(profile.notification_prefs?.events) ? profile.notification_prefs.events : undefined,
-    notificationStatusPrefs: {},
+    notificationPrefs: profile.notification_prefs?.events || undefined,
+    notificationStatusPrefs: profile.notification_prefs?.statuses || undefined,
     notificationPrefsFromProfile: !!profile.notification_prefs,
     organizationId: profile.organization_id,
     companyIds: profile.company_ids || [],
@@ -666,8 +657,8 @@ function mergeProfileWithWorkspaceUser(profile, payload){
     companyIds: existing.companyIds || profile?.companyIds || [],
     // Round108: campos governados por profiles têm prioridade sobre o workspace_state antigo.
     visibleStatuses: (profile?.visibleStatuses&&profile.visibleStatuses.length) ? profile.visibleStatuses : (existing.visibleStatuses || []),
-    notificationPrefs: profile?.notificationPrefsFromProfile ? notificationPrefsOf(profile) : (Array.isArray(existing.notificationPrefs) ? existing.notificationPrefs : notificationPrefsOf(profile)),
-    notificationStatusPrefs: {},
+    notificationPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationPrefs || NOTIFICATION_EVENTS) : (existing.notificationPrefs || profile?.notificationPrefs || NOTIFICATION_EVENTS),
+    notificationStatusPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationStatusPrefs || {}) : (existing.notificationStatusPrefs || profile?.notificationStatusPrefs || {}),
     socialInstagram: profile?.socialInstagram ?? existing.socialInstagram ?? '',
     socialStatus: profile?.socialStatus ?? existing.socialStatus ?? '',
     lastSeenAt: profile?.lastSeenAt || existing.lastSeenAt || '',
@@ -847,7 +838,7 @@ async function updateAuthBackedAppUserProfile(draft){
       visible_statuses: draft.visibleStatuses || [],
       notification_prefs: {
         events: draft.notificationPrefs || NOTIFICATION_EVENTS,
-        statuses: {}
+        statuses: draft.notificationStatusPrefs || {}
       }
     };
     // Evita mexer em username/email aqui. Alterar login/senha de usuário Auth
@@ -882,7 +873,7 @@ async function createManagedAppUser(draft){
     active:draft.active!==false,
     visibleStatuses:draft.visibleStatuses||[],
     notificationPrefs:draft.notificationPrefs||NOTIFICATION_EVENTS,
-    notificationStatusPrefs:{}
+    notificationStatusPrefs:draft.notificationStatusPrefs||{}
   };
   if(!payload.email) throw new Error('Informe o login/e-mail do usuário.');
   if(!payload.password) throw new Error('Informe a senha inicial do usuário.');
@@ -1171,11 +1162,8 @@ function App(){
   const [saveTick,setSaveTick]=useState(0);
   const [saveStatus,setSaveStatus]=useState('');
   const [taskTablesReady,setTaskTablesReady]=useState(false);
-  const [notificationTablesReady,setNotificationTablesReady]=useState(false);
   const taskTablesReadyRef=useRef(false);
-  const notificationTablesReadyRef=useRef(false);
   const taskSyncBusyRef=useRef(false);
-  const notificationSyncBusyRef=useRef(false);
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
 
@@ -1215,7 +1203,6 @@ function App(){
   },[]);
 
   useEffect(()=>{ taskTablesReadyRef.current = taskTablesReady; },[taskTablesReady]);
-  useEffect(()=>{ notificationTablesReadyRef.current = notificationTablesReady; },[notificationTablesReady]);
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
@@ -1235,40 +1222,6 @@ function App(){
     })();
     return ()=>{ alive=false; };
   },[cloudReady, auth?.organizationId]);
-
-
-  useEffect(()=>{
-    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
-    let alive=true;
-    (async()=>{
-      try{
-        const fromTables = await bootstrapNotificationsFromTables(auth.organizationId, notifications);
-        if(!alive) return;
-        setNotificationsState(fromTables);
-        setNotificationTablesReady(true);
-      }catch(err){
-        if(!alive) return;
-        setNotificationTablesReady(false);
-        setCloudError(`Tabelas de notificações ainda não estão prontas: ${err.message||err}`);
-      }
-    })();
-    return ()=>{ alive=false; };
-  },[cloudReady, auth?.organizationId]);
-
-  useEffect(()=>{
-    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !notificationTablesReady) return;
-    let alive=true;
-    const interval=setInterval(async()=>{
-      if(notificationSyncBusyRef.current) return;
-      try{
-        const latest = await loadNotificationRecords(auth.organizationId);
-        if(alive) setNotificationsState(latest);
-      }catch(err){
-        console.warn('notification table refresh failed', err);
-      }
-    },5000);
-    return ()=>{ alive=false; clearInterval(interval); };
-  },[cloudReady, auth?.organizationId, notificationTablesReady]);
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady) return;
@@ -1307,7 +1260,7 @@ function App(){
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
     if(workspaceMetaRef.current.applyingRemote) return;
-    const localPayload=workspacePayloadForSave({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications: notificationTablesReady ? [] : notifications, system });
+    const localPayload=workspacePayloadForSave({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications, system });
     const localSignature=payloadSignature(localPayload);
     if(localSignature === workspaceMetaRef.current.lastSavedSignature) return;
     if(saveRetryRef.current) clearTimeout(saveRetryRef.current);
@@ -1333,7 +1286,7 @@ function App(){
       }
     },650);
     return()=>clearTimeout(timer);
-  },[users,companies,statuses,notifications,system,cloudReady,auth?.organizationId,saveTick,taskTablesReady,notificationTablesReady]);
+  },[users,companies,statuses,notifications,system,cloudReady,auth?.organizationId,saveTick,taskTablesReady]);
 
   // Round106: o polling/merge remoto do workspace_state foi desativado.
   // Motivo: o workspace ainda é um JSON grande. Sincronizar e mesclar esse JSON em abas antigas
@@ -1369,23 +1322,7 @@ function App(){
       return next;
     });
   };
-  const setNotifications=v=>{
-    setNotificationsState(prev=>{
-      const next = typeof v === 'function' ? v(prev) : v;
-      if(isSupabaseConfigured && notificationTablesReadyRef.current && auth?.organizationId){
-        notificationSyncBusyRef.current = true;
-        syncNotificationListDelta(auth.organizationId, prev, next)
-          .catch(err=>{
-            console.error('notification table sync failed', err);
-            setCloudError(`Não foi possível salvar notificação(ões): ${err.message||err}`);
-          })
-          .finally(()=>{ notificationSyncBusyRef.current = false; });
-      } else if(!isSupabaseConfigured){
-        save('argos_notifications_r9', next);
-      }
-      return next;
-    });
-  };
+  const setNotifications=v=>{setNotificationsState(v); if(!isSupabaseConfigured) save('argos_notifications_r9',v)};
 
   useEffect(()=>{
     const favicon = system?.favicon || '';
@@ -1462,18 +1399,14 @@ function App(){
   function createTask(){
     if(!form.title||!form.companyId||!form.responsibleId||!form.type||!form.status){ alert('Preencha os campos principais.'); return; }
     const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
-    setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null); notifyTask(t,'Nova tarefa atribuída.','Nova tarefa atribuída',t.status);
+    setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null);
   }
   function notifyTask(task,text,event,statusId=null){
     if(!task) return;
-    const normalizedEvent = normalizeNotificationEvent(event);
     const recipients = users.filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
       .filter(u=>u.id!==effectiveUser.id)
-      .filter(u=>wantsNotification(u,normalizedEvent));
-    if(recipients.length){
-      const created = recipients.map(u=>({id:safeUUID(),taskId:task.id,userId:u.id,text:`${task.title}: ${text}`,at:now(),done:false,event:normalizedEvent,statusId}));
-      setNotifications(prev=>[...created,...prev]);
-    }
+      .filter(u=>wantsNotification(u,event,statusId));
+    if(recipients.length) setNotifications([...recipients.map(u=>({id:safeUUID(),taskId:task.id,userId:u.id,text:`${task.title}: ${text}`,at:now(),done:false,event,statusId})),...notifications]);
   }
   function updateTask(id, patch, logText){
     const original=tasks.find(t=>t.id===id);
@@ -1492,7 +1425,7 @@ function App(){
 
       if(patch.responsibleId && patch.responsibleId!==t.responsibleId){
         eventText='Responsável alterado.';
-        eventName='Nova tarefa atribuída';
+        eventName='Mudança de responsável';
       }
 
       if(patch.status && patch.status!==t.status){
@@ -1511,7 +1444,7 @@ function App(){
         });
 
         eventText=statusText;
-        eventName='Mudança de status em tarefa minha';
+        eventName='Alteração de status';
         eventStatus=patch.status;
       }
 
@@ -1538,9 +1471,13 @@ function App(){
       if(eventName) notifyTask(targetTask,eventText,eventName,eventStatus);
 
       if(logText){
-        const ev=logText.includes('aprov') || logText.includes('alteração') || logText.includes('reaberta')
-          ? 'Mudança de status em tarefa minha'
-          : 'Comentário em tarefa minha';
+        const ev=logText.includes('aprov')
+          ? 'Aprovação do cliente'
+          : logText.includes('alteração')
+            ? 'Solicitação de alteração'
+            : logText.includes('reaberta')
+              ? 'Tarefa reaberta'
+              : 'Comentário na tarefa';
 
         notifyTask(targetTask,logText,ev,eventStatus);
       }
@@ -1551,7 +1488,7 @@ function App(){
     const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:now(),text,resolved:false};
     setTasks(prev=>prev.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     const task=tasks.find(t=>t.id===id);
-    const event = (type==='change' || type==='approval') ? 'Mudança de status em tarefa minha' : 'Comentário em tarefa minha';
+    const event = type==='change' ? 'Solicitação de alteração' : type==='approval' ? 'Aprovação do cliente' : 'Comentário na tarefa';
     notifyTask(task,text,event,task?.status);
   }
 
@@ -1628,7 +1565,7 @@ function App(){
         {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask} search=""/>} 
         {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={setSelectedTask} search=""/>} 
         {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
-        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={setSelectedTask} tasks={tasks} user={effectiveUser} auth={auth} users={users} setUsers={setUsers}/>}
+        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={setSelectedTask} tasks={tasks} user={effectiveUser} auth={auth}/>}
       </>}
     </main>
     {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)}/>} 
@@ -2445,8 +2382,10 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   const [editing,setEditing]=useState(null);
   const [sort,setSort]=useState('role');
   const [showArchived,setShowArchived]=useState(false);
+  const [openNotif,setOpenNotif]=useState({});
   const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived || u.active!==false));
   const sortedPeople=sortEntities(people,sort,u=>u.name);
+  const events=NOTIFICATION_EVENTS;
   async function archiveTeamUser(u){
     if(u.id===currentUser?.id) return alert('Você não pode arquivar seu próprio usuário.');
     const nextActive = u.active===false;
@@ -2467,6 +2406,22 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
       console.error(err);
       alert('Não foi possível excluir o acesso no Supabase Auth. Instale/atualize a Edge Function manage-app-user e tente novamente. Erro: '+(err.message||err));
     }
+  }
+  function canEditNotifications(u){ return !(u.role==='admin' && currentUser?.id && u.id!==currentUser.id); }
+  function toggleNotif(id){ setOpenNotif(prev=>({...prev,[id]:!prev[id]})); }
+  function updateUserPrefs(userId,patch){
+    setUsers(prev=>prev.map(x=>{
+      if(x.id!==userId) return x;
+      const patchValue = typeof patch==='function' ? patch(x) : patch;
+      const nextUser = {...x,...patchValue, notificationPrefsFromProfile:true};
+      if(isSupabaseConfigured){
+        updateProfileNotificationPrefs(userId, {
+          notificationPrefs: nextUser.notificationPrefs || events,
+          notificationStatusPrefs: nextUser.notificationStatusPrefs || {}
+        }).catch(err=>alert('Não foi possível salvar notificações no perfil: '+(err.message||err)));
+      }
+      return nextUser;
+    }));
   }
   async function save(u){
     const role=u.role||'team';
@@ -2511,10 +2466,24 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
       alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
-  return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><p className="muted">As preferências de notificação agora ficam na tela Notificações de cada usuário. Aqui ficam apenas cadastro, cargo e permissões.</p><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=><div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
+  return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=>{
+    const isOpen=!!openNotif[u.id];
+    const canEdit=canEditNotifications(u);
+    return <div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
       <div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small>{u.role==='admin'?'Admin':(u.title||'Equipe')} {u.active===false?'• Arquivado':''}</small></div></div>
-      <div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button></div>
-    </div>)}</div>{editing&&<UserEditor u={editing} statuses={statuses} save={save} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>}</div>
+      <div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>toggleNotif(u.id)}>{isOpen?'Minimizar notificações':'Configurar notificações'}</button></div>
+      {isOpen&&<div className="team-notification-box">
+        {!canEdit&&<p className="muted admin-lock-note">Notificações de outro admin não podem ser alteradas.</p>}
+        <div className="notification-prefs-grid">
+          <div><h3>Eventos</h3><div className="checks one-col compact-checks-v3">{events.map(ev=>{
+            const cur=u.notificationPrefs||events;
+            return <label key={ev}><input type="checkbox" disabled={!canEdit} checked={cur.includes(ev)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; updateUserPrefs(u.id,(current)=>{ const currentPrefs=current.notificationPrefs||events; const next=checked?[...new Set([...currentPrefs,ev])]:currentPrefs.filter(x=>x!==ev); return {notificationPrefs:next}; });}}/>{ev}</label>
+          })}</div></div>
+          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" disabled={!canEdit} checked={(u.notificationStatusPrefs?.[st.id]??true)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; updateUserPrefs(u.id,(current)=>({notificationStatusPrefs:{...(current.notificationStatusPrefs||{}),[st.id]:checked}}));}}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
+        </div>
+      </div>}
+    </div>
+  })}</div>{editing&&<UserEditor u={editing} statuses={statuses} save={save} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>}</div>
 }
 function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
   const [f,setF]=useState(c);
@@ -2577,6 +2546,7 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
+  const events=NOTIFICATION_EVENTS;
   const editableUsers=sortEntities(users.filter(u=>u.role!=='client'),'role',u=>u.name);
   const [openIds,setOpenIds]=useState({});
   function toggleOpen(id){ setOpenIds(prev=>({...prev,[id]:!prev[id]})); }
@@ -2619,41 +2589,11 @@ function GeneralSettings({system,setSystem,reset}){
   </div></div>
 }
 
-function NotificationPreferencesPanel({user,users,setUsers}){
-  const [saving,setSaving]=useState(false);
-  const currentUser = users.find(u=>u.id===user.id) || user;
-  const prefs = notificationPrefsOf(currentUser);
-  async function toggleEvent(event, checked){
-    const nextPrefs = checked ? [...new Set([...prefs,event])] : prefs.filter(x=>x!==event);
-    setUsers(prev=>prev.map(u=>u.id===user.id?{...u,notificationPrefs:nextPrefs,notificationStatusPrefs:{},notificationPrefsFromProfile:true}:u));
-    if(isSupabaseConfigured){
-      try{
-        setSaving(true);
-        await updateProfileNotificationPrefs(user.id,{notificationPrefs:nextPrefs,notificationStatusPrefs:{}});
-      }catch(err){
-        console.error(err);
-        alert('Não foi possível salvar suas preferências de notificação: '+(err.message||err));
-      }finally{
-        setSaving(false);
-      }
-    }
-  }
-  return <div className="panel notification-preferences-panel">
-    <div className="section-header compact-section-header"><div><h2>Minhas preferências</h2><p className="muted">Essas opções valem só para o seu usuário. Cadastro, permissões e cargos continuam protegidos.</p></div>{saving&&<small>Salvando...</small>}</div>
-    <div className="notification-simple-grid">
-      {NOTIFICATION_EVENTS.map(ev=><label key={ev} className="notification-simple-option">
-        <input type="checkbox" checked={prefs.includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>
-        <span>{ev}</span>
-      </label>)}
-    </div>
-  </div>
-}
-
-function NotificationsPage({notifications,setNotifications,open,tasks,user,users,setUsers}){ 
+function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
   const [tab,setTab]=useState('open'); 
   const list=notifications.filter(n=>(!n.userId||n.userId===user.id)).filter(n=>tab==='done'?n.done:!n.done); 
-  function done(id){ setNotifications(prev=>prev.map(n=>n.id===id?{...n,done:true}:n)); } 
-  return <section><h1>Notificações</h1><NotificationPreferencesPanel user={user} users={users} setUsers={setUsers}/><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  function done(id){ setNotifications(notifications.map(n=>n.id===id?{...n,done:true}:n)); } 
+  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
 }
 
 
