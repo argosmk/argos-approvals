@@ -94,11 +94,42 @@ function safeUUID(){
 
 
 const ARGOS_UI_POLISH_CSS = `
-.documents-layout{grid-template-columns:minmax(260px,360px) minmax(0,1fr)!important;align-items:start!important;}
-.doc-list-item{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin:0 0 8px;padding:12px;border:1px solid rgba(225,177,44,.24);border-radius:12px;background:rgba(255,255,255,.03);color:inherit;text-align:left;}
-.doc-list-item.active{border-color:#e1b12c;background:rgba(225,177,44,.08);}
-.document-editor textarea.document-content-textarea{min-height:260px;font-family:inherit;line-height:1.55;}
-@media(max-width:760px){.documents-layout{grid-template-columns:1fr!important}.doc-list-item{border-radius:10px}.document-editor textarea.document-content-textarea{min-height:220px}}
+
+.docs-clickup-shell{min-height:calc(100vh - 70px);}
+.docs-topbar{margin-bottom:10px!important;}
+.docs-workspace{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:18px;align-items:stretch;min-height:calc(100vh - 170px);}
+.docs-editor{min-width:0;background:transparent!important;border:0!important;padding:8px 8px 0!important;display:flex;flex-direction:column;gap:14px;}
+.docs-editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:12px;}
+.docs-title-block{min-width:0;flex:1;}
+.docs-title-input{font-size:34px!important;font-weight:800!important;border:0!important;background:transparent!important;padding:0!important;color:var(--text)!important;box-shadow:none!important;min-height:46px!important;}
+.docs-title-input:focus{outline:0!important;box-shadow:none!important;}
+.docs-breadcrumb{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:4px;}
+.docs-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.docs-meta-panel{border:1px solid rgba(225,177,44,.22);border-radius:16px;padding:14px;background:rgba(255,255,255,.025);}
+.docs-metrics-strip{display:flex;gap:10px;flex-wrap:wrap;border:1px solid rgba(225,177,44,.18);background:rgba(225,177,44,.055);border-radius:14px;padding:10px 12px;color:var(--muted);}
+.docs-metrics-strip span{display:inline-flex;gap:5px;align-items:center;font-size:12px;}
+.docs-metrics-strip b{color:var(--text);}
+.docs-content-editor{flex:1;min-height:56vh!important;width:100%;border:0!important;background:transparent!important;color:var(--text)!important;font-size:16px!important;line-height:1.72!important;padding:8px 2px 70px!important;resize:vertical;box-shadow:none!important;}
+.docs-content-editor:focus{outline:0!important;box-shadow:none!important;}
+.docs-external-link{align-self:flex-start;color:#e1b12c;text-decoration:none;border:1px solid rgba(225,177,44,.35);border-radius:12px;padding:9px 12px;}
+.docs-sidebar{border-left:1px solid rgba(255,255,255,.08);padding-left:16px;min-width:0;}
+.docs-sidebar-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.docs-sidebar-head b{white-space:nowrap;}
+.docs-sidebar-head input{height:34px!important;padding:6px 10px!important;min-width:0;}
+.docs-folder-list{display:flex;flex-direction:column;gap:8px;}
+.docs-folder{border-radius:12px;background:rgba(255,255,255,.02);}
+.docs-folder-row{display:grid;grid-template-columns:28px minmax(0,1fr) 30px;align-items:center;gap:4px;padding:4px;}
+.docs-folder-row button{border:0!important;background:transparent!important;color:var(--text)!important;box-shadow:none!important;padding:6px!important;min-height:0!important;}
+.docs-folder-name{text-align:left!important;font-weight:700!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.docs-folder-add{color:#e1b12c!important;font-size:18px!important;}
+.docs-page-list{display:flex;flex-direction:column;gap:3px;padding:0 6px 8px 36px;}
+.docs-page-item{width:100%;border:0!important;background:transparent!important;color:var(--muted)!important;text-align:left!important;padding:8px 9px!important;border-radius:8px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:2px!important;box-shadow:none!important;}
+.docs-page-item:hover,.docs-page-item.active{background:rgba(255,255,255,.07)!important;color:var(--text)!important;}
+.docs-page-item span{font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.docs-page-item small{font-size:11px;color:var(--muted);}
+.docs-folder-empty{display:block;color:var(--muted);padding:7px 9px;}
+.docs-empty-editor{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;color:var(--muted);}
+@media(max-width:900px){.docs-workspace{grid-template-columns:1fr}.docs-sidebar{border-left:0;border-top:1px solid rgba(255,255,255,.08);padding:14px 0 0}.docs-title-input{font-size:28px!important}.docs-content-editor{min-height:45vh!important}.docs-editor-head{flex-direction:column}.docs-actions{justify-content:flex-start}}
 .task-topbar-split{display:grid;grid-template-columns:auto minmax(260px,1fr);align-items:center;gap:12px;margin-bottom:12px;}
 .task-topbar-split .task-nav-actions{justify-self:end;display:flex;gap:8px;flex-wrap:wrap;}
 .task-topbar-split .task-nav-actions button{white-space:nowrap;}
@@ -2845,24 +2876,19 @@ function moneyBR(value){
 function currentMonthKey(){ return new Date().toISOString().slice(0,7); }
 function taskMonthKey(task){ return String(task?.postDate || task?.internalDate || '').slice(0,7); }
 function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,currentUser}){
-  const [selected,setSelected]=useState(documents.find(d=>!d.archived)?.id || documents[0]?.id || null);
-  const [folder,setFolder]=useState('all');
-  const [link,setLink]=useState('all');
-  const [q,setQ]=useState('');
   const visibleDocs=(documents||[]).filter(d=>!d.archived);
-  const filtered=visibleDocs.filter(d=>{
-    if(folder!=='all' && d.folder!==folder) return false;
-    if(link!=='all' && d.linkType!==link) return false;
-    const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name: d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'';
-    const hay=`${d.title} ${d.folder} ${d.type} ${target} ${d.content}`.toLowerCase();
-    return hay.includes((q||'').trim().toLowerCase());
-  });
-  const doc=documents.find(d=>d.id===selected) || filtered[0] || visibleDocs[0] || null;
-  useEffect(()=>{ if(!doc && filtered[0]) setSelected(filtered[0].id); },[documents.length, folder, link, q]);
-  function createDoc(){
-    const next=blankDocument(currentUser);
+  const [selected,setSelected]=useState(visibleDocs[0]?.id || documents[0]?.id || null);
+  const [q,setQ]=useState('');
+  const [openFolders,setOpenFolders]=useState(()=>Object.fromEntries(DOCUMENT_FOLDERS.map(f=>[f,true])));
+  const doc=documents.find(d=>d.id===selected) || visibleDocs[0] || null;
+  useEffect(()=>{
+    if(!doc && visibleDocs[0]) setSelected(visibleDocs[0].id);
+  },[documents.length]);
+  function createDoc(folder='Clientes'){
+    const next={...blankDocument(currentUser), folder};
     setDocuments(prev=>[next,...(prev||[])]);
     setSelected(next.id);
+    setOpenFolders(prev=>({...prev,[folder]:true}));
   }
   function patchDoc(id,patch){
     setDocuments(prev=>(prev||[]).map(d=>d.id===id?{...d,...patch,updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy}:d));
@@ -2870,12 +2896,21 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
   function archiveDoc(id){
     if(!confirm('Arquivar este documento?')) return;
     patchDoc(id,{archived:true});
-    const next=filtered.find(d=>d.id!==id) || visibleDocs.find(d=>d.id!==id);
+    const next=visibleDocs.find(d=>d.id!==id);
     setSelected(next?.id || null);
   }
-  return <section><div className="section-header"><div><h1>Documentos</h1><p>Base interna para informações de clientes, equipe, processos e finanças leves.</p></div><button className="primary" onClick={createDoc}>+ Novo documento</button></div><div className="filters"><label>Pasta<select value={folder} onChange={e=>setFolder(e.target.value)}><option value="all">Todas</option>{DOCUMENT_FOLDERS.map(f=><option key={f}>{f}</option>)}</select></label><label>Vínculo<select value={link} onChange={e=>setLink(e.target.value)}><option value="all">Todos</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option><option value="general">Geral</option></select></label><label>Pesquisar<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar documento..."/></label></div><div className="grid2 documents-layout"><div className="panel"><h2>Biblioteca</h2>{filtered.length?filtered.map(d=>{const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name:d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'Geral'; return <button key={d.id} className={'doc-list-item '+(doc?.id===d.id?'active':'')} onClick={()=>setSelected(d.id)}><b>{d.title||'Sem título'}</b><small>{d.folder} • {d.type}{target?` • ${target}`:''}</small></button>}):<p className="muted-note">Nenhum documento encontrado.</p>}</div>{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} archiveDoc={archiveDoc} companies={companies} users={users} tasks={tasks} statuses={statuses}/>:<div className="panel"><h2>Nenhum documento</h2><p>Crie um documento para começar.</p></div>}</div></section>
+  const query=(q||'').trim().toLowerCase();
+  const filteredDocs=visibleDocs.filter(d=>{
+    if(!query) return true;
+    const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name: d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'Geral';
+    const hay=`${d.title||''} ${d.folder||''} ${d.type||''} ${target||''} ${d.content||''}`.toLowerCase();
+    return hay.includes(query);
+  });
+  const grouped=DOCUMENT_FOLDERS.map(folder=>({folder, docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder)}));
+  return <section className="documents-page docs-clickup-shell"><div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div><button className="primary" onClick={()=>createDoc(doc?.folder||'Clientes')}>+ Novo documento</button></div><div className="docs-workspace">{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} archiveDoc={archiveDoc} companies={companies} users={users} tasks={tasks} statuses={statuses}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>Crie um documento na lateral para começar.</p><button className="primary" onClick={()=>createDoc('Clientes')}>+ Novo documento</button></div>}<aside className="docs-sidebar"><div className="docs-sidebar-head"><b>Arquivos</b><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar..."/></div><div className="docs-folder-list">{grouped.map(group=>{const isOpen=openFolders[group.folder]!==false; return <div className="docs-folder" key={group.folder}><div className="docs-folder-row"><button className="docs-folder-toggle" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{isOpen?'▾':'▸'}</button><button className="docs-folder-name" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{group.folder}</button><button className="docs-folder-add" title="Novo documento nesta pasta" onClick={()=>createDoc(group.folder)}>+</button></div>{isOpen&&<div className="docs-page-list">{group.docs.length?group.docs.map(d=>{const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name:d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:''; return <button key={d.id} className={'docs-page-item '+(doc?.id===d.id?'active':'')} onClick={()=>setSelected(d.id)}><span>{d.title||'Sem título'}</span>{target&&<small>{target}</small>}</button>}):<small className="docs-folder-empty">Sem documentos</small>}</div>}</div>})}</div></aside></div></section>
 }
 function DocumentEditor({doc,patchDoc,archiveDoc,companies,users,tasks,statuses}){
+  const [metaOpen,setMetaOpen]=useState(false);
   const targetName=doc.linkType==='company'?companies.find(c=>c.id===doc.targetId)?.name:doc.linkType==='user'?users.find(u=>u.id===doc.targetId)?.name:'Geral';
   const month=currentMonthKey();
   const monthTasks=tasks.filter(t=>!t.archived && taskMonthKey(t)===month);
@@ -2887,9 +2922,11 @@ function DocumentEditor({doc,patchDoc,archiveDoc,companies,users,tasks,statuses}
   const avgFinished=monthly && companyFinished.length ? monthly/companyFinished.length : 0;
   const employeeCost=moneyNumber(doc.employeeMonthlyCost);
   const costPerFinished=employeeCost && employeeFinished.length ? employeeCost/employeeFinished.length : 0;
-  const linkedOptions=doc.linkType==='company'?companies.filter(c=>c.active!==false):doc.linkType==='user'?users.filter(u=>u.active!==false && u.role!=='client'):[];
-  return <div className="panel document-editor"><div className="section-header"><div><h2>{doc.title||'Documento'}</h2><small>{targetName || 'Sem vínculo'} • Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</small></div><button onClick={()=>archiveDoc(doc.id)}>Arquivar</button></div><label>Título<input value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})}/></label><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{DOCUMENT_FOLDERS.map(f=><option key={f}>{f}</option>)}</select></label><label>Tipo<select value={doc.type||'Informações gerais'} onChange={e=>patchDoc(doc.id,{type:e.target.value})}>{DOCUMENT_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="form-two"><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label><label>{doc.linkType==='user'?'Funcionário':doc.linkType==='company'?'Empresa/cliente':'Vínculo'}<select disabled={doc.linkType==='general'} value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div><label>Link externo opcional<input value={doc.externalLink||''} onChange={e=>patchDoc(doc.id,{externalLink:e.target.value})} placeholder="Link de planilha, pasta do Drive, Docs etc."/></label><div className="form-two"><label>Valor mensal do cliente<input value={doc.monthlyValue||''} onChange={e=>patchDoc(doc.id,{monthlyValue:e.target.value})} placeholder="Ex: 1700"/></label><label>Dia de pagamento<input value={doc.billingDay||''} onChange={e=>patchDoc(doc.id,{billingDay:e.target.value})} placeholder="Ex: 10"/></label></div><div className="form-two"><label>Custo mensal do funcionário<input value={doc.employeeMonthlyCost||''} onChange={e=>patchDoc(doc.id,{employeeMonthlyCost:e.target.value})} placeholder="Ex: 1500"/></label><label>Custo variável / observação<input value={doc.employeeVariableCost||''} onChange={e=>patchDoc(doc.id,{employeeVariableCost:e.target.value})} placeholder="Ex: R$ 50 por vídeo"/></label></div>{doc.linkType==='company'&&doc.targetId&&<div className="cards quick-cards"><Card title="Tarefas do mês" value={companyTasks.length}/><Card title="Finalizadas no mês" value={companyFinished.length}/><Card title="Valor mensal" value={moneyBR(monthly)}/><Card title="Média por finalizada" value={avgFinished?moneyBR(avgFinished):'—'}/></div>}{doc.linkType==='user'&&doc.targetId&&<div className="cards quick-cards"><Card title="Tarefas do mês" value={employeeTasks.length}/><Card title="Finalizadas no mês" value={employeeFinished.length}/><Card title="Custo mensal" value={moneyBR(employeeCost)}/><Card title="Custo por finalizada" value={costPerFinished?moneyBR(costPerFinished):'—'}/></div>}<label>Conteúdo do documento<textarea className="document-content-textarea" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Briefing, acessos, preferências, combinados, observações internas..."/></label><small className="muted-note">Primeira versão segura: texto e campos estruturados no Argos, com link externo opcional para Drive/Sheets. Upload e sincronização automática ficam para fases futuras.</small></div>
+  const linkedOptions=doc.linkType==='company'?companies.filter(c=>c.active!==false):doc.linkType==='user'?users.filter(u=>u.active!==false && u.role!=='client'):[ ];
+  const hasMetrics=(doc.linkType==='company'&&doc.targetId)||(doc.linkType==='user'&&doc.targetId);
+  return <main className="docs-editor"><div className="docs-editor-head"><div className="docs-title-block"><input className="docs-title-input" value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})} placeholder="Título do documento"/><div className="docs-breadcrumb"><span>{doc.folder||'Clientes'}</span><span>•</span><span>{targetName||'Sem vínculo'}</span><span>•</span><span>Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</span></div></div><div className="docs-actions"><button onClick={()=>setMetaOpen(v=>!v)}>{metaOpen?'Ocultar dados':'Dados'}</button><button onClick={()=>archiveDoc(doc.id)}>Arquivar</button></div></div>{metaOpen&&<div className="docs-meta-panel"><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{DOCUMENT_FOLDERS.map(f=><option key={f}>{f}</option>)}</select></label><label>Tipo<select value={doc.type||'Informações gerais'} onChange={e=>patchDoc(doc.id,{type:e.target.value})}>{DOCUMENT_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="form-two"><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label><label>{doc.linkType==='user'?'Funcionário':doc.linkType==='company'?'Empresa/cliente':'Vínculo'}<select disabled={doc.linkType==='general'} value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div><label>Link externo opcional<input value={doc.externalLink||''} onChange={e=>patchDoc(doc.id,{externalLink:e.target.value})} placeholder="Link de planilha, pasta do Drive, Docs etc."/></label><div className="form-two"><label>Valor mensal do cliente<input value={doc.monthlyValue||''} onChange={e=>patchDoc(doc.id,{monthlyValue:e.target.value})} placeholder="Ex: 1700"/></label><label>Dia de pagamento<input value={doc.billingDay||''} onChange={e=>patchDoc(doc.id,{billingDay:e.target.value})} placeholder="Ex: 10"/></label></div><div className="form-two"><label>Custo mensal do funcionário<input value={doc.employeeMonthlyCost||''} onChange={e=>patchDoc(doc.id,{employeeMonthlyCost:e.target.value})} placeholder="Ex: 1500"/></label><label>Custo variável / observação<input value={doc.employeeVariableCost||''} onChange={e=>patchDoc(doc.id,{employeeVariableCost:e.target.value})} placeholder="Ex: R$ 50 por vídeo"/></label></div></div>}{hasMetrics&&<div className="docs-metrics-strip">{doc.linkType==='company'&&doc.targetId&&<><span><b>{companyTasks.length}</b> tarefas no mês</span><span><b>{companyFinished.length}</b> finalizadas</span><span><b>{moneyBR(monthly)}</b> mensal</span><span><b>{avgFinished?moneyBR(avgFinished):'—'}</b> por finalizada</span></>}{doc.linkType==='user'&&doc.targetId&&<><span><b>{employeeTasks.length}</b> tarefas no mês</span><span><b>{employeeFinished.length}</b> finalizadas</span><span><b>{moneyBR(employeeCost)}</b> custo mensal</span><span><b>{costPerFinished?moneyBR(costPerFinished):'—'}</b> por finalizada</span></>}</div>}<textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/>{doc.externalLink&&<a className="docs-external-link" href={doc.externalLink} target="_blank" rel="noreferrer">Abrir link externo ↗</a>}</main>
 }
+
 
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
