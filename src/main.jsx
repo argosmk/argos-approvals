@@ -97,14 +97,20 @@ const ARGOS_UI_POLISH_CSS = `
 
  .docs-clickup-shell{min-height:calc(100vh - 70px);}
 .docs-topbar{margin-bottom:10px!important;}
-.docs-workspace{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:stretch;min-height:calc(100vh - 165px);}
-.docs-editor{min-width:0;background:transparent!important;border:0!important;padding:6px 8px 0!important;display:flex;flex-direction:column;gap:12px;}
+.docs-workspace{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px;align-items:stretch;min-height:calc(100vh - 165px);}
+.docs-editor{min-width:0;background:transparent!important;border:0!important;padding:6px 10px 0!important;display:flex;flex-direction:column;gap:12px;}
 .docs-editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:10px;}
 .docs-title-block{min-width:0;flex:1;}
 .docs-title-input{font-size:34px!important;font-weight:800!important;border:0!important;background:transparent!important;padding:0!important;color:var(--text)!important;box-shadow:none!important;min-height:46px!important;}
 .docs-title-input:focus{outline:0!important;box-shadow:none!important;}
 .docs-breadcrumb{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:4px;}
+.docs-linked-card{margin-top:10px;display:inline-flex;align-items:center;gap:9px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.07);max-width:100%;}
+.docs-linked-card .avatar-mini{width:26px!important;height:26px!important;min-width:26px!important;font-size:10px!important;}
+.docs-linked-card div{min-width:0;display:flex;flex-direction:column;line-height:1.1;}
+.docs-linked-card small{color:var(--muted);font-size:10px;}
+.docs-linked-card b{font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .docs-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.docs-actions button{border:0!important;background:rgba(255,255,255,.045)!important;box-shadow:none!important;}
 .docs-meta-panel{border:0!important;border-radius:12px;padding:10px 0 12px;background:transparent!important;}
 .docs-meta-panel .danger-zone{margin-top:12px;padding:12px;border-radius:12px;border:1px solid rgba(255,84,84,.28);background:rgba(255,84,84,.045);}
 .docs-content-editor{flex:1;min-height:62vh!important;width:100%;border:0!important;background:transparent!important;color:var(--text)!important;font-size:16px!important;line-height:1.72!important;padding:8px 2px 70px!important;resize:vertical;box-shadow:none!important;}
@@ -112,22 +118,30 @@ const ARGOS_UI_POLISH_CSS = `
 .docs-sidebar{border-left:1px solid rgba(255,255,255,.08);padding-left:14px;min-width:0;}
 .docs-sidebar-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .docs-sidebar-head b{white-space:nowrap;}
-.docs-sidebar-head input{height:34px!important;padding:6px 10px!important;min-width:0;}
-.docs-folder-list{display:flex;flex-direction:column;gap:3px;}
+.docs-sidebar-head input{height:34px!important;padding:6px 10px!important;min-width:0;border-radius:10px!important;}
+.docs-folder-list{display:flex;flex-direction:column;gap:4px;}
 .docs-folder{border-radius:10px;background:transparent!important;}
-.docs-folder-row{display:grid;grid-template-columns:26px minmax(0,1fr) 28px 28px;align-items:center;gap:2px;padding:2px 0;}
-.docs-folder-row button{border:0!important;background:transparent!important;color:var(--text)!important;box-shadow:none!important;padding:6px!important;min-height:0!important;}
+.docs-folder-row{display:grid;grid-template-columns:24px minmax(0,1fr) 22px 22px 26px 26px;align-items:center;gap:1px;padding:2px 0;}
+.docs-folder-row button{border:0!important;background:transparent!important;color:var(--text)!important;box-shadow:none!important;padding:5px!important;min-height:0!important;}
 .docs-folder-name{text-align:left!important;font-weight:700!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .docs-folder-add{color:#e1b12c!important;font-size:18px!important;}
 .docs-folder-delete{color:var(--muted)!important;font-size:15px!important;}
 .docs-folder-delete:hover{color:#ff6b6b!important;}
-.docs-page-list{display:flex;flex-direction:column;gap:2px;padding:0 0 7px 32px;}
-.docs-page-item{width:100%;border:0!important;background:transparent!important;color:var(--muted)!important;text-align:left!important;padding:7px 8px!important;border-radius:8px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:2px!important;box-shadow:none!important;}
-.docs-page-item:hover,.docs-page-item.active{background:rgba(255,255,255,.07)!important;color:var(--text)!important;}
+.docs-folder-move,.docs-doc-move{color:var(--muted)!important;font-size:11px!important;}
+.docs-folder-move:disabled,.docs-doc-move:disabled{opacity:.22!important;cursor:not-allowed!important;}
+.docs-page-list{display:flex;flex-direction:column;gap:2px;padding:0 0 7px 29px;}
+.docs-page-row{display:grid;grid-template-columns:minmax(0,1fr) 22px 22px;align-items:center;gap:1px;border-radius:8px;}
+.docs-page-row.active,.docs-page-row:hover{background:rgba(255,255,255,.07)!important;}
+.docs-page-item{width:100%;border:0!important;background:transparent!important;color:var(--muted)!important;text-align:left!important;padding:7px 8px!important;border-radius:8px!important;display:flex!important;align-items:flex-start!important;box-shadow:none!important;min-width:0!important;}
+.docs-page-row.active .docs-page-item,.docs-page-row:hover .docs-page-item{color:var(--text)!important;}
 .docs-page-item span{font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.docs-page-row button{border:0!important;background:transparent!important;box-shadow:none!important;min-height:0!important;padding:5px!important;}
 .docs-folder-empty{display:block;color:var(--muted);padding:7px 8px;}
 .docs-new-folder{width:100%;margin-top:10px;border:0!important;background:rgba(255,255,255,.035)!important;color:var(--text)!important;text-align:left!important;box-shadow:none!important;}
-@media(max-width:900px){.docs-workspace{grid-template-columns:1fr}.docs-sidebar{border-left:0;border-top:1px solid rgba(255,255,255,.08);padding:14px 0 0}.docs-title-input{font-size:28px!important}.docs-content-editor{min-height:45vh!important}.docs-editor-head{flex-direction:column}.docs-actions{justify-content:flex-start}}
+.docs-new-folder-inline{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;margin-top:10px;align-items:center;}
+.docs-new-folder-inline input{height:34px!important;padding:6px 10px!important;border-radius:10px!important;}
+.docs-new-folder-inline button{border:0!important;background:rgba(255,255,255,.055)!important;box-shadow:none!important;padding:7px 9px!important;}
+@media(max-width:900px){.docs-workspace{grid-template-columns:1fr}.docs-sidebar{border-left:0;border-top:1px solid rgba(255,255,255,.08);padding:14px 0 0}.docs-title-input{font-size:28px!important}.docs-content-editor{min-height:45vh!important}.docs-editor-head{flex-direction:column}.docs-actions{justify-content:flex-start}.docs-linked-card b{max-width:220px}}
 .task-topbar-split{display:grid;grid-template-columns:auto minmax(260px,1fr);align-items:center;gap:12px;margin-bottom:12px;}
 .task-topbar-split .task-nav-actions{justify-self:end;display:flex;gap:8px;flex-wrap:wrap;}
 .task-topbar-split .task-nav-actions button{white-space:nowrap;}
@@ -2847,13 +2861,33 @@ function folderMarker(name,currentUser,patch={}){
   return {id:safeUUID(),documentKind:'folder',folderName,title:folderName,folder:folderName,archived:false,deleted:false,createdAt:now(),updatedAt:now(),createdBy:currentUser?.id||'',updatedBy:currentUser?.id||'',...patch};
 }
 function documentFolders(documents){
-  const deleted=new Set((documents||[]).filter(isFolderMarker).filter(d=>d.deleted).map(d=>normalizeFolderName(d.folderName||d.folder||d.title)));
+  const folderState=new Map();
+  (documents||[]).forEach(d=>{
+    if(!isFolderMarker(d)) return;
+    const name=normalizeFolderName(d.folderName||d.folder||d.title);
+    if(name && !folderState.has(name)) folderState.set(name,{deleted:!!d.deleted,archived:!!d.archived,order:Number.isFinite(d.order)?d.order:null});
+  });
   const names=[...DEFAULT_DOCUMENT_FOLDERS];
   (documents||[]).forEach(d=>{
-    if(isFolderMarker(d) && !d.deleted && !d.archived) names.push(normalizeFolderName(d.folderName||d.folder||d.title));
-    if(!isFolderMarker(d) && !d.archived && d.folder) names.push(normalizeFolderName(d.folder));
+    if(isFolderMarker(d)){
+      const name=normalizeFolderName(d.folderName||d.folder||d.title);
+      const state=folderState.get(name);
+      if(name && state && !state.deleted && !state.archived) names.push(name);
+    }else if(!d.archived && d.folder){
+      names.push(normalizeFolderName(d.folder));
+    }
   });
-  return [...new Set(names.filter(Boolean).filter(name=>!deleted.has(name)))];
+  const unique=[...new Set(names.filter(Boolean).filter(name=>{
+    const state=folderState.get(name);
+    return !(state?.deleted || state?.archived);
+  }))];
+  const defaultIndex=new Map(DEFAULT_DOCUMENT_FOLDERS.map((name,i)=>[name,i]));
+  return unique.sort((a,b)=>{
+    const ao=folderState.get(a)?.order;
+    const bo=folderState.get(b)?.order;
+    if(Number.isFinite(ao) || Number.isFinite(bo)) return (Number.isFinite(ao)?ao:9999)-(Number.isFinite(bo)?bo:9999);
+    return (defaultIndex.has(a)?defaultIndex.get(a):9999)-(defaultIndex.has(b)?defaultIndex.get(b):9999) || a.localeCompare(b,'pt-BR');
+  });
 }
 function blankDocument(currentUser){
   return {
@@ -2877,30 +2911,40 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
   const [selected,setSelected]=useState(visibleDocs[0]?.id || documents.find(d=>!isFolderMarker(d))?.id || null);
   const [q,setQ]=useState('');
   const [openFolders,setOpenFolders]=useState(()=>Object.fromEntries(folders.map(f=>[f,true])));
+  const [creatingFolder,setCreatingFolder]=useState(false);
+  const [folderDraft,setFolderDraft]=useState('');
   const doc=documents.find(d=>!isFolderMarker(d) && d.id===selected) || visibleDocs[0] || null;
   useEffect(()=>{
     if(!doc && visibleDocs[0]) setSelected(visibleDocs[0].id);
   },[documents.length]);
   function createDoc(folder='Clientes'){
-    const safeFolder=normalizeFolderName(folder)||'Clientes';
-    const next={...blankDocument(currentUser), folder:safeFolder};
+    const safeFolder=normalizeFolderName(folder)||folders[0]||'Clientes';
+    const folderDocs=visibleDocs.filter(d=>(d.folder||'Clientes')===safeFolder);
+    const next={...blankDocument(currentUser), folder:safeFolder, order:folderDocs.length};
     setDocuments(prev=>[next,...(prev||[])]);
     setSelected(next.id);
     setOpenFolders(prev=>({...prev,[safeFolder]:true}));
   }
-  function createFolder(){
-    const name=normalizeFolderName(prompt('Nome da nova pasta:'));
-    if(!name) return;
-    if(folders.some(f=>f.toLowerCase()===name.toLowerCase())){ alert('Essa pasta já existe.'); return; }
-    setDocuments(prev=>[folderMarker(name,currentUser),...(prev||[])]);
+  function createFolder(nameValue){
+    const name=normalizeFolderName(nameValue);
+    if(!name) return false;
+    if(folders.some(f=>f.toLowerCase()===name.toLowerCase())){ alert('Essa pasta já existe.'); return false; }
+    setDocuments(prev=>[folderMarker(name,currentUser,{order:folders.length}),...(prev||[])]);
     setOpenFolders(prev=>({...prev,[name]:true}));
+    return true;
+  }
+  function commitFolderDraft(){
+    if(createFolder(folderDraft)){
+      setFolderDraft('');
+      setCreatingFolder(false);
+    }
   }
   function deleteFolder(folder){
     const safeFolder=normalizeFolderName(folder);
     const docsInFolder=visibleDocs.filter(d=>(d.folder||'Clientes')===safeFolder);
     const msg=docsInFolder.length?`Excluir a pasta "${safeFolder}" e arquivar ${docsInFolder.length} documento(s) dentro dela?`:`Excluir a pasta "${safeFolder}"?`;
     if(!confirm(msg)) return;
-    const deletedMarker=folderMarker(safeFolder,currentUser,{archived:true,deleted:true});
+    const deletedMarker=folderMarker(safeFolder,currentUser,{archived:true,deleted:true,order:folders.indexOf(safeFolder)});
     setDocuments(prev=>{
       const hasMarker=(prev||[]).some(d=>isFolderMarker(d)&&normalizeFolderName(d.folderName||d.folder||d.title)===safeFolder);
       const next=(prev||[]).map(d=>{
@@ -2915,6 +2959,23 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
       setSelected(next?.id||null);
     }
   }
+  function moveFolder(folder,dir){
+    const idx=folders.indexOf(folder);
+    const nextIdx=idx+dir;
+    if(idx<0 || nextIdx<0 || nextIdx>=folders.length) return;
+    const ordered=[...folders];
+    [ordered[idx],ordered[nextIdx]]=[ordered[nextIdx],ordered[idx]];
+    setDocuments(prev=>{
+      const previous=prev||[];
+      const markerByName=new Map(previous.filter(isFolderMarker).map(d=>[normalizeFolderName(d.folderName||d.folder||d.title),d]));
+      const without=previous.filter(d=>!(isFolderMarker(d)&&ordered.includes(normalizeFolderName(d.folderName||d.folder||d.title))));
+      const markers=ordered.map((name,i)=>{
+        const old=markerByName.get(name);
+        return {...(old||folderMarker(name,currentUser)),id:old?.id||safeUUID(),documentKind:'folder',folderName:name,title:name,folder:name,archived:false,deleted:false,order:i,updatedAt:now(),updatedBy:currentUser?.id||old?.updatedBy||''};
+      });
+      return [...markers,...without];
+    });
+  }
   function patchDoc(id,patch){
     setDocuments(prev=>(prev||[]).map(d=>d.id===id?{...d,...patch,updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy}:d));
   }
@@ -2924,21 +2985,37 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
     const next=visibleDocs.find(d=>d.id!==id);
     setSelected(next?.id || null);
   }
+  function moveDoc(id,folder,dir){
+    const orderedDocs=visibleDocs.filter(d=>(d.folder||'Clientes')===folder).sort((a,b)=>(a.order??9999)-(b.order??9999));
+    const idx=orderedDocs.findIndex(d=>d.id===id);
+    const nextIdx=idx+dir;
+    if(idx<0 || nextIdx<0 || nextIdx>=orderedDocs.length) return;
+    const next=[...orderedDocs];
+    [next[idx],next[nextIdx]]=[next[nextIdx],next[idx]];
+    const orderMap=new Map(next.map((d,i)=>[d.id,i]));
+    setDocuments(prev=>(prev||[]).map(d=>orderMap.has(d.id)?{...d,order:orderMap.get(d.id),updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy}:d));
+  }
   const query=(q||'').trim().toLowerCase();
+  const baseOrder = new Map((documents||[]).map((d,i)=>[d.id,i]));
   const filteredDocs=visibleDocs.filter(d=>{
     if(!query) return true;
     const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name: d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'Geral';
     const hay=`${d.title||''} ${d.folder||''} ${target||''} ${d.content||''}`.toLowerCase();
     return hay.includes(query);
   });
-  const grouped=folders.map(folder=>({folder, docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder)}));
-  return <section className="documents-page docs-clickup-shell"><div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div></div><div className="docs-workspace">{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} deleteDoc={deleteDoc} folders={folders} companies={companies} users={users}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>Crie um documento em uma pasta para começar.</p></div>}<aside className="docs-sidebar"><div className="docs-sidebar-head"><b>Arquivos</b><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar..."/></div><div className="docs-folder-list">{grouped.map(group=>{const isOpen=openFolders[group.folder]!==false; return <div className="docs-folder" key={group.folder}><div className="docs-folder-row"><button className="docs-folder-toggle" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{isOpen?'▾':'▸'}</button><button className="docs-folder-name" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{group.folder}</button><button className="docs-folder-add" title="Novo documento nesta pasta" onClick={()=>createDoc(group.folder)}>+</button><button className="docs-folder-delete" title="Excluir pasta" onClick={()=>deleteFolder(group.folder)}>×</button></div>{isOpen&&<div className="docs-page-list">{group.docs.length?group.docs.map(d=><button key={d.id} className={'docs-page-item '+(doc?.id===d.id?'active':'')} onClick={()=>setSelected(d.id)}><span>{d.title||'Sem título'}</span></button>):<small className="docs-folder-empty">Sem documentos</small>}</div>}</div>})}</div><button className="docs-new-folder" onClick={createFolder}>+ Nova pasta</button></aside></div></section>
+  const grouped=folders.map(folder=>({folder, docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder).sort((a,b)=>((a.order??9999)-(b.order??9999)) || ((baseOrder.get(a.id)||0)-(baseOrder.get(b.id)||0)))}));
+  return <section className="documents-page docs-clickup-shell"><div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div></div><div className="docs-workspace">{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} deleteDoc={deleteDoc} folders={folders} companies={companies} users={users}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>Crie uma pasta e depois um documento para começar.</p></div>}<aside className="docs-sidebar"><div className="docs-sidebar-head"><b>Arquivos</b><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar..."/></div><div className="docs-folder-list">{grouped.map((group,folderIndex)=>{const isOpen=openFolders[group.folder]!==false; return <div className="docs-folder" key={group.folder}><div className="docs-folder-row"><button className="docs-folder-toggle" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{isOpen?'▾':'▸'}</button><button className="docs-folder-name" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{group.folder}</button><button className="docs-folder-move" disabled={folderIndex===0} title="Subir pasta" onClick={()=>moveFolder(group.folder,-1)}>↑</button><button className="docs-folder-move" disabled={folderIndex===folders.length-1} title="Descer pasta" onClick={()=>moveFolder(group.folder,1)}>↓</button><button className="docs-folder-add" title="Novo documento nesta pasta" onClick={()=>createDoc(group.folder)}>+</button><button className="docs-folder-delete" title="Excluir pasta" onClick={()=>deleteFolder(group.folder)}>×</button></div>{isOpen&&<div className="docs-page-list">{group.docs.length?group.docs.map((d,docIndex)=><div key={d.id} className={'docs-page-row '+(doc?.id===d.id?'active':'')}><button className="docs-page-item" onClick={()=>setSelected(d.id)}><span>{d.title||'Sem título'}</span></button><button className="docs-doc-move" disabled={docIndex===0} title="Subir documento" onClick={()=>moveDoc(d.id,group.folder,-1)}>↑</button><button className="docs-doc-move" disabled={docIndex===group.docs.length-1} title="Descer documento" onClick={()=>moveDoc(d.id,group.folder,1)}>↓</button></div>):<small className="docs-folder-empty">Sem documentos</small>}</div>}</div>})}</div>{creatingFolder?<div className="docs-new-folder-inline"><input autoFocus value={folderDraft} onChange={e=>setFolderDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') commitFolderDraft(); if(e.key==='Escape'){setCreatingFolder(false); setFolderDraft('');}}} placeholder="Nome da pasta"/><button onClick={commitFolderDraft}>Criar</button><button onClick={()=>{setCreatingFolder(false);setFolderDraft('')}}>×</button></div>:<button className="docs-new-folder" onClick={()=>setCreatingFolder(true)}>+ Nova pasta</button>}</aside></div></section>
 }
+
 function DocumentEditor({doc,patchDoc,deleteDoc,folders,companies,users}){
   const [metaOpen,setMetaOpen]=useState(false);
   const linkedOptions=doc.linkType==='company'?companies.filter(c=>c.active!==false):doc.linkType==='user'?users.filter(u=>u.active!==false && u.role!=='client'):[ ];
-  return <main className="docs-editor"><div className="docs-editor-head"><div className="docs-title-block"><input className="docs-title-input" value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})} placeholder="Título do documento"/><div className="docs-breadcrumb"><span>{doc.folder||'Clientes'}</span><span>•</span><span>Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</span></div></div><div className="docs-actions"><button onClick={()=>setMetaOpen(v=>!v)}>{metaOpen?'Ocultar configurações':'Configurações'}</button></div></div>{metaOpen&&<div className="docs-meta-panel"><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{folders.map(f=><option key={f}>{f}</option>)}</select></label><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label></div>{doc.linkType!=='general'&&<label>{doc.linkType==='user'?'Funcionário':'Empresa/cliente'}<select value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}<div className="danger-zone"><h3>Documento</h3><p>Use apenas se tiver certeza. Esta ação remove o documento da biblioteca.</p><button onClick={()=>deleteDoc(doc.id)}>Excluir documento</button></div></div>}<textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/></main>
+  const linkedTarget=doc.linkType==='company'?companies.find(c=>c.id===doc.targetId):doc.linkType==='user'?users.find(u=>u.id===doc.targetId):null;
+  const linkedAvatar=doc.linkType==='company'?linkedTarget?.logo:linkedTarget?.avatar;
+  const linkedLabel=doc.linkType==='company'?'Empresa/cliente':doc.linkType==='user'?'Funcionário':'Sem vínculo';
+  return <main className="docs-editor"><div className="docs-editor-head"><div className="docs-title-block"><input className="docs-title-input" value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})} placeholder="Título do documento"/><div className="docs-breadcrumb"><span>{doc.folder||'Clientes'}</span><span>•</span><span>Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</span></div>{linkedTarget&&<div className="docs-linked-card"><AvatarMini value={linkedAvatar} label={linkedTarget.name}/><div><small>{linkedLabel}</small><b>{linkedTarget.name}</b></div></div>}</div><div className="docs-actions"><button onClick={()=>setMetaOpen(v=>!v)}>{metaOpen?'Ocultar configurações':'Configurações'}</button></div></div>{metaOpen&&<div className="docs-meta-panel"><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{folders.map(f=><option key={f}>{f}</option>)}</select></label><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label></div>{doc.linkType!=='general'&&<label>{doc.linkType==='user'?'Funcionário':'Empresa/cliente'}<select value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}<div className="danger-zone"><h3>Documento</h3><p>Use apenas se tiver certeza. Esta ação remove o documento da biblioteca.</p><button onClick={()=>deleteDoc(doc.id)}>Excluir documento</button></div></div>}<textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/></main>
 }
+
 
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
