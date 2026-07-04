@@ -95,40 +95,38 @@ function safeUUID(){
 
 const ARGOS_UI_POLISH_CSS = `
 
-.docs-clickup-shell{min-height:calc(100vh - 70px);}
+ .docs-clickup-shell{min-height:calc(100vh - 70px);}
 .docs-topbar{margin-bottom:10px!important;}
-.docs-workspace{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:18px;align-items:stretch;min-height:calc(100vh - 170px);}
-.docs-editor{min-width:0;background:transparent!important;border:0!important;padding:8px 8px 0!important;display:flex;flex-direction:column;gap:14px;}
-.docs-editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:12px;}
+.docs-workspace{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:stretch;min-height:calc(100vh - 165px);}
+.docs-editor{min-width:0;background:transparent!important;border:0!important;padding:6px 8px 0!important;display:flex;flex-direction:column;gap:12px;}
+.docs-editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:10px;}
 .docs-title-block{min-width:0;flex:1;}
 .docs-title-input{font-size:34px!important;font-weight:800!important;border:0!important;background:transparent!important;padding:0!important;color:var(--text)!important;box-shadow:none!important;min-height:46px!important;}
 .docs-title-input:focus{outline:0!important;box-shadow:none!important;}
 .docs-breadcrumb{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:4px;}
 .docs-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-.docs-meta-panel{border:1px solid rgba(225,177,44,.22);border-radius:16px;padding:14px;background:rgba(255,255,255,.025);}
-.docs-metrics-strip{display:flex;gap:10px;flex-wrap:wrap;border:1px solid rgba(225,177,44,.18);background:rgba(225,177,44,.055);border-radius:14px;padding:10px 12px;color:var(--muted);}
-.docs-metrics-strip span{display:inline-flex;gap:5px;align-items:center;font-size:12px;}
-.docs-metrics-strip b{color:var(--text);}
-.docs-content-editor{flex:1;min-height:56vh!important;width:100%;border:0!important;background:transparent!important;color:var(--text)!important;font-size:16px!important;line-height:1.72!important;padding:8px 2px 70px!important;resize:vertical;box-shadow:none!important;}
+.docs-meta-panel{border:0!important;border-radius:12px;padding:10px 0 12px;background:transparent!important;}
+.docs-meta-panel .danger-zone{margin-top:12px;padding:12px;border-radius:12px;border:1px solid rgba(255,84,84,.28);background:rgba(255,84,84,.045);}
+.docs-content-editor{flex:1;min-height:62vh!important;width:100%;border:0!important;background:transparent!important;color:var(--text)!important;font-size:16px!important;line-height:1.72!important;padding:8px 2px 70px!important;resize:vertical;box-shadow:none!important;}
 .docs-content-editor:focus{outline:0!important;box-shadow:none!important;}
-.docs-external-link{align-self:flex-start;color:#e1b12c;text-decoration:none;border:1px solid rgba(225,177,44,.35);border-radius:12px;padding:9px 12px;}
-.docs-sidebar{border-left:1px solid rgba(255,255,255,.08);padding-left:16px;min-width:0;}
-.docs-sidebar-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.docs-sidebar{border-left:1px solid rgba(255,255,255,.08);padding-left:14px;min-width:0;}
+.docs-sidebar-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .docs-sidebar-head b{white-space:nowrap;}
 .docs-sidebar-head input{height:34px!important;padding:6px 10px!important;min-width:0;}
-.docs-folder-list{display:flex;flex-direction:column;gap:8px;}
-.docs-folder{border-radius:12px;background:rgba(255,255,255,.02);}
-.docs-folder-row{display:grid;grid-template-columns:28px minmax(0,1fr) 30px;align-items:center;gap:4px;padding:4px;}
+.docs-folder-list{display:flex;flex-direction:column;gap:3px;}
+.docs-folder{border-radius:10px;background:transparent!important;}
+.docs-folder-row{display:grid;grid-template-columns:26px minmax(0,1fr) 28px 28px;align-items:center;gap:2px;padding:2px 0;}
 .docs-folder-row button{border:0!important;background:transparent!important;color:var(--text)!important;box-shadow:none!important;padding:6px!important;min-height:0!important;}
 .docs-folder-name{text-align:left!important;font-weight:700!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .docs-folder-add{color:#e1b12c!important;font-size:18px!important;}
-.docs-page-list{display:flex;flex-direction:column;gap:3px;padding:0 6px 8px 36px;}
-.docs-page-item{width:100%;border:0!important;background:transparent!important;color:var(--muted)!important;text-align:left!important;padding:8px 9px!important;border-radius:8px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:2px!important;box-shadow:none!important;}
+.docs-folder-delete{color:var(--muted)!important;font-size:15px!important;}
+.docs-folder-delete:hover{color:#ff6b6b!important;}
+.docs-page-list{display:flex;flex-direction:column;gap:2px;padding:0 0 7px 32px;}
+.docs-page-item{width:100%;border:0!important;background:transparent!important;color:var(--muted)!important;text-align:left!important;padding:7px 8px!important;border-radius:8px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:2px!important;box-shadow:none!important;}
 .docs-page-item:hover,.docs-page-item.active{background:rgba(255,255,255,.07)!important;color:var(--text)!important;}
 .docs-page-item span{font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.docs-page-item small{font-size:11px;color:var(--muted);}
-.docs-folder-empty{display:block;color:var(--muted);padding:7px 9px;}
-.docs-empty-editor{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;color:var(--muted);}
+.docs-folder-empty{display:block;color:var(--muted);padding:7px 8px;}
+.docs-new-folder{width:100%;margin-top:10px;border:0!important;background:rgba(255,255,255,.035)!important;color:var(--text)!important;text-align:left!important;box-shadow:none!important;}
 @media(max-width:900px){.docs-workspace{grid-template-columns:1fr}.docs-sidebar{border-left:0;border-top:1px solid rgba(255,255,255,.08);padding:14px 0 0}.docs-title-input{font-size:28px!important}.docs-content-editor{min-height:45vh!important}.docs-editor-head{flex-direction:column}.docs-actions{justify-content:flex-start}}
 .task-topbar-split{display:grid;grid-template-columns:auto minmax(260px,1fr);align-items:center;gap:12px;margin-bottom:12px;}
 .task-topbar-split .task-nav-actions{justify-self:end;display:flex;gap:8px;flex-wrap:wrap;}
@@ -2841,8 +2839,22 @@ function GeneralSettings({system,setSystem,reset}){
 }
 
 
-const DOCUMENT_FOLDERS = ['Clientes','Funcionários','Financeiro','Processos','Modelos','Interno'];
-const DOCUMENT_TYPES = ['Informações gerais','Briefing','Preferências','Acessos','Financeiro do cliente','Pagamento de funcionário','Processo interno','Modelo'];
+const DEFAULT_DOCUMENT_FOLDERS = ['Clientes','Funcionários','Financeiro','Processos','Modelos','Interno'];
+function isFolderMarker(d){ return d?.documentKind==='folder'; }
+function normalizeFolderName(name){ return String(name||'').trim().replace(/\s+/g,' '); }
+function folderMarker(name,currentUser,patch={}){
+  const folderName=normalizeFolderName(name)||'Nova pasta';
+  return {id:safeUUID(),documentKind:'folder',folderName,title:folderName,folder:folderName,archived:false,deleted:false,createdAt:now(),updatedAt:now(),createdBy:currentUser?.id||'',updatedBy:currentUser?.id||'',...patch};
+}
+function documentFolders(documents){
+  const deleted=new Set((documents||[]).filter(isFolderMarker).filter(d=>d.deleted).map(d=>normalizeFolderName(d.folderName||d.folder||d.title)));
+  const names=[...DEFAULT_DOCUMENT_FOLDERS];
+  (documents||[]).forEach(d=>{
+    if(isFolderMarker(d) && !d.deleted && !d.archived) names.push(normalizeFolderName(d.folderName||d.folder||d.title));
+    if(!isFolderMarker(d) && !d.archived && d.folder) names.push(normalizeFolderName(d.folder));
+  });
+  return [...new Set(names.filter(Boolean).filter(name=>!deleted.has(name)))];
+}
 function blankDocument(currentUser){
   return {
     id:safeUUID(),
@@ -2852,11 +2864,6 @@ function blankDocument(currentUser){
     linkType:'general',
     targetId:'',
     content:'',
-    externalLink:'',
-    monthlyValue:'',
-    billingDay:'',
-    employeeMonthlyCost:'',
-    employeeVariableCost:'',
     archived:false,
     createdAt:now(),
     updatedAt:now(),
@@ -2864,38 +2871,56 @@ function blankDocument(currentUser){
     updatedBy:currentUser?.id || ''
   };
 }
-function moneyNumber(value){
-  const raw=String(value??'').replace(/\./g,'').replace(',', '.').replace(/[^0-9.-]/g,'');
-  const n=Number(raw);
-  return Number.isFinite(n)?n:0;
-}
-function moneyBR(value){
-  const n=Number(value)||0;
-  try{return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}catch(e){return `R$ ${n.toFixed(2)}`;}
-}
-function currentMonthKey(){ return new Date().toISOString().slice(0,7); }
-function taskMonthKey(task){ return String(task?.postDate || task?.internalDate || '').slice(0,7); }
 function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,currentUser}){
-  const visibleDocs=(documents||[]).filter(d=>!d.archived);
-  const [selected,setSelected]=useState(visibleDocs[0]?.id || documents[0]?.id || null);
+  const visibleDocs=(documents||[]).filter(d=>!d.archived && !isFolderMarker(d));
+  const folders=documentFolders(documents);
+  const [selected,setSelected]=useState(visibleDocs[0]?.id || documents.find(d=>!isFolderMarker(d))?.id || null);
   const [q,setQ]=useState('');
-  const [openFolders,setOpenFolders]=useState(()=>Object.fromEntries(DOCUMENT_FOLDERS.map(f=>[f,true])));
-  const doc=documents.find(d=>d.id===selected) || visibleDocs[0] || null;
+  const [openFolders,setOpenFolders]=useState(()=>Object.fromEntries(folders.map(f=>[f,true])));
+  const doc=documents.find(d=>!isFolderMarker(d) && d.id===selected) || visibleDocs[0] || null;
   useEffect(()=>{
     if(!doc && visibleDocs[0]) setSelected(visibleDocs[0].id);
   },[documents.length]);
   function createDoc(folder='Clientes'){
-    const next={...blankDocument(currentUser), folder};
+    const safeFolder=normalizeFolderName(folder)||'Clientes';
+    const next={...blankDocument(currentUser), folder:safeFolder};
     setDocuments(prev=>[next,...(prev||[])]);
     setSelected(next.id);
-    setOpenFolders(prev=>({...prev,[folder]:true}));
+    setOpenFolders(prev=>({...prev,[safeFolder]:true}));
+  }
+  function createFolder(){
+    const name=normalizeFolderName(prompt('Nome da nova pasta:'));
+    if(!name) return;
+    if(folders.some(f=>f.toLowerCase()===name.toLowerCase())){ alert('Essa pasta já existe.'); return; }
+    setDocuments(prev=>[folderMarker(name,currentUser),...(prev||[])]);
+    setOpenFolders(prev=>({...prev,[name]:true}));
+  }
+  function deleteFolder(folder){
+    const safeFolder=normalizeFolderName(folder);
+    const docsInFolder=visibleDocs.filter(d=>(d.folder||'Clientes')===safeFolder);
+    const msg=docsInFolder.length?`Excluir a pasta "${safeFolder}" e arquivar ${docsInFolder.length} documento(s) dentro dela?`:`Excluir a pasta "${safeFolder}"?`;
+    if(!confirm(msg)) return;
+    const deletedMarker=folderMarker(safeFolder,currentUser,{archived:true,deleted:true});
+    setDocuments(prev=>{
+      const hasMarker=(prev||[]).some(d=>isFolderMarker(d)&&normalizeFolderName(d.folderName||d.folder||d.title)===safeFolder);
+      const next=(prev||[]).map(d=>{
+        if(isFolderMarker(d)&&normalizeFolderName(d.folderName||d.folder||d.title)===safeFolder) return {...d,archived:true,deleted:true,updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy};
+        if(!isFolderMarker(d)&&(d.folder||'Clientes')===safeFolder) return {...d,archived:true,updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy};
+        return d;
+      });
+      return hasMarker?next:[deletedMarker,...next];
+    });
+    if(doc && (doc.folder||'Clientes')===safeFolder){
+      const next=visibleDocs.find(d=>(d.folder||'Clientes')!==safeFolder);
+      setSelected(next?.id||null);
+    }
   }
   function patchDoc(id,patch){
     setDocuments(prev=>(prev||[]).map(d=>d.id===id?{...d,...patch,updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy}:d));
   }
-  function archiveDoc(id){
-    if(!confirm('Arquivar este documento?')) return;
-    patchDoc(id,{archived:true});
+  function deleteDoc(id){
+    if(!confirm('Excluir este documento? Esta ação remove o documento da lista.')) return;
+    setDocuments(prev=>(prev||[]).filter(d=>d.id!==id));
     const next=visibleDocs.find(d=>d.id!==id);
     setSelected(next?.id || null);
   }
@@ -2903,30 +2928,17 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
   const filteredDocs=visibleDocs.filter(d=>{
     if(!query) return true;
     const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name: d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'Geral';
-    const hay=`${d.title||''} ${d.folder||''} ${d.type||''} ${target||''} ${d.content||''}`.toLowerCase();
+    const hay=`${d.title||''} ${d.folder||''} ${target||''} ${d.content||''}`.toLowerCase();
     return hay.includes(query);
   });
-  const grouped=DOCUMENT_FOLDERS.map(folder=>({folder, docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder)}));
-  return <section className="documents-page docs-clickup-shell"><div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div><button className="primary" onClick={()=>createDoc(doc?.folder||'Clientes')}>+ Novo documento</button></div><div className="docs-workspace">{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} archiveDoc={archiveDoc} companies={companies} users={users} tasks={tasks} statuses={statuses}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>Crie um documento na lateral para começar.</p><button className="primary" onClick={()=>createDoc('Clientes')}>+ Novo documento</button></div>}<aside className="docs-sidebar"><div className="docs-sidebar-head"><b>Arquivos</b><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar..."/></div><div className="docs-folder-list">{grouped.map(group=>{const isOpen=openFolders[group.folder]!==false; return <div className="docs-folder" key={group.folder}><div className="docs-folder-row"><button className="docs-folder-toggle" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{isOpen?'▾':'▸'}</button><button className="docs-folder-name" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{group.folder}</button><button className="docs-folder-add" title="Novo documento nesta pasta" onClick={()=>createDoc(group.folder)}>+</button></div>{isOpen&&<div className="docs-page-list">{group.docs.length?group.docs.map(d=>{const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name:d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:''; return <button key={d.id} className={'docs-page-item '+(doc?.id===d.id?'active':'')} onClick={()=>setSelected(d.id)}><span>{d.title||'Sem título'}</span>{target&&<small>{target}</small>}</button>}):<small className="docs-folder-empty">Sem documentos</small>}</div>}</div>})}</div></aside></div></section>
+  const grouped=folders.map(folder=>({folder, docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder)}));
+  return <section className="documents-page docs-clickup-shell"><div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div></div><div className="docs-workspace">{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} deleteDoc={deleteDoc} folders={folders} companies={companies} users={users}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>Crie um documento em uma pasta para começar.</p></div>}<aside className="docs-sidebar"><div className="docs-sidebar-head"><b>Arquivos</b><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar..."/></div><div className="docs-folder-list">{grouped.map(group=>{const isOpen=openFolders[group.folder]!==false; return <div className="docs-folder" key={group.folder}><div className="docs-folder-row"><button className="docs-folder-toggle" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{isOpen?'▾':'▸'}</button><button className="docs-folder-name" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{group.folder}</button><button className="docs-folder-add" title="Novo documento nesta pasta" onClick={()=>createDoc(group.folder)}>+</button><button className="docs-folder-delete" title="Excluir pasta" onClick={()=>deleteFolder(group.folder)}>×</button></div>{isOpen&&<div className="docs-page-list">{group.docs.length?group.docs.map(d=><button key={d.id} className={'docs-page-item '+(doc?.id===d.id?'active':'')} onClick={()=>setSelected(d.id)}><span>{d.title||'Sem título'}</span></button>):<small className="docs-folder-empty">Sem documentos</small>}</div>}</div>})}</div><button className="docs-new-folder" onClick={createFolder}>+ Nova pasta</button></aside></div></section>
 }
-function DocumentEditor({doc,patchDoc,archiveDoc,companies,users,tasks,statuses}){
+function DocumentEditor({doc,patchDoc,deleteDoc,folders,companies,users}){
   const [metaOpen,setMetaOpen]=useState(false);
-  const targetName=doc.linkType==='company'?companies.find(c=>c.id===doc.targetId)?.name:doc.linkType==='user'?users.find(u=>u.id===doc.targetId)?.name:'Geral';
-  const month=currentMonthKey();
-  const monthTasks=tasks.filter(t=>!t.archived && taskMonthKey(t)===month);
-  const companyTasks=doc.linkType==='company' && doc.targetId ? monthTasks.filter(t=>t.companyId===doc.targetId) : [];
-  const companyFinished=companyTasks.filter(t=>isFinalStatus(statuses,t.status));
-  const employeeTasks=doc.linkType==='user' && doc.targetId ? monthTasks.filter(t=>t.responsibleId===doc.targetId) : [];
-  const employeeFinished=employeeTasks.filter(t=>isFinalStatus(statuses,t.status));
-  const monthly=moneyNumber(doc.monthlyValue);
-  const avgFinished=monthly && companyFinished.length ? monthly/companyFinished.length : 0;
-  const employeeCost=moneyNumber(doc.employeeMonthlyCost);
-  const costPerFinished=employeeCost && employeeFinished.length ? employeeCost/employeeFinished.length : 0;
   const linkedOptions=doc.linkType==='company'?companies.filter(c=>c.active!==false):doc.linkType==='user'?users.filter(u=>u.active!==false && u.role!=='client'):[ ];
-  const hasMetrics=(doc.linkType==='company'&&doc.targetId)||(doc.linkType==='user'&&doc.targetId);
-  return <main className="docs-editor"><div className="docs-editor-head"><div className="docs-title-block"><input className="docs-title-input" value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})} placeholder="Título do documento"/><div className="docs-breadcrumb"><span>{doc.folder||'Clientes'}</span><span>•</span><span>{targetName||'Sem vínculo'}</span><span>•</span><span>Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</span></div></div><div className="docs-actions"><button onClick={()=>setMetaOpen(v=>!v)}>{metaOpen?'Ocultar dados':'Dados'}</button><button onClick={()=>archiveDoc(doc.id)}>Arquivar</button></div></div>{metaOpen&&<div className="docs-meta-panel"><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{DOCUMENT_FOLDERS.map(f=><option key={f}>{f}</option>)}</select></label><label>Tipo<select value={doc.type||'Informações gerais'} onChange={e=>patchDoc(doc.id,{type:e.target.value})}>{DOCUMENT_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="form-two"><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label><label>{doc.linkType==='user'?'Funcionário':doc.linkType==='company'?'Empresa/cliente':'Vínculo'}<select disabled={doc.linkType==='general'} value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label></div><label>Link externo opcional<input value={doc.externalLink||''} onChange={e=>patchDoc(doc.id,{externalLink:e.target.value})} placeholder="Link de planilha, pasta do Drive, Docs etc."/></label><div className="form-two"><label>Valor mensal do cliente<input value={doc.monthlyValue||''} onChange={e=>patchDoc(doc.id,{monthlyValue:e.target.value})} placeholder="Ex: 1700"/></label><label>Dia de pagamento<input value={doc.billingDay||''} onChange={e=>patchDoc(doc.id,{billingDay:e.target.value})} placeholder="Ex: 10"/></label></div><div className="form-two"><label>Custo mensal do funcionário<input value={doc.employeeMonthlyCost||''} onChange={e=>patchDoc(doc.id,{employeeMonthlyCost:e.target.value})} placeholder="Ex: 1500"/></label><label>Custo variável / observação<input value={doc.employeeVariableCost||''} onChange={e=>patchDoc(doc.id,{employeeVariableCost:e.target.value})} placeholder="Ex: R$ 50 por vídeo"/></label></div></div>}{hasMetrics&&<div className="docs-metrics-strip">{doc.linkType==='company'&&doc.targetId&&<><span><b>{companyTasks.length}</b> tarefas no mês</span><span><b>{companyFinished.length}</b> finalizadas</span><span><b>{moneyBR(monthly)}</b> mensal</span><span><b>{avgFinished?moneyBR(avgFinished):'—'}</b> por finalizada</span></>}{doc.linkType==='user'&&doc.targetId&&<><span><b>{employeeTasks.length}</b> tarefas no mês</span><span><b>{employeeFinished.length}</b> finalizadas</span><span><b>{moneyBR(employeeCost)}</b> custo mensal</span><span><b>{costPerFinished?moneyBR(costPerFinished):'—'}</b> por finalizada</span></>}</div>}<textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/>{doc.externalLink&&<a className="docs-external-link" href={doc.externalLink} target="_blank" rel="noreferrer">Abrir link externo ↗</a>}</main>
+  return <main className="docs-editor"><div className="docs-editor-head"><div className="docs-title-block"><input className="docs-title-input" value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})} placeholder="Título do documento"/><div className="docs-breadcrumb"><span>{doc.folder||'Clientes'}</span><span>•</span><span>Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</span></div></div><div className="docs-actions"><button onClick={()=>setMetaOpen(v=>!v)}>{metaOpen?'Ocultar configurações':'Configurações'}</button></div></div>{metaOpen&&<div className="docs-meta-panel"><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{folders.map(f=><option key={f}>{f}</option>)}</select></label><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label></div>{doc.linkType!=='general'&&<label>{doc.linkType==='user'?'Funcionário':'Empresa/cliente'}<select value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}<div className="danger-zone"><h3>Documento</h3><p>Use apenas se tiver certeza. Esta ação remove o documento da biblioteca.</p><button onClick={()=>deleteDoc(doc.id)}>Excluir documento</button></div></div>}<textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/></main>
 }
-
 
 
 function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
