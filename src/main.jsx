@@ -648,6 +648,73 @@ if (typeof document !== 'undefined') {
   style42.textContent = ARGOS_ROUND42_CLEAN_LAYOUT_CSS;
 }
 
+
+const ARGOS_ROUND139A_VISUAL_CSS = `
+/* Round139A: ajustes visuais leves, sem impacto no banco */
+*{
+  scrollbar-width:thin!important;
+  scrollbar-color:#5b6472 transparent!important;
+}
+*::-webkit-scrollbar{
+  width:9px!important;
+  height:9px!important;
+}
+*::-webkit-scrollbar-track{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+*::-webkit-scrollbar-thumb{
+  background:#5b6472!important;
+  border:0!important;
+  border-radius:999px!important;
+  box-shadow:none!important;
+}
+*::-webkit-scrollbar-thumb:hover{
+  background:#747d8c!important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator{
+  opacity:.95!important;
+  filter:invert(1) grayscale(1) contrast(1.35)!important;
+  cursor:pointer!important;
+}
+input[type="date"]:disabled::-webkit-calendar-picker-indicator{
+  opacity:.45!important;
+}
+.nav-btn{
+  position:relative!important;
+}
+.nav-btn span{
+  min-width:0!important;
+}
+.nav-notification-badge{
+  margin-left:auto!important;
+  min-width:17px!important;
+  height:17px!important;
+  padding:0 5px!important;
+  border-radius:999px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  background:#ef4444!important;
+  color:#fff!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  line-height:1!important;
+  box-shadow:0 0 0 1px rgba(5,5,5,.9)!important;
+  pointer-events:none!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style139A = document.getElementById('argos-round139a-visual');
+  if (!style139A) {
+    style139A = document.createElement('style');
+    style139A.id = 'argos-round139a-visual';
+    document.head.appendChild(style139A);
+  }
+  style139A.textContent = ARGOS_ROUND139A_VISUAL_CSS;
+}
+
 const TASK_TYPES = ['Estático', 'Carrossel', 'Vídeo', 'Vídeo Inglês', 'Pacote de criativos', 'Outras demandas'];
 const WEEK_DAYS = [
   { value:0, label:'Segunda' },
@@ -1125,6 +1192,7 @@ function periodMatch(date, period, from, to){
   const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate()+6);
   const lastWeekStart = new Date(startOfWeek); lastWeekStart.setDate(startOfWeek.getDate()-7);
   const lastWeekEnd = new Date(endOfWeek); lastWeekEnd.setDate(endOfWeek.getDate()-7);
+  if(period==='current'){ const currentStart=new Date(today); currentStart.setDate(today.getDate()-30); return d>=currentStart; }
   if(period==='today') return date===todayStr();
   if(period==='week') return d>=startOfWeek && d<=endOfWeek;
   if(period==='lastweek') return d>=lastWeekStart && d<=lastWeekEnd;
@@ -1736,7 +1804,7 @@ function App(){
     taskOpenSessionRef.current[selectedTask] = true;
   }
   return <div className="app">
-    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
+    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
       {selectedTask ? (
@@ -1855,7 +1923,7 @@ function SearchBox({value,setValue,tasks,companies,users,user,open}){
     {show&&q&&<div className="search-results">{results.length?results.map(t=><button key={t.id} onClick={()=>{open(t.id);setShow(false)}}><b>{t.title}</b><small>{companies.find(c=>c.id===t.companyId)?.name} • {fmtDate(t.postDate)} {t.archived?'• Arquivada':''}</small></button>):<p>Nenhuma tarefa encontrada.</p>}<small className="search-note">Pesquisa restrita às tarefas permitidas.</small></div>}
   </div>
 }
-function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],system,realAdmin,nav,screen,setScreen,setAuth}){
+function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notifications=[],system,realAdmin,nav,screen,setScreen,setAuth}){
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const drawerRef=useRef(null);
   const menuButtonRef=useRef(null);
@@ -1881,6 +1949,7 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],system,
   const teamViewUsers = activeViewUsers.filter(u=>u.role==='team');
   const clientViewUsers = activeViewUsers.filter(u=>u.role==='client');
   const goScreen=(id)=>{ setScreen(id); setMobileMenuOpen(false); };
+  const pendingNotificationsCount = (notifications||[]).filter(n=>n?.userId===effectiveUser?.id && !n?.done).length;
   return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')}>
     <div className="mobile-side-bar">
       <div className="mobile-brand-mini">
@@ -1897,16 +1966,16 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],system,
       </div>
       <div className="user-card user-clean"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{roleLabel}</small></div></div>
       {realAdmin&&<div className="impersonate"><small>ACESSAR COMO</small><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>────────────</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup><option disabled>────────────</option><optgroup label="Usuários clientes">{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</optgroup></select><small>Permissões reais do usuário simulado.</small></div>}
-      <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span></button>)}</nav>
+      <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<i className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</i>}</button>)}</nav>
       <div className="spacer"/>
       <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
     </div>
   </aside> 
 }
 function CreateModal({form,setForm,companies,users,statuses,types,createTask,close}){ const F=(k,v)=>setForm({...form,[k]:v}); const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')); return <div className="modal-bg"><div className="modal create"><button className="x" onClick={close}>×</button><h2>Nova tarefa</h2><p>Organize briefing, prazos e materiais da produção.</p><label>Nome da tarefa<input value={form.title} onChange={e=>F('title',e.target.value)} placeholder="Ex: Reels | Oferta Junho"/></label><div className="form-two"><label>Cliente / Empresa<div className="select-entity"><EntityLabel value={companies.find(c=>c.id===form.companyId)?.logo} label={companies.find(c=>c.id===form.companyId)?.name||'Empresa'}/><select value={form.companyId} onChange={e=>F('companyId',e.target.value)}>{companies.filter(c=>c.active).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={teams.find(u=>u.id===form.responsibleId)?.avatar} label={teams.find(u=>u.id===form.responsibleId)?.name||'Responsável'}/><select value={form.responsibleId} onChange={e=>F('responsibleId',e.target.value)}>{teams.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label></div><div className="form-two"><label>Tipo de post<select value={form.type} onChange={e=>F('type',e.target.value)}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select">{statusDot(statuses.find(s=>s.id===form.status))}<select value={form.status} onChange={e=>F('status',e.target.value)}>{statuses.filter(s=>s.active).map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label></div><div className="form-two"><label>Data do post<input type="date" value={form.postDate} onChange={e=>F('postDate',e.target.value)}/></label><label className={'date-field '+priorityClass(form.internalDate)}>Prazo<input type="date" value={form.internalDate} onChange={e=>F('internalDate',e.target.value)}/><small>{priorityText(form.internalDate)}</small></label></div><label>Instruções ao copy<textarea value={form.copyInstructions||''} onChange={e=>F('copyInstructions',e.target.value)} placeholder="Objetivo, tom, CTA, ideias e referências para o copy..."/></label><label>Instruções ao editor<textarea value={form.editorInstructions||''} onChange={e=>F('editorInstructions',e.target.value)} placeholder="Referências visuais, formato, identidade, imagens, links e observações para edição..."/></label><label>Copy<textarea value={form.copy} onChange={e=>F('copy',e.target.value)} placeholder="Opcional. Use quando a copy precisa ser criada ou aprovada antes do design."/></label><label>Legenda<textarea value={form.caption} onChange={e=>F('caption',e.target.value)} placeholder="Opcional. Pode ser preenchida agora ou depois."/></label><label>Links do material, um por linha<textarea value={form.materialLinks} onChange={e=>F('materialLinks',e.target.value)} placeholder="Cole um link por linha. Imagem, vídeo ou Drive público."/></label><div className="modal-actions"><button onClick={close}>Cancelar</button><button className="primary" onClick={createTask}>+ Criar tarefa</button></div></div></div> }
-function PeriodFilters({period,setPeriod,from,setFrom,to,setTo}){ return <><label>Período<select value={period} onChange={e=>setPeriod(e.target.value)}><option value="month">Mês corrente</option><option value="lastmonth">Mês passado</option><option value="week">Essa semana</option><option value="lastweek">Semana passada</option><option value="today">Hoje</option><option value="custom">Personalizado</option></select></label>{period==='custom'&&<><label>De<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>Até<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></>}</> }
+function PeriodFilters({period,setPeriod,from,setFrom,to,setTo}){ return <><label>Período<select value={period} onChange={e=>setPeriod(e.target.value)}><option value="current">Atualmente</option><option value="month">Mês corrente</option><option value="lastmonth">Mês passado</option><option value="week">Essa semana</option><option value="lastweek">Semana passada</option><option value="today">Hoje</option><option value="custom">Personalizado</option></select></label>{period==='custom'&&<><label>De<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>Até<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></>}</> }
 function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){ 
-  const [period,setPeriod]=useState('month'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'); 
+  const [period,setPeriod]=useState('current'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'); 
   const isAdmin=user.role==='admin'; 
   const activeCompanies=companies.filter(c=>c.active);
   const activeUsers=sortMembersAdminFirst(users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')));
@@ -2302,7 +2371,7 @@ function DayView({day,setSelectedDay,tasks,companies,users,statusById,open}){
   return <div><div className="month-head"><h2>{fmtDate(day)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div><small>{list.length} tarefa(s) neste dia</small></div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} onClick={()=>open(t.id)} style={{borderColor:statusById[t.status]?.color}}><b>{t.title}</b><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small><span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span></button>)}</div></div> 
 }
 function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
-  const [period,setPeriod]=useState('month'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'),[archivedOnly,setArchivedOnly]=useState(false),[sort,setSort]=useState('priority'); 
+  const [period,setPeriod]=useState('current'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'),[archivedOnly,setArchivedOnly]=useState(false),[sort,setSort]=useState('priority'); 
   const isAdmin=user.role==='admin'; 
   const allowed=statuses.filter(s=>user.role==='admin'||(user.visibleStatuses||[]).includes(s.id)); 
   let filtered=applyFilters(tasks,{period,from,to,company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,archivedOnly,search}); 
