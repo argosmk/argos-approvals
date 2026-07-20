@@ -1358,8 +1358,12 @@ function App(){
   useEffect(()=>{
     const syncRoute=()=>{
       const route=parseAppRoute();
+      if(route.taskId){
+        setSelectedTask(route.taskId);
+        return;
+      }
       setScreen(route.screen || 'dashboard');
-      setSelectedTask(route.taskId || null);
+      setSelectedTask(null);
     };
     syncRoute();
     window.addEventListener('hashchange', syncRoute);
@@ -1807,27 +1811,26 @@ function App(){
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
-      {selectedTask ? (
+      {selectedTask && (
         selectedTaskObj && selectedTaskAllowed
           ? <TaskPage task={selectedTaskObj} tasks={tasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
           : <TaskAccessDenied back={closeTaskRoute}/>
-      ) : (
-        <>
-          <div className="top-actions">
-            <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={openTaskRoute}/>
-            {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
-          </div>
-          {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
-          {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} setAuth={setAuth} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser}/>}
-          {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
-          {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute}/>} 
-          {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
-          {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
-          {activeScreen==='documents' && isAdmin && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
-          {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
-          {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} user={effectiveUser} auth={auth}/>} 
-        </>
       )}
+      <div style={selectedTask ? {display:'none'} : undefined}>
+        <div className="top-actions">
+          <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={openTaskRoute}/>
+          {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
+        </div>
+        {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
+        {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} setAuth={setAuth} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser}/>}
+        {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
+        {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute}/>} 
+        {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
+        {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
+        {activeScreen==='documents' && isAdmin && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
+        {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
+        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} user={effectiveUser} auth={auth}/>} 
+      </div>
     </main>
     {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)}/>} 
   </div>
