@@ -1829,7 +1829,7 @@ function App(){
         {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
         {activeScreen==='documents' && isAdmin && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
         {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
-        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} user={effectiveUser} auth={auth}/>} 
+        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} companies={companies} users={users} statuses={statuses} user={effectiveUser} auth={auth}/>} 
       </div>
     </main>
     {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)}/>} 
@@ -3090,21 +3090,41 @@ function DocumentEditor({doc,patchDoc,deleteDoc,folders,companies,users}){
 
 
 
-function NotificationsPage({notifications,setNotifications,open,tasks,user}){ 
+function NotificationsPage({notifications,setNotifications,open,tasks,companies,users,statuses,user}){ 
   const [tab,setTab]=useState('open'); 
   const scoped=notifications.filter(n=>(!n.userId||n.userId===user.id));
   const list=scoped.filter(n=>tab==='done'?n.done:!n.done); 
   const doneCount=scoped.filter(n=>n.done).length;
+  const companyById=Object.fromEntries((companies||[]).map(c=>[c.id,c]));
+  const userById=Object.fromEntries((users||[]).map(u=>[u.id,u]));
+  const statusById=Object.fromEntries((statuses||[]).map(s=>[s.id,s]));
   function done(id){ setNotifications(prev=>prev.map(n=>n.id===id?{...n,done:true}:n)); }
   function clearDone(){
     if(!doneCount) return;
     if(!confirm(`Limpar ${doneCount} notificação${doneCount===1?' concluída':' concluídas'}?`)) return;
     setNotifications(prev=>prev.filter(n=>!(n.done && (!n.userId || n.userId===user.id))));
   }
-  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=><div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p><div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  function notificationMeta(n){
+    const task=(tasks||[]).find(t=>t.id===n.taskId);
+    if(!task) return [];
+    const company=companyById[task.companyId]?.name;
+    const responsible=userById[task.responsibleId]?.name;
+    const status=statusById[task.status]?.name;
+    const deadline=task.internalDate||task.postDate;
+    return [
+      company&&`Empresa: ${company}`,
+      responsible&&`Responsável: ${responsible}`,
+      deadline&&`Prazo: ${formatDate(deadline)}`,
+      status&&`Status: ${status}`
+    ].filter(Boolean);
+  }
+  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=>{const meta=notificationMeta(n);return <div className="panel notification-item" key={n.id}><small>{new Date(n.at).toLocaleString('pt-BR')}</small><p>{n.text}</p>{meta.length>0&&<div className="notification-task-meta">{meta.map(item=><span key={item}>{item}</span>)}</div>}<div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>}):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
 }
 
 
+
+.notification-task-meta{display:flex;flex-wrap:wrap;gap:7px 12px;margin:8px 0 12px;color:var(--muted);font-size:12px;}
+.notification-task-meta span{display:inline-flex;align-items:center;min-height:26px;padding:4px 8px;border-radius:8px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06);}
 
 const ARGOS_ROUND43_MOBILE_VIDEO_DATE_CSS = `
 /* Round 43: polimento final mobile: vídeo sem controles nativos gigantes e datas alinhadas */
