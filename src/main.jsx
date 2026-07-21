@@ -95,6 +95,22 @@ function safeUUID(){
 
 const ARGOS_UI_POLISH_CSS = `
 
+.tasks-board .task-row,
+.kanban .kcard{
+  border-color:rgba(255,255,255,.14)!important;
+}
+
+.notification-card .status-pill,
+.notification-card .priority-pill,
+.notifications-page .status-pill,
+.notifications-page .priority-pill{
+  border-radius:8px!important;
+  padding:6px 10px!important;
+  font-size:12px!important;
+  font-weight:700!important;
+  line-height:1.2!important;
+}
+
 @media (min-width:761px){
   .side .impersonate{padding-top:8px!important;padding-bottom:8px!important;}
   .side .impersonate select{
@@ -1293,6 +1309,25 @@ function isFinishedTask(task, statuses){
   const txt=normalizedStatusText(task,statuses);
   return !!isFinalStatus(statuses, task?.status) || txt.includes('pronto') || txt.includes('finaliz');
 }
+
+function taskPriorityClass(task,statuses){
+  if(isScheduledTask(task,statuses) || isFinishedTask(task,statuses)) return 'done';
+  return priorityClass(task?.internalDate);
+}
+function taskPriorityGroup(task,statuses){
+  if(isScheduledTask(task,statuses)) return 'Agendada';
+  if(isFinishedTask(task,statuses)) return 'Concluída';
+  return priorityText(task?.internalDate);
+}
+function taskDeadlineColor(task,statuses,statusById){
+  if(isScheduledTask(task,statuses) || isFinishedTask(task,statuses)) return statusById?.[task?.status]?.color || '#22c55e';
+  const cls=priorityClass(task?.internalDate);
+  if(cls==='late') return '#ef4444';
+  if(cls==='hot') return '#f97316';
+  if(cls==='warn') return '#eab308';
+  if(cls==='ok') return '#22c55e';
+  return '#9ca3af';
+}
 function memberWorkStats(tasks, member, statuses){
   const assigned=(tasks||[]).filter(t=>!t.archived && t.responsibleId===member?.id);
   return {
@@ -2178,16 +2213,22 @@ function TeamFeedItem({task}){
 }
 
 function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,open}){
-  const [mode,setMode]=useState('priority'),[type,setType]=useState('all'),[showArchived,setShowArchived]=useState(false),[selected,setSelected]=useState([]),[bulkEdit,setBulkEdit]=useState(null),[bulkValue,setBulkValue]=useState('');
+  const collapseStorageKey=`argos_tasks_collapsed_${user?.id||'anonymous'}`;
+  const preferencesStorageKey=`argos_tasks_preferences_${user?.id||'anonymous'}`;
+  const initialPreferences=load(preferencesStorageKey,{mode:'priority',type:'all',showArchived:false});
+  const [mode,setMode]=useState(initialPreferences.mode||'priority'),[type,setType]=useState(initialPreferences.type||'all'),[showArchived,setShowArchived]=useState(!!initialPreferences.showArchived),[selected,setSelected]=useState([]),[bulkEdit,setBulkEdit]=useState(null),[bulkValue,setBulkValue]=useState(''),[collapsedGroups,setCollapsedGroups]=useState(()=>load(collapseStorageKey,{}));
   const isAdmin=user.role==='admin';
   const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
   const activeStatuses=statuses.filter(s=>s.active!==false);
-  const visibleForArchive = isAdmin && showArchived ? tasks : tasks.filter(t=>!t.archived);
-  const filtered=visibleForArchive.filter(t=>type==='all'||t.type===type);
+  const visibleForArchive = isAdmin && showArchived ? tasks.filter(t=>t.archived) : tasks.filter(t=>!t.archived);
+  const filtered=visibleForArchive
+    .filter(t=>type==='all'||t.type===type)
+    .filter(t=>showArchived || mode==='status' || !isFinishedTask(t,statuses));
   const selectedFiltered = selected.filter(id=>filtered.some(t=>t.id===id));
-  const priorityOrder={late:0,hot:1,warn:2,ok:3,neutral:4};
+  const priorityOrder={late:0,hot:1,warn:2,ok:3,neutral:4,done:5};
+  useEffect(()=>{ save(preferencesStorageKey,{mode,type,showArchived}); },[preferencesStorageKey,mode,type,showArchived]);
   const groupers={
-    priority:t=>priorityText(t.internalDate),
+    priority:t=>taskPriorityGroup(t,statuses),
     status:t=>statusById[t.status]?.name||t.status,
     client:t=>companies.find(c=>c.id===t.companyId)?.name||'Sem cliente',
     type:t=>t.type,
@@ -2196,9 +2237,28 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
   };
   const sorted=[...filtered].sort((a,b)=>{
     if(showArchived && isAdmin && (a.archived!==b.archived)) return a.archived?1:-1;
-    return priorityOrder[priorityClass(a.internalDate)]-priorityOrder[priorityClass(b.internalDate)] || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || a.title.localeCompare(b.title);
+    return priorityOrder[taskPriorityClass(a,statuses)]-priorityOrder[taskPriorityClass(b,statuses)] || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || a.title.localeCompare(b.title);
   });
   const groups={}; sorted.forEach(t=>{const k=(groupers[mode]||groupers.priority)(t); (groups[k] ||= []).push(t)});
+  const groupEntries=Object.entries(groups).sort(([groupA],[groupB])=>{
+    if(mode==='status'){
+      const order=new Map(activeStatuses.map((status,index)=>[status.name,index]));
+      const a=order.has(groupA)?order.get(groupA):Number.MAX_SAFE_INTEGER;
+      const b=order.has(groupB)?order.get(groupB):Number.MAX_SAFE_INTEGER;
+      return a-b||groupA.localeCompare(groupB);
+    }
+    return 0;
+  });
+  function groupCollapseKey(group){ return `${mode}:${group}`; }
+  function isGroupCollapsed(group){ return !!collapsedGroups[groupCollapseKey(group)]; }
+  function toggleGroup(group){
+    const key=groupCollapseKey(group);
+    setCollapsedGroups(prev=>{
+      const next={...prev,[key]:!prev[key]};
+      save(collapseStorageKey,next);
+      return next;
+    });
+  }
   function toggleSelected(id){
     setSelected(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
   }
@@ -2286,10 +2346,17 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     clearSelected();
   }
   const totalArchived=tasks.filter(t=>t.archived).length;
-  return <section><h1>Tarefas</h1><p>Visão rápida das tarefas atribuídas e filtradas.</p><div className="filters tasks-filters"><label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="date">Prazo</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label><label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>{isAdmin&&<label className="toggle-archived tasks-archive-toggle"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span>Mostrar arquivadas{totalArchived?` (${totalArchived})`:''}</span></label>}</div>{isAdmin&&<div className="panel task-bulk-panel"><div className="task-bulk-left"><label className="task-select-all"><input type="checkbox" checked={filtered.length>0 && filtered.every(t=>selected.includes(t.id))} onChange={selectAllVisible}/><span></span></label><small>{selectedFiltered.length} selecionada(s)</small></div><div className="task-bulk-actions task-bulk-edit-actions"><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('responsibleId')}>Responsável</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('status')}>Status</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('internalDate')}>Prazo</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('postDate')}>Data</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(true)}>Arquivar</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(false)}>Desarquivar</button><button disabled={!selectedFiltered.length} onClick={bulkDuplicate}>Duplicar</button><button className="danger" disabled={!selectedFiltered.length} onClick={bulkDelete}>Excluir</button></div></div>}{bulkEdit&&<div className="modal-bg"><div className="modal bulk-edit-modal"><h2>Alterar {bulkLabel(bulkEdit)}</h2><p>{selectedFiltered.length} tarefa(s) selecionada(s).</p>{bulkEdit==='responsibleId'&&<label>Novo responsável<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}{bulkEdit==='status'&&<label>Novo status<div className="status-select">{statusDot(activeStatuses.find(s=>s.id===bulkValue))}<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{activeStatuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>}{bulkEdit==='internalDate'&&<label>Novo prazo<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}{bulkEdit==='postDate'&&<label>Nova data do post<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}<div className="modal-actions"><button onClick={()=>{setBulkEdit(null);setBulkValue('')}}>Cancelar</button><button className="primary" onClick={applyBulkEdit}>Aplicar</button></div></div></div>}<div className="tasks-board" style={{display:'flex',flexDirection:'column',gap:16}}>{Object.entries(groups).length?Object.entries(groups).map(([group,items])=><div className="panel task-group" style={{width:'100%'}} key={group}><h2>{group}<small>{items.length}</small></h2>{items.map(t=>{const c=companies.find(x=>x.id===t.companyId);const r=users.find(x=>x.id===t.responsibleId);return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>{isAdmin&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>}<button className={'task-row priority-'+priorityClass(t.internalDate)} onClick={()=>open(t.id)}><b>{t.title}{t.archived?' • Arquivada':''}</b><span>{c?.name} • {statusById[t.status]?.name} • Prazo: {fmtDate(t.internalDate)} • {priorityText(t.internalDate)}</span><span className="avatars"><AvatarMini value={c?.logo} label={c?.name}/><AvatarMini value={r?.avatar} label={r?.name}/></span></button></div>})}</div>):<div className="panel"><p className="muted-note">Nenhuma tarefa encontrada.</p></div>}</div></section>
+  return <section><h1>Tarefas</h1><p>Visão rápida das tarefas atribuídas e filtradas.</p><div className="filters tasks-filters"><label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="date">Prazo</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label><label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>{isAdmin&&<label className="toggle-archived tasks-archive-toggle"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span>Mostrar arquivadas{totalArchived?` (${totalArchived})`:''}</span></label>}</div>{isAdmin&&<div className="panel task-bulk-panel"><div className="task-bulk-left"><label className="task-select-all"><input type="checkbox" checked={filtered.length>0 && filtered.every(t=>selected.includes(t.id))} onChange={selectAllVisible}/><span></span></label><small>{selectedFiltered.length} selecionada(s)</small></div><div className="task-bulk-actions task-bulk-edit-actions"><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('responsibleId')}>Responsável</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('status')}>Status</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('internalDate')}>Prazo</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('postDate')}>Data</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(true)}>Arquivar</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(false)}>Desarquivar</button><button disabled={!selectedFiltered.length} onClick={bulkDuplicate}>Duplicar</button><button className="danger" disabled={!selectedFiltered.length} onClick={bulkDelete}>Excluir</button></div></div>}{bulkEdit&&<div className="modal-bg"><div className="modal bulk-edit-modal"><h2>Alterar {bulkLabel(bulkEdit)}</h2><p>{selectedFiltered.length} tarefa(s) selecionada(s).</p>{bulkEdit==='responsibleId'&&<label>Novo responsável<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}{bulkEdit==='status'&&<label>Novo status<div className="status-select">{statusDot(activeStatuses.find(s=>s.id===bulkValue))}<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{activeStatuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>}{bulkEdit==='internalDate'&&<label>Novo prazo<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}{bulkEdit==='postDate'&&<label>Nova data do post<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}<div className="modal-actions"><button onClick={()=>{setBulkEdit(null);setBulkValue('')}}>Cancelar</button><button className="primary" onClick={applyBulkEdit}>Aplicar</button></div></div></div>}<div className="tasks-board" style={{display:'flex',flexDirection:'column',gap:16}}>{groupEntries.length?groupEntries.map(([group,items])=>{const collapsed=isGroupCollapsed(group);const groupStatus=mode==='status'?activeStatuses.find(s=>s.name===group):null;return <div className="panel task-group" style={{width:'100%',borderColor:groupStatus?.color||undefined}} key={group}><button type="button" onClick={()=>toggleGroup(group)} aria-expanded={!collapsed} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:0,background:'transparent',border:0,textAlign:'left'}}><h2 style={{margin:0,display:'flex',alignItems:'center',gap:8,color:groupStatus?.color||undefined}}><span style={{display:'inline-block',transform:collapsed?'rotate(-90deg)':'rotate(0deg)',transition:'transform .18s ease'}}>▾</span>{group}<small>{items.length}</small></h2><small>{collapsed?'Expandir':'Minimizar'}</small></button>{!collapsed&&<div style={{marginTop:12}}>{items.map(t=>{const c=companies.find(x=>x.id===t.companyId);const r=users.find(x=>x.id===t.responsibleId);const statusColor=statusById[t.status]?.color||'#9ca3af';const deadlineColor=taskDeadlineColor(t,statuses,statusById);return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>{isAdmin&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>}<button className="task-row" onClick={()=>open(t.id)}><b>{t.title}{t.archived?' • Arquivada':''}</b><span style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+  <small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:'1px solid rgba(156,163,175,.38)',background:'rgba(156,163,175,.08)',color:'#aeb4bd',fontSize:12,fontWeight:400,lineHeight:1.2}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>
+  <small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${deadlineColor}66`,background:`${deadlineColor}18`,color:deadlineColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{fmtDate(t.internalDate)}</small>
+  <small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${statusColor}66`,background:`${statusColor}18`,color:statusColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{statusById[t.status]?.name||t.status}</small>
+</span><span className="avatars"><AvatarMini value={c?.logo} label={c?.name}/><AvatarMini value={r?.avatar} label={r?.name}/></span></button></div>})}</div>}</div>}):<div className="panel"><p className="muted-note">Nenhuma tarefa encontrada.</p></div>}</div></section>
 }
 function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
-  const [view,setView]=useState('month'),[selectedDay,setSelectedDay]=useState(todayStr()),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'),[status,setStatus]=useState('all'),[archivedOnly,setArchivedOnly]=useState(false); 
+  const preferencesStorageKey=`argos_calendar_preferences_${user?.id||'anonymous'}`;
+  const initialPreferences=load(preferencesStorageKey,{view:'month',company:'all',resp:'all',type:'all',status:'all',archivedOnly:false});
+  const [view,setView]=useState(initialPreferences.view||'month'),[selectedDay,setSelectedDay]=useState(todayStr()),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[status,setStatus]=useState(initialPreferences.status||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly);
+  useEffect(()=>{ save(preferencesStorageKey,{view,company,resp,type,status,archivedOnly}); },[preferencesStorageKey,view,company,resp,type,status,archivedOnly]); 
   const isAdmin=user.role==='admin'; 
   const filtered=applyFilters(tasks,{company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,status,archivedOnly,search}); 
   const current=dObj(selectedDay)||dObj(todayStr()); 
@@ -2421,10 +2488,32 @@ function DayView({day,setSelectedDay,tasks,companies,users,statusById,open}){
   return <div><div className="month-head"><h2>{fmtDate(day)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div><small>{list.length} tarefa(s) neste dia</small></div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} onClick={()=>open(t.id)} style={{borderColor:statusById[t.status]?.color}}><b>{t.title}</b><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small><span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span></button>)}</div></div> 
 }
 function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
-  const [period,setPeriod]=useState('current'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'),[archivedOnly,setArchivedOnly]=useState(false),[sort,setSort]=useState('priority'); 
+  const preferencesStorageKey=`argos_kanban_preferences_${user?.id||'anonymous'}`;
+  const initialPreferences=load(preferencesStorageKey,{period:'current',from:'',to:'',company:'all',resp:'all',type:'all',archivedOnly:false,sort:'priority'});
+  const [period,setPeriod]=useState(initialPreferences.period||'current'),[from,setFrom]=useState(initialPreferences.from||''),[to,setTo]=useState(initialPreferences.to||''),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly),[sort,setSort]=useState(initialPreferences.sort||'priority');
+  const PAGE_SIZE=10;
+  const [visibleByStatus,setVisibleByStatus]=useState({});
+  useEffect(()=>{ save(preferencesStorageKey,{period,from,to,company,resp,type,archivedOnly,sort}); },[preferencesStorageKey,period,from,to,company,resp,type,archivedOnly,sort]);
   const isAdmin=user.role==='admin'; 
-  const allowed=statuses.filter(s=>user.role==='admin'||(user.visibleStatuses||[]).includes(s.id)); 
-  let filtered=applyFilters(tasks,{period,from,to,company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,archivedOnly,search}); 
+  const allowed=statuses.filter(s=>user.role==='admin'||(user.visibleStatuses||[]).includes(s.id));
+
+  let filtered=applyFilters(tasks,{
+    period:null,
+    from,
+    to,
+    company:isAdmin?company:'all',
+    resp:isAdmin?resp:'all',
+    type,
+    archivedOnly,
+    search
+  });
+
+  filtered=filtered.filter(t=>{
+    if(!period) return true;
+    if(!t.postDate) return true;
+    return periodMatch(t.postDate,period,from,to);
+  });
+
   const priorityOrder={late:0,hot:1,warn:2,ok:3,neutral:4}; 
   function cmp(a,b){
     const pa=priorityOrder[priorityClass(a.internalDate)], pb=priorityOrder[priorityClass(b.internalDate)];
@@ -2433,12 +2522,34 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''})
     if(sort==='client') return clientA.localeCompare(clientB)||pa-pb||a.title.localeCompare(b.title);
     if(sort==='type') return a.type.localeCompare(b.type)||pa-pb||clientA.localeCompare(clientB);
     if(sort==='responsible') return respA.localeCompare(respB)||pa-pb||clientA.localeCompare(clientB);
-    if(sort==='postDate') return String(a.postDate||'').localeCompare(String(b.postDate||''))||pa-pb;
-    if(sort==='internalDate') return String(a.internalDate||'').localeCompare(String(b.internalDate||''))||clientA.localeCompare(clientB);
-    return pa-pb||clientA.localeCompare(clientB)||String(a.internalDate||'').localeCompare(String(b.internalDate||''));
+    if(sort==='postDate') return String(a.postDate||'9999-12-31').localeCompare(String(b.postDate||'9999-12-31'))||pa-pb;
+    if(sort==='internalDate') return String(a.internalDate||'9999-12-31').localeCompare(String(b.internalDate||'9999-12-31'))||clientA.localeCompare(clientB);
+    return pa-pb||clientA.localeCompare(clientB)||String(a.internalDate||'9999-12-31').localeCompare(String(b.internalDate||'9999-12-31'));
   }
-  filtered=[...filtered].sort(cmp); 
-  return <section><h1>Kanban</h1><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Responsável<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="priority">Prioridade</option><option value="client">Cliente</option><option value="type">Tipo de post</option>{isAdmin&&<option value="responsible">Responsável</option>}{isAdmin&&<option value="postDate">Data do post</option>}<option value="internalDate">Prazo</option></select></label><label className="check archive-check inline"><input type="checkbox" checked={archivedOnly} onChange={e=>setArchivedOnly(e.target.checked)}/><span>Mostrar só arquivados</span></label></div><div className="kanban">{allowed.map(s=><div className="col" key={s.id} style={{borderTopColor:s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{filtered.filter(t=>t.status===s.id).length}</b></h3>{filtered.filter(t=>t.status===s.id).map(t=>{const company=companies.find(c=>c.id===t.companyId);const respUser=users.find(u=>u.id===t.responsibleId);return <button className={'kcard priority-'+priorityClass(t.internalDate)} key={t.id} onClick={()=>open(t.id)}><b className="k-title" title={t.title}>{t.title}</b><div className="k-meta"><small>Prazo: {fmtDate(t.internalDate)} • {priorityText(t.internalDate)}</small><span className="avatars"><AvatarMini value={company?.logo} label={company?.name}/><AvatarMini value={respUser?.avatar} label={respUser?.name}/></span></div></button>})}</div>)}</div></section> 
+
+  filtered=[...filtered].sort(cmp);
+
+  useEffect(()=>{
+    setVisibleByStatus({});
+  },[period,from,to,company,resp,type,archivedOnly,sort,search]);
+
+  function visibleLimit(statusId){
+    return visibleByStatus[statusId]||PAGE_SIZE;
+  }
+
+  function loadMore(statusId){
+    setVisibleByStatus(prev=>({...prev,[statusId]:(prev[statusId]||PAGE_SIZE)+PAGE_SIZE}));
+  }
+
+  return <section><h1>Kanban</h1><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Responsável<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="priority">Prioridade</option><option value="client">Cliente</option><option value="type">Tipo de post</option>{isAdmin&&<option value="responsible">Responsável</option>}{isAdmin&&<option value="postDate">Data do post</option>}<option value="internalDate">Prazo</option></select></label><label className="check archive-check inline"><input type="checkbox" checked={archivedOnly} onChange={e=>setArchivedOnly(e.target.checked)}/><span>Mostrar só arquivados</span></label></div><div className="kanban">{allowed.map(s=>{
+    const columnTasks=filtered.filter(t=>t.status===s.id);
+    const limit=visibleLimit(s.id);
+    const visibleTasks=columnTasks.slice(0,limit);
+    return <div className="col" key={s.id} style={{borderTopColor:s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{const company=companies.find(c=>c.id===t.companyId);const respUser=users.find(u=>u.id===t.responsibleId);return <button className="kcard" key={t.id} onClick={()=>open(t.id)}><b className="k-title" title={t.title}>{t.title}</b><div className="k-meta" style={{alignItems:'center',gap:6}}><span style={{display:'flex',gap:4,flexWrap:'nowrap',minWidth:0}}>
+  <small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:'1px solid rgba(156,163,175,.30)',background:'rgba(156,163,175,.06)',color:'#aeb4bd',fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>
+  <small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:`1px solid ${taskDeadlineColor(t,statuses,statusById)}55`,background:`${taskDeadlineColor(t,statuses,statusById)}14`,color:taskDeadlineColor(t,statuses,statusById),fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{fmtDate(t.internalDate)}</small>
+</span><span className="avatars" style={{marginLeft:'auto',flex:'0 0 auto'}}><AvatarMini value={company?.logo} label={company?.name}/><AvatarMini value={respUser?.avatar} label={respUser?.name}/></span></div></button>})}{columnTasks.length>visibleTasks.length&&<button type="button" onClick={()=>loadMore(s.id)} style={{width:'100%',marginTop:10}}>Carregar mais {Math.min(PAGE_SIZE,columnTasks.length-visibleTasks.length)}</button>}</div>;
+  })}</div></section> 
 }
 function ReadOnlyInstruction({title,text}){
   return <div className="readonly-instruction"><label>{title}</label><div className="instruction-box textarea-like">{text?linkify(text):<span className="muted-note">Sem informações.</span>}</div></div>
@@ -2547,7 +2658,6 @@ function MaterialLinksEditor({task,updateTask}){
   return <div className="material-links-editor">
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
       <b>Links de visualização</b>
-      <button type="button" onClick={add}>+ Adicionar link</button>
     </div>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {items.map((value,index)=>{
@@ -2561,8 +2671,22 @@ function MaterialLinksEditor({task,updateTask}){
             rel="noreferrer"
             aria-disabled={!filled}
             onClick={e=>{if(!filled)e.preventDefault();}}
-            style={{pointerEvents:filled?'auto':'none',opacity:filled?1:.45}}
-            className="button-link"
+            style={{
+              pointerEvents:filled?'auto':'none',
+              opacity:filled?1:.45,
+              display:'inline-flex',
+              alignItems:'center',
+              justifyContent:'center',
+              minHeight:36,
+              padding:'0 12px',
+              border:'1px solid rgba(225,177,44,.35)',
+              borderRadius:10,
+              background:'rgba(225,177,44,.04)',
+              color:'#f3e6b2',
+              textDecoration:'none',
+              fontWeight:700,
+              boxSizing:'border-box'
+            }}
           >Abrir</a>
           <button type="button" onClick={()=>move(index,-1)} disabled={!filled||index===0}>↑</button>
           <button type="button" onClick={()=>move(index,1)} disabled={!filled||index>=items.length-2}>↓</button>
@@ -3293,7 +3417,8 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
       company:(companies||[]).find(c=>c.id===task.companyId),
       responsible:(users||[]).find(u=>u.id===task.responsibleId),
       status:(statuses||[]).find(s=>s.id===task.status),
-      deadline:task.internalDate||task.postDate
+      postDate:task.postDate||'',
+      deadline:task.internalDate||''
     };
   }
   function deadlineColor(date){
@@ -3304,7 +3429,11 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     const value=String(color||'');
     return /^#[0-9a-f]{6}$/i.test(value)?`${value}${alpha}`:'rgba(255,255,255,.05)';
   }
-  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=>{const info=notificationInfo(n);const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';return <div className="panel notification-item" key={n.id}><div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:18}}><div style={{minWidth:0,flex:1}}><small>{new Date(n.at).toLocaleString('pt-BR')}</small>{info.task&&<div style={{fontWeight:750,fontSize:'14px',marginTop:12,marginBottom:6}}>{info.task.title}</div>}{info.actorName&&<div style={{fontWeight:700,fontSize:'13px',marginBottom:4,color:'var(--text)'}}>{info.actorName}:</div>}<div style={{lineHeight:1.5,color:'var(--text)',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{info.content}</div></div><div style={{display:'flex',alignItems:'center',gap:14,flex:'0 0 auto',padding:'6px 8px 0 0'}}>{info.company&&<span title={`Empresa: ${info.company.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.company.logo} label={info.company.name}/></span>}{info.responsible&&<span title={`Responsável: ${info.responsible.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.responsible.avatar} label={info.responsible.name}/></span>}</div></div>{(info.deadline||info.status)&&<div style={{display:'flex',flexWrap:'wrap',gap:'7px 12px',margin:'12px 0',fontSize:'12px'}}>{info.deadline&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:deadlineTone,background:softColor(deadlineTone,'18'),border:`1px solid ${softColor(deadlineTone,'66')}`}}>Prazo: {fmtDate(info.deadline)}</span>}{info.status&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:statusTone,background:softColor(statusTone,'18'),border:`1px solid ${softColor(statusTone,'66')}`}}>Status: {info.status.name}</span>}</div>}<div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>}):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=>{const info=notificationInfo(n);const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';return <div className="panel notification-item" key={n.id}><div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:18}}><div style={{minWidth:0,flex:1}}><small>{new Date(n.at).toLocaleString('pt-BR')}</small>{info.task&&<div style={{fontWeight:750,fontSize:'14px',marginTop:12,marginBottom:6}}>{info.task.title}</div>}{info.actorName&&<div style={{fontWeight:700,fontSize:'13px',marginBottom:4,color:'var(--text)'}}>{info.actorName}:</div>}<div style={{lineHeight:1.5,color:'var(--text)',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{info.content}</div></div><div style={{display:'flex',alignItems:'center',gap:14,flex:'0 0 auto',padding:'6px 8px 0 0'}}>{info.company&&<span title={`Empresa: ${info.company.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.company.logo} label={info.company.name}/></span>}{info.responsible&&<span title={`Responsável: ${info.responsible.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.responsible.avatar} label={info.responsible.name}/></span>}</div></div>{(info.postDate||info.deadline||info.status)&&<div style={{display:'flex',flexWrap:'wrap',gap:'7px 12px',margin:'12px 0',fontSize:'12px'}}>
+  <span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:'#aeb4bd',background:'rgba(156,163,175,.08)',border:'1px solid rgba(156,163,175,.38)'}}>{info.postDate?fmtDate(info.postDate):'Sem data'}</span>
+  {info.deadline&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:deadlineTone,background:softColor(deadlineTone,'18'),border:`1px solid ${softColor(deadlineTone,'66')}`}}>{fmtDate(info.deadline)}</span>}
+  {info.status&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:statusTone,background:softColor(statusTone,'18'),border:`1px solid ${softColor(statusTone,'66')}`}}>{info.status.name}</span>}
+</div>}<div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>}):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
 }
 
 
