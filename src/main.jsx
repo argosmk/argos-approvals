@@ -95,6 +95,41 @@ function safeUUID(){
 
 const ARGOS_UI_POLISH_CSS = `
 
+@media (min-width:761px){
+  .side .impersonate{padding-top:8px!important;padding-bottom:8px!important;}
+  .side .impersonate select{
+    width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+    font-size:12px!important;
+    padding-left:10px!important;
+    padding-right:24px!important;
+  }
+  .side .nav-btn{
+    grid-template-columns:16px minmax(0,1fr) auto!important;
+    gap:6px!important;
+    padding-left:10px!important;
+    padding-right:7px!important;
+  }
+  .side .nav-btn span{
+    min-width:0!important;
+    white-space:nowrap!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    font-size:12px!important;
+  }
+  .side .nav-notification-badge{
+    position:static!important;
+    margin-left:0!important;
+    min-width:20px!important;
+    height:18px!important;
+    padding:0 5px!important;
+    font-size:10px!important;
+    line-height:18px!important;
+    justify-self:end!important;
+  }
+}
+
  .docs-clickup-shell{min-height:calc(100vh - 70px);}
 .docs-topbar{margin-bottom:10px!important;}
 .docs-workspace{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px;align-items:stretch;min-height:calc(100vh - 165px);}
@@ -1968,7 +2003,7 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
         <small>{system?.title || 'Painel de Aprovação'}</small>
       </div>
       <div className="user-card user-clean"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{roleLabel}</small></div></div>
-      {realAdmin&&<div className="impersonate"><small>ACESSAR COMO</small><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>────────────</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup><option disabled>────────────</option><optgroup label="Usuários clientes">{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</optgroup></select><small>Permissões reais do usuário simulado.</small></div>}
+      {realAdmin&&<div className="impersonate"><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>────────────</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup><option disabled>────────────</option><optgroup label="Usuários clientes">{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</optgroup></select></div>}
       <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<i className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</i>}</button>)}</nav>
       <div className="spacer"/>
       <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
@@ -2271,7 +2306,7 @@ const FIXED_SPECIAL_DATES = [
   { md:'01-06', name:'Dia de Reis', type:'comemorativa', icon:'✦' },
   { md:'01-20', name:'Dia do Farmacêutico', type:'nicho', icon:'•' },
   { md:'01-30', name:'Dia da Saudade', type:'conteúdo', icon:'•' },
-  { md:'02-14', name:'Valentine’s Day', type:'comercial global', icon:'♡' },
+  { md:'02-14', name:'Valentine’s Day', type:'comercial global', icon:'♡', market:'us' },
   { md:'03-08', name:'Dia da Mulher', type:'comercial', icon:'✦' },
   { md:'03-15', name:'Dia do Consumidor', type:'comercial', icon:'✦' },
   { md:'03-20', name:'Início do outono', type:'estação', icon:'◐' },
@@ -2283,7 +2318,10 @@ const FIXED_SPECIAL_DATES = [
   { md:'06-05', name:'Dia do Meio Ambiente', type:'conteúdo', icon:'•' },
   { md:'06-12', name:'Dia dos Namorados', type:'comercial', icon:'♡' },
   { md:'06-20', name:'Início do inverno', type:'estação', icon:'◐' },
+  { md:'06-14', name:'Flag Day', type:'comemorativa', icon:'✦', market:'us' },
+  { md:'06-19', name:'Juneteenth', type:'feriado federal', icon:'✦', market:'us' },
   { md:'06-24', name:'São João', type:'sazonal', icon:'✦' },
+  { md:'07-04', name:'Independence Day', type:'feriado federal', icon:'✦', market:'us' },
   { md:'07-13', name:'Dia do Rock', type:'conteúdo', icon:'•' },
   { md:'07-20', name:'Dia do Amigo', type:'conteúdo', icon:'•' },
   { md:'08-15', name:'Dia dos Solteiros', type:'conteúdo', icon:'•' },
@@ -2292,8 +2330,9 @@ const FIXED_SPECIAL_DATES = [
   { md:'09-22', name:'Início da primavera', type:'estação', icon:'◐' },
   { md:'10-12', name:'Dia das Crianças', type:'comercial', icon:'✦' },
   { md:'10-15', name:'Dia dos Professores', type:'conteúdo', icon:'•' },
-  { md:'10-31', name:'Halloween', type:'sazonal', icon:'✦' },
+  { md:'10-31', name:'Halloween', type:'sazonal', icon:'✦', market:'us' },
   { md:'11-02', name:'Finados', type:'feriado', icon:'•' },
+  { md:'11-11', name:'Veterans Day', type:'feriado federal', icon:'✦', market:'us' },
   { md:'11-15', name:'Proclamação da República', type:'feriado', icon:'✦' },
   { md:'11-20', name:'Consciência Negra', type:'feriado/conteúdo', icon:'✦' },
   { md:'12-21', name:'Início do verão', type:'estação', icon:'◐' },
@@ -2336,16 +2375,24 @@ function easterDateKey(year){
 function variableSpecialDates(year){
   const easter = easterDateKey(year);
   const blackFriday = lastWeekdayOfMonth(year,10,5);
+  const thanksgiving = nthWeekdayOfMonth(year,10,4,4);
   return [
+    { date:nthWeekdayOfMonth(year,0,1,3), name:'Martin Luther King Jr. Day', type:'feriado federal', icon:'✦', market:'us' },
+    { date:nthWeekdayOfMonth(year,1,1,3), name:'Presidents’ Day', type:'feriado federal', icon:'✦', market:'us' },
     { date:addDateKeys(easter,-47), name:'Carnaval', type:'sazonal', icon:'✦' },
     { date:addDateKeys(easter,-46), name:'Carnaval', type:'sazonal', icon:'✦' },
     { date:addDateKeys(easter,-2), name:'Sexta-feira Santa', type:'feriado', icon:'✦' },
     { date:easter, name:'Páscoa', type:'comercial', icon:'✦' },
     { date:addDateKeys(easter,60), name:'Corpus Christi', type:'feriado', icon:'✦' },
     { date:nthWeekdayOfMonth(year,4,0,2), name:'Dia das Mães', type:'comercial', icon:'♡' },
+    { date:lastWeekdayOfMonth(year,4,1), name:'Memorial Day', type:'feriado federal', icon:'✦', market:'us' },
+    { date:nthWeekdayOfMonth(year,5,0,3), name:'Father’s Day', type:'comercial', icon:'♡', market:'us' },
     { date:nthWeekdayOfMonth(year,7,0,2), name:'Dia dos Pais', type:'comercial', icon:'♡' },
-    { date:blackFriday, name:'Black Friday', type:'comercial', icon:'✦' },
-    { date:addDateKeys(blackFriday,3), name:'Cyber Monday', type:'comercial', icon:'✦' }
+    { date:nthWeekdayOfMonth(year,8,1,1), name:'Labor Day', type:'feriado federal', icon:'✦', market:'us' },
+    { date:nthWeekdayOfMonth(year,9,1,2), name:'Columbus Day', type:'feriado federal', icon:'✦', market:'us' },
+    { date:thanksgiving, name:'Thanksgiving', type:'feriado federal', icon:'✦', market:'us' },
+    { date:blackFriday, name:'Black Friday', type:'comercial', icon:'✦', market:'us' },
+    { date:addDateKeys(blackFriday,3), name:'Cyber Monday', type:'comercial', icon:'✦', market:'us' }
   ].filter(x=>x.date);
 }
 function specialDatesFor(ds){
@@ -2359,14 +2406,14 @@ function specialDatesFor(ds){
 }
 function SpecialDateMarks({items=[]}){
   if(!items.length) return null;
-  return <div className="special-date-marks" title={items.map(i=>`${i.name} (${i.type})`).join(' • ')}>{items.slice(0,2).map((item,idx)=><span className={'special-date-chip type-'+String(item.type||'').replace(/[^a-z0-9]/gi,'-').toLowerCase()} key={item.name+idx}><i>{item.icon||'✦'}</i><em>{item.name}</em></span>)}{items.length>2&&<span className="special-date-more">+{items.length-2}</span>}</div>
+  return <div className="special-date-marks" title={items.map(i=>`${i.name} (${i.type})${i.market==='us'?' • EUA':''}`).join(' • ')}>{items.slice(0,2).map((item,idx)=><span className={'special-date-chip type-'+String(item.type||'').replace(/[^a-z0-9]/gi,'-').toLowerCase()+(item.market==='us'?' market-us':'')} key={item.name+idx}><i>{item.icon||'✦'}</i><em>{item.name}</em>{item.market==='us'&&<strong>EUA</strong>}</span>)}{items.length>2&&<span className="special-date-more">+{items.length-2}</span>}</div>
 }
 function SpecialDatePanel({items=[]}){
   if(!items.length) return null;
-  return <div className="special-date-panel"><h3>Datas especiais</h3>{items.map((item,idx)=><div className="special-date-line" key={item.name+idx}><b>{item.icon||'✦'}</b><span>{item.name}</span><small>{item.type}</small></div>)}</div>
+  return <div className="special-date-panel"><h3>Datas especiais</h3>{items.map((item,idx)=><div className={'special-date-line'+(item.market==='us'?' market-us':'')} key={item.name+idx}><b>{item.icon||'✦'}</b><span>{item.name}</span><small>{item.market==='us'?`EUA • ${item.type}`:item.type}</small></div>)}</div>
 }
 
-function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open}){ const cur=dObj(selectedDay); return <div className="month"><div className="month-head"><h2>{monthLabel(selectedDay)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div><small>{tasks.length} tarefa(s)</small></div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className="special-date-dot" onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
+function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open}){ const cur=dObj(selectedDay); return <div className="month"><div className="month-head"><h2>{monthLabel(selectedDay)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div><small>{tasks.length} tarefa(s)</small></div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
 function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div><div className="month-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div></div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}</div>})}</div></div> }
 function DayView({day,setSelectedDay,tasks,companies,users,statusById,open}){ 
   const list=tasks.filter(t=>t.postDate===day); 
@@ -2441,6 +2488,57 @@ function WeeklyTemplateEditor({company,users,save,cancel}){
 
 function TaskAccessDenied({back}){
   return <section className="task-access-denied"><button onClick={back}>← Voltar</button><div className="panel"><h1>Acesso não permitido</h1><p>Esta tarefa não está disponível para o seu perfil ou não está mais em um status visível para você.</p></div></section>
+}
+
+function AutoTextarea({value,onChange,minHeight=92,...props}){
+  const ref=useRef(null);
+  function resize(){
+    const element=ref.current;
+    if(!element) return;
+    element.style.height='auto';
+    element.style.height=`${Math.max(element.scrollHeight,minHeight)}px`;
+  }
+  useEffect(()=>{ resize(); },[value,minHeight]);
+  return <textarea ref={ref} value={value} onChange={onChange} onInput={resize} style={{overflow:'hidden',resize:'vertical',...props.style}} {...props}/>;
+}
+
+function MaterialLinksEditor({task,updateTask}){
+  const fromTask=()=>String(task?.materialLinks||'').split('\n');
+  const [items,setItems]=useState(()=>fromTask().length?fromTask():['']);
+  useEffect(()=>{
+    const next=fromTask();
+    setItems(next.length?next:['']);
+  },[task?.id]);
+  function persist(next){
+    setItems(next);
+    updateTask(task.id,{materialLinks:next.join('\n')});
+  }
+  function change(index,value){
+    persist(items.map((item,i)=>i===index?value:item));
+  }
+  function add(){
+    setItems(prev=>[...prev,'']);
+  }
+  function remove(index){
+    const next=items.filter((_,i)=>i!==index);
+    persist(next.length?next:['']);
+  }
+  const validLinks=items.map(x=>x.trim()).filter(Boolean);
+  return <div className="material-links-editor">
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
+      <b>Links de visualização</b>
+      <button type="button" onClick={add}>+ Adicionar link</button>
+    </div>
+    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+      {items.map((value,index)=><div key={index} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:8,alignItems:'center'}}>
+        <input type="url" value={value} onChange={e=>change(index,e.target.value)} placeholder={`Link ${index+1}`}/>
+        <button type="button" onClick={()=>remove(index)} disabled={items.length===1&&!value}>Remover</button>
+      </div>)}
+    </div>
+    {validLinks.length>0&&<div className="editable-link-list" style={{marginTop:10}}>
+      {validLinks.map((url,i)=><a key={url+i} href={url} target="_blank" rel="noreferrer">Abrir link {i+1}</a>)}
+    </div>}
+  </div>
 }
 
 function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusById,updateTask,addLog,back,open,effectiveUser,isAdmin}){ 
@@ -2581,7 +2679,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   }
   function addComment(){ if(!comment.trim()) return; addLog(task.id,comment,'comment',isClient?'client':'internal'); setComment(''); }
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
-  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left"><div className="task-title">{isAdmin?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{!isClient&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div><div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div><div className="content-fields">{!isClient&&<>{isAdmin?<><label>Instruções ao copy<textarea value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/></label><label>Instruções ao editor<textarea value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/></label></>:<><ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/><ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/></>}</>}{(!isTeam || showTeamProtected || isClient)&&<>{isAdmin?<><label>Copy<textarea value={task.copy} onChange={e=>updateTask(task.id,{copy:e.target.value})}/></label><label>Legenda<textarea value={task.caption} onChange={e=>updateTask(task.id,{caption:e.target.value})}/></label>{!isClient&&<label>Links de visualização<textarea value={task.materialLinks} onChange={e=>updateTask(task.id,{materialLinks:e.target.value})}/></label>}</>:<><ReadOnlyInstruction title="Copy" text={task.copy||''}/><ReadOnlyInstruction title="Legenda" text={task.caption||''}/>{!isClient&&(isTeam?<label>Links de visualização<textarea value={task.materialLinks||''} onChange={e=>updateTask(task.id,{materialLinks:e.target.value})}/>{taskMaterialLinks(task).length>0&&<div className="editable-link-list">{taskMaterialLinks(task).map((url,i)=><a key={url+i} href={url} target="_blank" rel="noreferrer">Abrir link {i+1}</a>)}</div>}</label>:<ReadOnlyInstruction title="Links de visualização" text={task.materialLinks||''}/>)}</>}</>}</div></div><aside className="task-side">{!isClient&&<div className="panel panel-config"><h2>Configurações</h2><label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!isAdmin} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!isAdmin} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label><label>Tipo<select disabled={!isAdmin} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!isAdmin} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label><label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!isAdmin} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label><label>Data do post<input disabled={!isAdmin} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label></div>}{(isAdmin||showTeamProtected)&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{(isClient||isAdmin)&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {isClient&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2><div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{!isClient&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
+  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left"><div className="task-title">{isAdmin?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{!isClient&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div><div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div><div className="content-fields">{!isClient&&!hiddenTeam&&<>{isAdmin?<><label>Instruções ao copy<AutoTextarea value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/></label><label>Instruções ao editor<AutoTextarea value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/></label></>:<><ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/><ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/></>}</>}{(!isTeam || showTeamProtected || isClient || hiddenTeam)&&<>{isAdmin?<><label>Copy<AutoTextarea value={task.copy} onChange={e=>updateTask(task.id,{copy:e.target.value})}/></label><label>Legenda<AutoTextarea value={task.caption} onChange={e=>updateTask(task.id,{caption:e.target.value})}/></label>{!isClient&&<MaterialLinksEditor task={task} updateTask={updateTask}/>}</>:<><ReadOnlyInstruction title="Copy" text={task.copy||''}/><ReadOnlyInstruction title="Legenda" text={task.caption||''}/>{!isClient&&!hiddenTeam&&(isTeam?<MaterialLinksEditor task={task} updateTask={updateTask}/>:<ReadOnlyInstruction title="Links de visualização" text={task.materialLinks||''}/>)}</>}</>}</div></div><aside className="task-side">{!isClient&&<div className="panel panel-config"><h2>Configurações</h2><label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!isAdmin} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!isAdmin} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label><label>Tipo<select disabled={!isAdmin} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!isAdmin} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label><label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!isAdmin} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label><label>Data do post<input disabled={!isAdmin} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label></div>}{(isAdmin||showTeamProtected)&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{(isClient||isAdmin)&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {isClient&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2><div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{!isClient&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6c-1.7-1.9-4.4-2-6.2-.3L12 6.7 9.4 4.3C7.6 2.6 4.9 2.7 3.2 4.6c-1.8 2-1.6 5.1.4 7l8.4 7.8 8.4-7.8c2-1.9 2.2-5 .4-7Z"/></svg>
@@ -5456,6 +5554,43 @@ const ARGOS_ROUND74_SPECIAL_DATES_CSS = `
   font-style:normal!important;
   color:#e1b12c!important;
   font-size:10px!important;
+}
+
+.special-date-chip.market-us{
+  border-color:rgba(96,165,250,.42)!important;
+  background:linear-gradient(90deg,rgba(37,99,235,.13),rgba(239,68,68,.09))!important;
+  color:#dbeafe!important;
+}
+
+.special-date-chip.market-us i{
+  color:#93c5fd!important;
+}
+
+.special-date-chip.market-us strong{
+  font-size:8px!important;
+  letter-spacing:.45px!important;
+  color:#fecaca!important;
+  border-left:1px solid rgba(255,255,255,.16)!important;
+  padding-left:5px!important;
+}
+
+.special-date-dot.market-us{
+  border-color:rgba(96,165,250,.62)!important;
+  color:#bfdbfe!important;
+  background:linear-gradient(135deg,rgba(37,99,235,.18),rgba(239,68,68,.13))!important;
+}
+
+.has-us-special-date{
+  box-shadow:inset 0 0 0 1px rgba(96,165,250,.18)!important;
+}
+
+.special-date-line.market-us b{
+  color:#93c5fd!important;
+}
+
+.special-date-line.market-us small{
+  color:#fca5a5!important;
+  opacity:.9!important;
 }
 
 .special-date-chip em{
