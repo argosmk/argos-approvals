@@ -2503,41 +2503,73 @@ function AutoTextarea({value,onChange,minHeight=92,...props}){
 }
 
 function MaterialLinksEditor({task,updateTask}){
-  const fromTask=()=>String(task?.materialLinks||'').split('\n');
-  const [items,setItems]=useState(()=>fromTask().length?fromTask():['']);
-  useEffect(()=>{
-    const next=fromTask();
-    setItems(next.length?next:['']);
-  },[task?.id]);
+  function normalizedItems(){
+    const saved=String(task?.materialLinks||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    return [...saved,''];
+  }
+  const [items,setItems]=useState(normalizedItems);
+  useEffect(()=>{ setItems(normalizedItems()); },[task?.id]);
+
   function persist(next){
-    setItems(next);
-    updateTask(task.id,{materialLinks:next.join('\n')});
+    const cleaned=next.map(x=>String(x||'').trim()).filter(Boolean);
+    const visual=[...cleaned,''];
+    setItems(visual);
+    updateTask(task.id,{materialLinks:cleaned.join('\n')});
   }
+
   function change(index,value){
-    persist(items.map((item,i)=>i===index?value:item));
+    const next=[...items];
+    next[index]=value;
+    const isLast=index===next.length-1;
+    if(isLast&&String(value||'').trim()) next.push('');
+    setItems(next);
+    const cleaned=next.map(x=>String(x||'').trim()).filter(Boolean);
+    updateTask(task.id,{materialLinks:cleaned.join('\n')});
   }
+
   function add(){
-    setItems(prev=>[...prev,'']);
+    setItems(prev=>prev[prev.length-1]===''?prev:[...prev,'']);
   }
+
   function remove(index){
     const next=items.filter((_,i)=>i!==index);
-    persist(next.length?next:['']);
+    persist(next);
   }
-  const validLinks=items.map(x=>x.trim()).filter(Boolean);
+
+  function move(index,direction){
+    const target=index+direction;
+    if(target<0||target>=items.length-1) return;
+    const next=[...items];
+    [next[index],next[target]]=[next[target],next[index]];
+    persist(next);
+  }
+
   return <div className="material-links-editor">
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
       <b>Links de visualização</b>
       <button type="button" onClick={add}>+ Adicionar link</button>
     </div>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
-      {items.map((value,index)=><div key={index} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:8,alignItems:'center'}}>
-        <input type="url" value={value} onChange={e=>change(index,e.target.value)} placeholder={`Link ${index+1}`}/>
-        <button type="button" onClick={()=>remove(index)} disabled={items.length===1&&!value}>Remover</button>
-      </div>)}
+      {items.map((value,index)=>{
+        const filled=String(value||'').trim();
+        const isTrailingEmpty=index===items.length-1&&!filled;
+        return <div key={index} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto auto auto',gap:8,alignItems:'center'}}>
+          <input type="url" value={value} onChange={e=>change(index,e.target.value)} placeholder={`Link ${index+1}`}/>
+          <a
+            href={filled||undefined}
+            target="_blank"
+            rel="noreferrer"
+            aria-disabled={!filled}
+            onClick={e=>{if(!filled)e.preventDefault();}}
+            style={{pointerEvents:filled?'auto':'none',opacity:filled?1:.45}}
+            className="button-link"
+          >Abrir</a>
+          <button type="button" onClick={()=>move(index,-1)} disabled={!filled||index===0}>↑</button>
+          <button type="button" onClick={()=>move(index,1)} disabled={!filled||index>=items.length-2}>↓</button>
+          <button type="button" onClick={()=>remove(index)} disabled={isTrailingEmpty}>Remover</button>
+        </div>;
+      })}
     </div>
-    {validLinks.length>0&&<div className="editable-link-list" style={{marginTop:10}}>
-      {validLinks.map((url,i)=><a key={url+i} href={url} target="_blank" rel="noreferrer">Abrir link {i+1}</a>)}
-    </div>}
   </div>
 }
 
@@ -2608,7 +2640,18 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
     }
     updateTask(task.id,patch,'Tarefa acessada.');
   } 
-  function sendApproval(){ const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0; const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'aprovacao',previousWorkStatus:task.status}; if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed; else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed; updateTask(task.id,patch,'Enviado para aprovação.'); } 
+  function sendApproval(){
+    const validLinks=taskMaterialLinks(task);
+    if(!validLinks.length){
+      alert('Adicione pelo menos um link de visualização antes de enviar para aprovação.');
+      return;
+    }
+    const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0;
+    const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'aprovacao',previousWorkStatus:task.status};
+    if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed;
+    else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed;
+    updateTask(task.id,patch,'Enviado para aprovação.');
+  } 
   function returnToCopy(){ const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0; const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'copy',previousWorkStatus:task.status}; if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed; else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed; updateTask(task.id,patch,'Tarefa retornada para copy.'); } 
   function markWaiting(){
     const rawReason=prompt('Motivo do aguardando:');
