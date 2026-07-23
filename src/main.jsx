@@ -5,7 +5,17 @@ import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { loadWorkspaceRecord, saveWorkspaceState } from './services/workspaceStateService';
 import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './services/taskTableService';
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
+import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSettings } from './services/publicPortfolioService';
 
+
+
+function parsePublicPortfolioRoute(){
+  if(typeof window === 'undefined') return null;
+  const raw=String(window.location.hash||'').replace(/^#\/?/,'');
+  const parts=raw.split('/').filter(Boolean).map(part=>decodeURIComponent(part));
+  if(parts[0]!=='portfolio-publico') return null;
+  return {slug:parts[1]||'argos'};
+}
 
 const ROUTE_SCREEN_ALIASES = {
   '': 'dashboard',
@@ -1401,6 +1411,187 @@ function StatusVisibilityChecks({statuses,selected=[],onToggle}){
     </label>)}
   </div>
 }
+
+function PublicSocialIcon({type}){
+  const common={viewBox:'0 0 24 24',width:20,height:20,fill:'none','aria-hidden':true};
+  if(type==='whatsapp') return <svg {...common}><path fill="currentColor" d="M12.04 2C6.51 2 2 6.49 2 12c0 1.77.46 3.5 1.33 5.02L2 22l5.12-1.34A10.1 10.1 0 0 0 12.04 22C17.57 22 22 17.51 22 12S17.57 2 12.04 2Zm5.83 14.12c-.25.7-1.46 1.34-2.02 1.42-.52.08-1.18.12-1.9-.12-.44-.14-1-.32-1.72-.63-3.03-1.3-5-4.35-5.15-4.55-.15-.2-1.23-1.64-1.23-3.12 0-1.48.78-2.21 1.05-2.51.27-.3.6-.37.8-.37h.58c.18 0 .43-.07.67.51.25.6.85 2.08.92 2.23.08.15.13.33.03.53-.1.2-.15.33-.3.5-.15.18-.32.39-.45.52-.15.15-.3.3-.13.6.18.3.8 1.32 1.72 2.14 1.18 1.05 2.18 1.38 2.48 1.53.3.15.48.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.68-.15.27.1 1.75.82 2.05.97.3.15.5.23.58.35.07.13.07.73-.18 1.43Z"/></svg>;
+  if(type==='instagram') return <svg {...common}><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/><circle cx="17.4" cy="6.7" r="1.1" fill="currentColor"/></svg>;
+  if(type==='youtube') return <svg {...common}><path fill="currentColor" d="M21.58 7.19a2.97 2.97 0 0 0-2.1-2.1C17.63 4.59 12 4.59 12 4.59s-5.63 0-7.48.5a2.97 2.97 0 0 0-2.1 2.1C1.92 9.04 1.92 12 1.92 12s0 2.96.5 4.81a2.97 2.97 0 0 0 2.1 2.1c1.85.5 7.48.5 7.48.5s5.63 0 7.48-.5a2.97 2.97 0 0 0 2.1-2.1c.5-1.85.5-4.81.5-4.81s0-2.96-.5-4.81ZM10 15.46V8.54L16 12l-6 3.46Z"/></svg>;
+  if(type==='tiktok') return <svg {...common}><path fill="currentColor" d="M14.3 3c.22 1.88 1.27 3.38 3.2 4.1v2.55a7.28 7.28 0 0 1-3.18-.8v6.08A5.93 5.93 0 1 1 9.2 9.05v2.72a3.32 3.32 0 1 0 2.45 3.16V3h2.65Z"/></svg>;
+  if(type==='linkedin') return <svg {...common}><path fill="currentColor" d="M6.94 8.5H3.56V19h3.38V8.5ZM5.25 3A1.96 1.96 0 1 0 5.25 6.92 1.96 1.96 0 0 0 5.25 3ZM20.44 12.98c0-3.16-1.69-4.63-3.95-4.63-1.82 0-2.63 1-3.08 1.7V8.5h-3.38c.04 1.03 0 10.5 0 10.5h3.38v-5.86c0-.31.02-.63.11-.85.25-.63.82-1.28 1.78-1.28 1.26 0 1.76.96 1.76 2.37V19h3.38v-6.02Z"/></svg>;
+  if(type==='facebook') return <svg {...common}><path fill="currentColor" d="M13.5 21v-8h2.68l.4-3.13H13.5v-2c0-.91.25-1.53 1.55-1.53H16.7V3.56c-.29-.04-1.27-.12-2.41-.12-2.39 0-4.03 1.46-4.03 4.14v2.29H7.56V13h2.7v8h3.24Z"/></svg>;
+  return <svg {...common}><path stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M10 14 21 3m0 0h-7m7 0v7M14 10v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3h8Z"/></svg>;
+}
+
+function PublicPortfolioTile({item,onReady,onUnavailable}){
+  const materials=useMemo(()=>{
+    const all=[item?.previewUrl,...(Array.isArray(item?.materials)?item.materials:[])];
+    return [...new Set(all.map(value=>String(value||'').trim()).filter(Boolean))];
+  },[item]);
+  const [slide,setSlide]=useState(0);
+  const reportedRef=useRef('');
+  const index=Math.min(slide,Math.max(0,materials.length-1));
+  const source=materials[index]||'';
+
+  useEffect(()=>{
+    if(source && reportedRef.current!=='ready'){
+      reportedRef.current='ready';
+      onReady?.(item.id);
+    }
+  },[source,item.id,onReady]);
+
+  useEffect(()=>{
+    if(materials.length || reportedRef.current==='unavailable') return;
+    reportedRef.current='unavailable';
+    onUnavailable?.(item.id);
+  },[materials.length,item.id,onUnavailable]);
+
+  if(!source) return null;
+
+  return <article className="public-portfolio-tile is-ready" aria-label={item?.title||'Trabalho da Argos'}>
+    <div className="public-portfolio-paged-media">
+      <Media url={source}/>
+      {materials.length>1&&<div className="public-portfolio-paged-arrows">
+        <button type="button" onClick={()=>setSlide(current=>Math.max(0,current-1))} disabled={index<=0} aria-label="Material anterior">‹</button>
+        <button type="button" onClick={()=>setSlide(current=>Math.min(materials.length-1,current+1))} disabled={index>=materials.length-1} aria-label="Próximo material">›</button>
+      </div>}
+      {materials.length>1&&<span className="public-portfolio-paged-counter">{index+1}/{materials.length}</span>}
+    </div>
+  </article>;
+}
+
+function PublicPortfolioPage({slug='argos'}){
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  const [visibleIds,setVisibleIds]=useState(()=>new Set());
+  const [portfolioPage,setPortfolioPage]=useState(0);
+  const portfolioGridRef=useRef(null);
+
+  useEffect(()=>{
+    let alive=true;
+    setVisibleIds(new Set());
+    setPortfolioPage(0);
+    document.title='Portfólio Argos';
+    (async()=>{
+      try{
+        setLoading(true);
+        setError('');
+        const result=await loadPublicPortfolio(slug);
+        if(alive) setData(result);
+      }catch(err){
+        if(alive) setError(err.message||'Não foi possível carregar o portfólio.');
+      }finally{
+        if(alive) setLoading(false);
+      }
+    })();
+    return()=>{alive=false};
+  },[slug]);
+
+  if(loading) return <main className="public-portfolio-page public-portfolio-state"><div className="public-portfolio-loader"/><p>Carregando portfólio...</p></main>;
+  if(error) return <main className="public-portfolio-page public-portfolio-state"><h1>Portfólio indisponível</h1><p>{error}</p></main>;
+  if(!data) return <main className="public-portfolio-page public-portfolio-state"><h1>Portfólio indisponível</h1><p>Esta página não está ativa no momento.</p></main>;
+
+  const profile=data.profile||{};
+  const items=Array.isArray(data.items)?data.items:[];
+  const pageSize=12;
+  const pageCount=Math.max(1,Math.ceil(items.length/pageSize));
+  const safePage=Math.min(portfolioPage,pageCount-1);
+  const pageItems=items.slice(safePage*pageSize,(safePage+1)*pageSize);
+  const username=String(profile.username||'').trim();
+  const socialLinks=profile.socialLinks&&typeof profile.socialLinks==='object'?profile.socialLinks:{};
+  const socialDefinitions=[
+    ['whatsapp','WhatsApp'],
+    ['instagram','Instagram'],
+    ['youtube','YouTube'],
+    ['tiktok','TikTok'],
+    ['linkedin','LinkedIn'],
+    ['facebook','Facebook'],
+    ['site','Site'],
+  ];
+  const activeSocials=socialDefinitions
+    .map(([key,label])=>({key,label,url:String(socialLinks[key]||'').trim()}))
+    .filter(item=>item.url);
+
+  function changePortfolioPage(nextPage){
+    const page=Math.max(0,Math.min(pageCount-1,nextPage));
+    setPortfolioPage(page);
+    setVisibleIds(new Set());
+    requestAnimationFrame(()=>{
+      portfolioGridRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  }
+  const ctaUrl=String(profile.ctaUrl||'').trim();
+
+  function markVisible(id){
+    setVisibleIds(prev=>{
+      if(prev.has(id)) return prev;
+      const next=new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
+  function markUnavailable(id){
+    setVisibleIds(prev=>{
+      if(!prev.has(id)) return prev;
+      const next=new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  const visibleCount=visibleIds.size;
+
+  return <main className="public-portfolio-page">
+    <section className="public-portfolio-shell">
+      <header className="public-portfolio-header">
+        <div className="public-portfolio-avatar">
+          {profile.avatarUrl
+            ? <img src={driveDirect(profile.avatarUrl)} alt={profile.name||'Argos'}/>
+            : <span>A</span>}
+        </div>
+        <div className="public-portfolio-profile">
+          <div className="public-portfolio-title-row">
+            <div>
+              <h1>{profile.name||'Argos'}</h1>
+              {username&&<span>{username.startsWith('@')?username:`@${username}`}</span>}
+            </div>
+            {activeSocials.length>0&&<div className="public-portfolio-socials">
+              {activeSocials.map(social=><a key={social.key} className={`social-${social.key}`} href={social.url} target="_blank" rel="noreferrer" aria-label={social.label} title={social.label}><PublicSocialIcon type={social.key}/></a>)}
+            </div>}
+          </div>
+          {profile.bio&&<p className="public-portfolio-bio">{profile.bio}</p>}
+        </div>
+        {ctaUrl&&<a className="public-portfolio-cta public-portfolio-cta-wide" href={ctaUrl} target="_blank" rel="noreferrer">{profile.ctaText||'Solicitar orçamento'}</a>}
+      </header>
+
+      <div className="public-portfolio-divider"><span>PORTFÓLIO</span></div>
+
+      {items.length
+        ? <>
+            <section ref={portfolioGridRef} className="public-portfolio-grid">{pageItems.map(item=><PublicPortfolioTile key={item.id} item={item} onReady={markVisible} onUnavailable={markUnavailable}/>)}</section>
+            {pageCount>1&&<nav className="public-portfolio-pagination" aria-label="Páginas do portfólio">
+              <button type="button" onClick={()=>changePortfolioPage(safePage-1)} disabled={safePage<=0}>Anterior</button>
+              <span>Página {safePage+1} de {pageCount}</span>
+              <button type="button" onClick={()=>changePortfolioPage(safePage+1)} disabled={safePage>=pageCount-1}>Próxima</button>
+            </nav>}
+          </>
+        : <section className="public-portfolio-empty"><h2>Novos trabalhos em breve</h2><p>O portfólio está sendo atualizado.</p></section>}
+    </section>
+  </main>;
+}
+
+function RootApp(){
+  const [publicRoute,setPublicRoute]=useState(()=>parsePublicPortfolioRoute());
+  useEffect(()=>{
+    const update=()=>setPublicRoute(parsePublicPortfolioRoute());
+    window.addEventListener('hashchange',update);
+    return()=>window.removeEventListener('hashchange',update);
+  },[]);
+  return publicRoute?<PublicPortfolioPage slug={publicRoute.slug}/>:<App/>;
+}
+
 function App(){
   const [users,setUsersState]=useState(()=>load('argos_users_r8', seedUsers));
   const [companies,setCompaniesState]=useState(()=>load('argos_companies_r8', seedCompanies));
@@ -1892,7 +2083,7 @@ function App(){
           {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
         </div>
         {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
-        {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} setAuth={setAuth} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser}/>}
+        {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} setAuth={setAuth} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser} open={openTaskRoute}/>}
         {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
         {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute}/>} 
         {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
@@ -2065,7 +2256,7 @@ function Bar({title,rows}){
   return <div className="panel"><h2>{title}</h2>{rows.map(([label,val,color,avatar])=><div className="bar" key={label} style={{display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',columnGap:12}}><span className="bar-label" style={{display:'inline-flex',alignItems:'center',gap:8,minWidth:0}}>{avatar&&<AvatarMini value={avatar} label={label}/>}<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</span></span><b>{val}</b><i style={{gridColumn:'1 / -1'}}><em style={{width:`${val/max*100}%`,background:color}}/></i></div>)}</div>
 }
 
-function TeamHubPage({users,setUsers,setAuth,tasks,statuses,auth,viewer}){
+function TeamHubPage({users,setUsers,setAuth,tasks,statuses,auth,viewer,open}){
   const baseMembers = sortMembersAdminFirst(users.filter(u=>u.active && (u.role==='admin'||u.role==='team')));
   const selfId = viewer?.id || auth?.id || '';
   const members = selfId ? [...baseMembers.filter(u=>u.id===selfId), ...baseMembers.filter(u=>u.id!==selfId)] : baseMembers;
@@ -2103,7 +2294,7 @@ function TeamHubPage({users,setUsers,setAuth,tasks,statuses,auth,viewer}){
     <div className="team-profile-area">
       {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} stats={selectedStats} canEdit={selected.id===auth?.id} updateOwnSocial={updateOwnSocial}/>} 
       <div className="team-feed-toolbar" aria-hidden="true"></div>
-      {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t}/>)}</div>:<div className="empty-team-feed inline-empty"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
+      {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t} open={open}/>)}</div>:<div className="empty-team-feed inline-empty"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
       {portfolio.length>12&&<div className="team-feed-pager">
         <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
         <span>Página {safePage+1} de {totalPages}</span>
@@ -2202,13 +2393,17 @@ function TeamProfileHeader({member,tasks,statuses,stats,canEdit=false,updateOwnS
   </div>;
 }
 
-function TeamFeedItem({task}){
+function TeamFeedItem({task,open}){
   const links=taskMaterialLinks(task);
   const [slide,setSlide]=useState(0);
   const index=Math.min(slide, Math.max(0, links.length-1));
   if(!links.length) return null;
   return <article className="team-feed-item">
     <div className="team-feed-media"><Media url={links[index]} type={task.type} slide={index} total={links.length}/>{links.length>1&&<div className="team-feed-arrows"><button className="feed-arrow prev" onClick={()=>setSlide(i=>Math.max(0,i-1))} disabled={index<=0} aria-label="Arte anterior">‹</button><button className="feed-arrow next" onClick={()=>setSlide(i=>Math.min(links.length-1,i+1))} disabled={index>=links.length-1} aria-label="Próxima arte">›</button></div>}</div>
+    <footer className="team-feed-task-link">
+      <span title={task.title}>{task.title}</span>
+      <button type="button" onClick={()=>open?.(task.id)}>Abrir tarefa ↗</button>
+    </footer>
   </article>;
 }
 
@@ -3150,8 +3345,8 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
   function save(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
-  const tabs=[['status','Status'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['general','Geral']];
-  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
+  const tabs=[['status','Status'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Geral']];
+  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -3179,6 +3374,174 @@ function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   })}</div></div>
 }
 function StatusEditor({s,save,cancel}){ const [f,setF]=useState(s); const set=(k,v)=>setF({...f,[k]:v}); return <div className="modal-bg"><div className="modal"><h2>Status</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Cor<input type="color" value={f.color} onChange={e=>set('color',e.target.value)}/></label><label><input type="checkbox" checked={f.active} onChange={e=>set('active',e.target.checked)}/> Ativo</label><label><input type="checkbox" checked={f.final} onChange={e=>set('final',e.target.checked)}/> Conta como finalizado</label><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div> }
+
+
+function PublicPortfolioSettings({currentUser}){
+  const organizationId=currentUser?.organizationId;
+  const [form,setForm]=useState({
+    publicSlug:'argos',
+    profileName:'Argos',
+    profileUsername:'@argosmarketing',
+    avatarUrl:'',
+    bio:'',
+    ctaText:'Solicitar orçamento',
+    ctaUrl:'',
+    socialLinks:{
+      whatsapp:'',
+      instagram:'',
+      youtube:'',
+      tiktok:'',
+      linkedin:'',
+      facebook:'',
+      site:'',
+    },
+    active:true,
+  });
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [message,setMessage]=useState('');
+  const [error,setError]=useState('');
+  const set=(key,value)=>setForm(prev=>({...prev,[key]:value}));
+  const setSocial=(key,value)=>setForm(prev=>({...prev,socialLinks:{...(prev.socialLinks||{}),[key]:value}}));
+
+  useEffect(()=>{
+    let alive=true;
+    if(!organizationId){
+      setLoading(false);
+      setError('Organização não identificada.');
+      return ()=>{alive=false};
+    }
+    (async()=>{
+      try{
+        setLoading(true);
+        setError('');
+        const row=await loadPublicPortfolioSettings(organizationId);
+        if(!alive) return;
+        if(row){
+          setForm({
+            publicSlug:row.public_slug||'argos',
+            profileName:row.profile_name||'Argos',
+            profileUsername:row.profile_username||'@argosmarketing',
+            avatarUrl:row.avatar_url||'',
+            bio:row.bio||'',
+            ctaText:row.cta_text||'Solicitar orçamento',
+            ctaUrl:row.cta_url||'',
+            socialLinks:{
+              whatsapp:row.social_links?.whatsapp||'',
+              instagram:row.social_links?.instagram||'',
+              youtube:row.social_links?.youtube||'',
+              tiktok:row.social_links?.tiktok||'',
+              linkedin:row.social_links?.linkedin||'',
+              facebook:row.social_links?.facebook||'',
+              site:row.social_links?.site||'',
+            },
+            active:row.active!==false,
+          });
+        }
+      }catch(err){
+        if(alive) setError(err.message||'Não foi possível carregar as configurações.');
+      }finally{
+        if(alive) setLoading(false);
+      }
+    })();
+    return()=>{alive=false};
+  },[organizationId]);
+
+  async function uploadAvatar(event){
+    const file=event.target.files?.[0];
+    if(!file) return;
+    try{
+      setError('');
+      const url=await uploadImageToSupabase(file,'public-portfolio/avatar');
+      set('avatarUrl',url);
+    }catch(err){
+      setError('Não foi possível enviar a foto: '+(err.message||err));
+    }finally{
+      event.target.value='';
+    }
+  }
+
+  async function saveSettings(){
+    const cta=String(form.ctaUrl||'').trim();
+    if(cta && !/^https?:\/\//i.test(cta)){
+      setError('O link do orçamento precisa começar com http:// ou https://.');
+      setMessage('');
+      return;
+    }
+    const invalidSocial=Object.entries(form.socialLinks||{}).find(([,value])=>{
+      const link=String(value||'').trim();
+      return link && !/^https?:\/\//i.test(link);
+    });
+    if(invalidSocial){
+      setError('Os links das redes sociais precisam começar com http:// ou https://.');
+      setMessage('');
+      return;
+    }
+    try{
+      setSaving(true);
+      setError('');
+      setMessage('');
+      const row=await savePublicPortfolioSettings(organizationId,form);
+      setForm({
+        publicSlug:row.public_slug||'argos',
+        profileName:row.profile_name||'Argos',
+        profileUsername:row.profile_username||'@argosmarketing',
+        avatarUrl:row.avatar_url||'',
+        bio:row.bio||'',
+        ctaText:row.cta_text||'Solicitar orçamento',
+        ctaUrl:row.cta_url||'',
+        socialLinks:{
+          whatsapp:row.social_links?.whatsapp||'',
+          instagram:row.social_links?.instagram||'',
+          youtube:row.social_links?.youtube||'',
+          tiktok:row.social_links?.tiktok||'',
+          linkedin:row.social_links?.linkedin||'',
+          facebook:row.social_links?.facebook||'',
+          site:row.social_links?.site||'',
+        },
+        active:row.active!==false,
+      });
+      setMessage('Configurações do portfólio público salvas.');
+    }catch(err){
+      setError(err.message||'Não foi possível salvar as configurações.');
+    }finally{
+      setSaving(false);
+    }
+  }
+
+  if(loading) return <div className="settings-section"><div className="panel public-portfolio-settings"><h2>Portfólio público</h2><p>Carregando configurações...</p></div></div>;
+
+  return <div className="settings-section"><div className="panel public-portfolio-settings">
+    <div className="public-portfolio-settings-head">
+      <div><h2>Portfólio público</h2><p>Configure o perfil público da Argos. Os trabalhos em Pronto aparecem automaticamente, inclusive os arquivados.</p></div>
+      <label className="public-portfolio-active"><input type="checkbox" checked={form.active} onChange={e=>set('active',e.target.checked)}/><span>Portfólio ativo</span></label>
+    </div>
+    {error&&<div className="cloud-error">{error}</div>}
+    {message&&<div className="public-portfolio-success">{message}</div>}
+    <div className="public-portfolio-profile-row">
+      <div className="public-portfolio-avatar-preview"><AvatarMini value={form.avatarUrl} label={form.profileName}/></div>
+      <div className="public-portfolio-avatar-fields"><label>Foto do perfil<input value={form.avatarUrl} onChange={e=>set('avatarUrl',e.target.value)} placeholder="URL, link do Drive ou upload"/></label><input type="file" accept="image/*" onChange={uploadAvatar}/></div>
+    </div>
+    <div className="form-two"><label>Nome do perfil<input value={form.profileName} onChange={e=>set('profileName',e.target.value)} placeholder="Argos"/></label><label>Usuário público<input value={form.profileUsername} onChange={e=>set('profileUsername',e.target.value)} placeholder="@argosmarketing"/></label></div>
+    <label>Bio<textarea value={form.bio} onChange={e=>set('bio',e.target.value)} placeholder="Apresente a Argos em poucas linhas."/></label>
+    <div className="form-two"><label>Texto do botão<input value={form.ctaText} onChange={e=>set('ctaText',e.target.value)} placeholder="Solicitar orçamento"/></label><label>Link do orçamento<input value={form.ctaUrl} onChange={e=>set('ctaUrl',e.target.value)} placeholder="https://wa.me/..."/></label></div>
+    <div className="public-portfolio-social-settings">
+      <h3>Redes sociais</h3>
+      <p>Somente redes com link preenchido aparecem no portfólio público.</p>
+      <div className="form-two">
+        <label>WhatsApp<input value={form.socialLinks?.whatsapp||''} onChange={e=>setSocial('whatsapp',e.target.value)} placeholder="https://wa.me/..."/></label>
+        <label>Instagram<input value={form.socialLinks?.instagram||''} onChange={e=>setSocial('instagram',e.target.value)} placeholder="https://instagram.com/..."/></label>
+        <label>YouTube<input value={form.socialLinks?.youtube||''} onChange={e=>setSocial('youtube',e.target.value)} placeholder="https://youtube.com/..."/></label>
+        <label>TikTok<input value={form.socialLinks?.tiktok||''} onChange={e=>setSocial('tiktok',e.target.value)} placeholder="https://tiktok.com/@..."/></label>
+        <label>LinkedIn<input value={form.socialLinks?.linkedin||''} onChange={e=>setSocial('linkedin',e.target.value)} placeholder="https://linkedin.com/..."/></label>
+        <label>Facebook<input value={form.socialLinks?.facebook||''} onChange={e=>setSocial('facebook',e.target.value)} placeholder="https://facebook.com/..."/></label>
+        <label>Site<input value={form.socialLinks?.site||''} onChange={e=>setSocial('site',e.target.value)} placeholder="https://..."/></label>
+      </div>
+    </div>
+    <label>Endereço público<input value={form.publicSlug} disabled/><small>Endereço usado pela página pública do portfólio.</small></label>
+    <div className="row-actions"><button className="primary" onClick={saveSettings} disabled={saving||!organizationId}>{saving?'Salvando...':'Salvar portfólio público'}</button></div>
+  </div></div>
+}
 
 function GeneralSettings({system,setSystem,reset}){
   const [f,setF]=useState(system||{logo:'',title:'Painel de Aprovação'});
@@ -3639,7 +4002,7 @@ if (typeof document !== 'undefined') {
   style50.textContent = ARGOS_ROUND50_TEAM_NOTIFS_BRAND_CSS;
 }
 
-createRoot(document.getElementById('root')).render(<App/>);
+createRoot(document.getElementById('root')).render(<RootApp/>);
 
 const ARGOS_ROUND45_CALENDAR_TITLE_MOBILE_CSS = `
 /* Round 45: manter botões Mês/Semana/Dia ao lado do título no mobile */

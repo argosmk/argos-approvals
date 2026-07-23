@@ -11,6 +11,7 @@ const DEFAULT_PROFILE = Object.freeze({
   bio: '',
   ctaText: 'Solicitar orçamento',
   ctaUrl: '',
+  socialLinks: {},
 });
 
 function cleanSlug(value = 'argos') {
@@ -28,6 +29,9 @@ function normalizePublicPortfolio(data, slug) {
       ...DEFAULT_PROFILE,
       ...profile,
       slug: cleanSlug(profile.slug || slug),
+      socialLinks: profile.socialLinks && typeof profile.socialLinks === 'object'
+        ? profile.socialLinks
+        : {},
     },
     items: Array.isArray(data?.items)
       ? data.items.map(item => ({
@@ -94,6 +98,9 @@ export async function savePublicPortfolioSettings(organizationId, settings = {})
     bio: String(settings.bio ?? '').trim(),
     cta_text: String(settings.ctaText ?? settings.cta_text ?? 'Solicitar orçamento').trim() || 'Solicitar orçamento',
     cta_url: String(settings.ctaUrl ?? settings.cta_url ?? '').trim(),
+    social_links: settings.socialLinks && typeof settings.socialLinks === 'object'
+      ? settings.socialLinks
+      : (settings.social_links && typeof settings.social_links === 'object' ? settings.social_links : {}),
     active: settings.active !== false,
   };
 
