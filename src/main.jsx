@@ -2889,7 +2889,7 @@ function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[]
   const [editing,setEditing]=useState(null);
   const [sort,setSort]=useState('created');
   const [showArchived,setShowArchived]=useState(false);
-  const visibleCompanies=companies.filter(c=>showArchived || c.active!==false);
+  const visibleCompanies=companies.filter(c=>showArchived ? c.active===false : c.active!==false);
   const sortedCompanies=sortEntities(visibleCompanies,sort,c=>c.name);
   function save(c){
     const exists=companies.some(x=>x.id===c.id);
@@ -2915,13 +2915,13 @@ function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[]
     setCompanies(companies.filter(x=>x.id!==c.id));
     setEditing(null);
   }
-  return <div className="settings-section"><div className="section-header"><h2>Empresas</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivadas</label><SortControl value={sort} setValue={setSort} options={[{value:'created',label:'Data de criação'},{value:'name',label:'Nome'}]}/><button className="primary" onClick={()=>setEditing({id:'',name:'',instagram:'',logo:'',entryDate:'',active:true,createdAt:now()})}>+ Nova empresa</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedCompanies.map(c=><div className={'panel '+(c.active===false?'archived-card':'')} key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{c.instagram || 'Sem Instagram'} {c.active===false?'• Arquivada':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(c)}>Editar</button></div></div>)}</div>{editing&&<CompanyEditor c={editing} users={users} save={save} cancel={()=>setEditing(null)} onArchive={archiveCompany} onDelete={deleteCompany}/>}</div>
+  return <div className="settings-section"><div className="section-header"><h2>Empresas</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivadas</label><SortControl value={sort} setValue={setSort} options={[{value:'created',label:'Data de criação'},{value:'name',label:'Nome'}]}/><button className="primary" onClick={()=>setEditing({id:'',name:'',instagram:'',logo:'',entryDate:'',active:true,createdAt:now()})}>+ Nova empresa</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedCompanies.map(c=><div className={'panel '+(c.active===false?'archived-card':'')} key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{c.instagram || 'Sem Instagram'} {c.active===false?'• Arquivada':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(c)}>Editar</button></div></div>)}</div>{editing&&<CompanyEditor c={editing} users={users} save={save} cancel={()=>setEditing(null)} onArchive={archiveCompany} onDelete={deleteCompany}/>}</div>
 }
 function ClientUsersPage({users,setUsers,companies,statuses}){
   const [editing,setEditing]=useState(null);
   const [sort,setSort]=useState('company');
   const [showArchived,setShowArchived]=useState(false);
-  const clients=users.filter(u=>u.role==='client' && (showArchived || u.active!==false));
+  const clients=users.filter(u=>u.role==='client' && (showArchived ? u.active===false : u.active!==false));
   const sortedClients=sortEntities(clients,sort,u=>{
     if(sort==='company') return (u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name||'').filter(Boolean).join(' ') || 'zzzz sem empresa';
     return u.name;
@@ -2984,14 +2984,14 @@ function ClientUsersPage({users,setUsers,companies,statuses}){
       alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
-  return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button></div></div>)}</div>{editing&&<UserEditor u={editing} companies={companies} statuses={statuses} save={save} cancel={()=>setEditing(null)} clientMode onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>}</div>
+  return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button></div></div>)}</div>{editing&&<UserEditor u={editing} companies={companies} statuses={statuses} save={save} cancel={()=>setEditing(null)} clientMode onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>}</div>
 }
 function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
   const [editing,setEditing]=useState(null);
   const [sort,setSort]=useState('role');
   const [showArchived,setShowArchived]=useState(false);
   const [openNotif,setOpenNotif]=useState({});
-  const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived || u.active!==false));
+  const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived ? u.active===false : u.active!==false));
   const sortedPeople=sortEntities(people,sort,u=>u.name);
   const events=NOTIFICATION_VISIBLE_EVENTS;
   async function archiveTeamUser(u){
@@ -3074,7 +3074,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
       alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
-  return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=>{
+  return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=>{
     const isOpen=!!openNotif[u.id];
     const canEdit=canEditNotifications(u);
     return <div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>

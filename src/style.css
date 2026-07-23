@@ -2310,3 +2310,891 @@ html, body, #root {
 .team-feed-media .team-feed-arrows{
   z-index:30!important;
 }
+
+/* ==========================================================================
+   Round150 — Paleta Preto e Dourado
+   Escopo exclusivo: tons neutros do sistema e dourado institucional.
+   Não altera cores funcionais de status, prazos ou prioridades.
+   ========================================================================== */
+
+:root{
+  --bg:#050506;
+  --surface:#0b0c0e;
+  --surface-2:#101114;
+  --surface-3:#15161a;
+  --line:rgba(255,255,255,.07);
+  --line-gold:rgba(193,158,83,.24);
+  --text:#eee9df;
+  --text-2:#c9c1b4;
+  --muted:#888176;
+  --gold:#c19e53;
+  --gold-2:#d4b56d;
+}
+
+html,
+body,
+#root{
+  background:#050506;
+}
+
+body{
+  background:#050506;
+}
+
+.side{
+  background:#060607!important;
+  border-right-color:rgba(255,255,255,.055)!important;
+  scrollbar-color:rgba(193,158,83,.34) transparent;
+}
+
+.side-drawer{
+  background:#060607!important;
+}
+
+.card,
+.panel,
+.month,
+.legend,
+.col,
+.modal,
+.content-fields,
+.user-card,
+.impersonate,
+.login-card{
+  background:#0b0c0e;
+}
+
+.dash-zone{
+  background:#08090b;
+}
+
+.kcard,
+.task-row,
+.clean-day-card,
+.week-col,
+.comment-log{
+  background:#101114;
+}
+
+button{
+  background:#090a0c;
+  border-color:rgba(193,158,83,.24);
+}
+
+button:hover{
+  background:#101114;
+  border-color:rgba(193,158,83,.46);
+}
+
+input,
+select,
+textarea,
+.status-select,
+.select-entity,
+.rendered-text,
+.instruction-box.textarea-like{
+  background:#07080a!important;
+  border-color:rgba(193,158,83,.24);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.select-entity:focus-within{
+  border-color:rgba(212,181,109,.58)!important;
+  box-shadow:0 0 0 3px rgba(193,158,83,.07)!important;
+}
+
+select option{
+  background:#090a0c!important;
+}
+
+button.primary,
+.primary{
+  background:#c19e53;
+  border-color:#c19e53;
+}
+
+.side button.active{
+  background:linear-gradient(
+    90deg,
+    rgba(193,158,83,.17),
+    rgba(193,158,83,.055) 62%,
+    transparent
+  )!important;
+  box-shadow:inset 3px 0 0 #c19e53!important;
+}
+
+.settings-tabs button.active{
+  border-bottom-color:#c19e53;
+  color:#c19e53;
+}
+
+a,
+.brand-logo span,
+.team-story.active .team-story-name,
+.team-story.selected .team-story-name,
+.team-story.selected > span:last-of-type{
+  color:#c19e53;
+}
+
+.search-wrap input,
+.search-results,
+.user-card,
+.impersonate,
+.card,
+.panel,
+.month,
+.legend,
+.col,
+.modal,
+.content-fields,
+.dash-zone,
+.week-col,
+.login-card{
+  border-color:rgba(193,158,83,.22);
+}
+
+.search-results{
+  background:#0b0c0e;
+}
+
+.search-results button{
+  background:#090a0c;
+}
+
+.search-clear{
+  border-color:rgba(193,158,83,.34)!important;
+}
+
+.search-clear:hover{
+  background:rgba(193,158,83,.13)!important;
+}
+
+.comment-log,
+.editable-link-list a,
+.external-material-preview{
+  border-color:rgba(193,158,83,.25)!important;
+}
+
+.editable-link-list a{
+  color:#c19e53!important;
+  background:rgba(193,158,83,.07)!important;
+}
+
+.editable-link-list a:hover{
+  background:rgba(193,158,83,.13)!important;
+}
+
+.side::-webkit-scrollbar-thumb,
+.calendar-main::-webkit-scrollbar-thumb{
+  background:rgba(193,158,83,.30);
+}
+
+.login{
+  background:
+    radial-gradient(circle at center,rgba(193,158,83,.075),transparent 42%),
+    #050506!important;
+}
+
+.login-card{
+  border-color:rgba(193,158,83,.28)!important;
+}
+
+.login-card::before{
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(193,158,83,.20),
+      rgba(193,158,83,.09) 32%,
+      rgba(193,158,83,.025) 56%,
+      transparent 74%
+    )!important;
+}
+
+.login-card .logo{
+  color:#c19e53!important;
+  border-color:rgba(193,158,83,.22)!important;
+}
+
+.login-card input{
+  border-color:rgba(193,158,83,.26)!important;
+}
+
+.login-card input:focus{
+  border-color:rgba(212,181,109,.68)!important;
+  box-shadow:0 0 0 3px rgba(193,158,83,.10)!important;
+}
+
+.login-card button{
+  border-color:rgba(193,158,83,.42)!important;
+}
+
+.login-card button:hover{
+  border-color:rgba(212,181,109,.78)!important;
+  box-shadow:0 0 22px rgba(193,158,83,.13)!important;
+}
+
+/* ==========================================================================
+   Round150.1 — Seleção da Sidebar
+   Escopo exclusivo: estado ativo e hover dos itens de navegação.
+   ========================================================================== */
+
+.side nav .nav-btn{
+  background:transparent!important;
+  border-color:transparent!important;
+  color:rgba(238,233,223,.68)!important;
+  box-shadow:none!important;
+}
+
+.side nav .nav-btn:hover{
+  background:rgba(193,158,83,.055)!important;
+  border-color:transparent!important;
+  color:#e9e0cd!important;
+  box-shadow:none!important;
+}
+
+.side nav .nav-btn.active{
+  background:#17150f!important;
+  border-color:transparent!important;
+  color:#d7b96f!important;
+  box-shadow:none!important;
+}
+
+.side nav .nav-btn.active .nav-icon{
+  color:#d7b96f!important;
+  stroke:#d7b96f!important;
+  opacity:1!important;
+  filter:none!important;
+}
+
+.side nav .nav-btn.active span{
+  color:#d7b96f!important;
+  font-weight:560!important;
+  filter:none!important;
+}
+
+/* ==========================================================================
+   Round150.2 — Dashboard com traços finos
+   Escopo exclusivo: Dashboard principal.
+   Não altera estrutura, dimensões, espaçamentos ou cores funcionais.
+   ========================================================================== */
+
+/* Superfície principal do Dashboard */
+.main > section:has(> .dash-zone) .dash-zone{
+  background:#08090a!important;
+  border-color:rgba(193,158,83,.18)!important;
+  box-shadow:none!important;
+}
+
+/* Cards de métricas */
+.main > section:has(> .dash-zone) .dash-zone .card{
+  background:#0b0c0e!important;
+  border-color:rgba(255,255,255,.075)!important;
+  box-shadow:none!important;
+}
+
+.main > section:has(> .dash-zone) .dash-zone .card:hover{
+  background:#0d0e10!important;
+  border-color:rgba(193,158,83,.22)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.018)!important;
+}
+
+/* Títulos, rótulos e números dos indicadores */
+.main > section:has(> .dash-zone) .dash-zone .card small{
+  color:#8f887d!important;
+  font-weight:560!important;
+}
+
+.main > section:has(> .dash-zone) .dash-zone .card b{
+  color:#eee9df!important;
+  text-shadow:none!important;
+}
+
+/* Painéis analíticos abaixo das métricas */
+.main > section:has(> .dash-zone) > .grid2 > .panel{
+  background:#0a0b0d!important;
+  border-color:rgba(255,255,255,.075)!important;
+  box-shadow:none!important;
+}
+
+.main > section:has(> .dash-zone) > .grid2 > .panel:hover{
+  border-color:rgba(193,158,83,.20)!important;
+}
+
+/* Divisores e trilhos das barras */
+.main > section:has(> .dash-zone) .bar{
+  border-color:rgba(255,255,255,.055)!important;
+}
+
+.main > section:has(> .dash-zone) .bar i{
+  background:#191a1d!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.018)!important;
+}
+
+/* Mantém integralmente a cor configurada de cada barra */
+.main > section:has(> .dash-zone) .bar em{
+  box-shadow:none!important;
+  filter:none!important;
+  opacity:1!important;
+}
+
+/* Hierarquia mais limpa nos painéis analíticos */
+.main > section:has(> .dash-zone) > .grid2 > .panel h2{
+  color:#ece7de!important;
+  font-weight:700!important;
+}
+
+.main > section:has(> .dash-zone) .bar span{
+  color:#b8b0a4!important;
+}
+
+.main > section:has(> .dash-zone) .bar b{
+  color:#eee8de!important;
+}
+
+/* Filtros do Dashboard, sem afetar os demais painéis */
+.main > section:has(> .dash-zone) > .filters input,
+.main > section:has(> .dash-zone) > .filters select,
+.main > section:has(> .dash-zone) > .filters button{
+  background:#08090a!important;
+  border-color:rgba(193,158,83,.20)!important;
+  box-shadow:none!important;
+}
+
+.main > section:has(> .dash-zone) > .filters input:hover,
+.main > section:has(> .dash-zone) > .filters select:hover,
+.main > section:has(> .dash-zone) > .filters button:hover{
+  border-color:rgba(193,158,83,.34)!important;
+  background:#0b0c0e!important;
+}
+
+.main > section:has(> .dash-zone) > .filters input:focus,
+.main > section:has(> .dash-zone) > .filters select:focus{
+  border-color:rgba(212,181,109,.50)!important;
+  box-shadow:0 0 0 2px rgba(193,158,83,.055)!important;
+}
+
+/* ==========================================================================
+   Round150.2C — Dashboard Premium Corrigido
+   Escopo exclusivo: Dashboard principal.
+   Seletores corrigidos para a estrutura real dentro de .main > div > section.
+   ========================================================================== */
+
+/* Moldura geral das métricas */
+.main > div > section > .dash-zone{
+  background:
+    linear-gradient(145deg,rgba(193,158,83,.055),rgba(193,158,83,.018) 42%,rgba(255,255,255,.008)),
+    #090a0c!important;
+  border:1px solid rgba(193,158,83,.28)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    inset 0 0 40px rgba(193,158,83,.025),
+    0 18px 42px rgba(0,0,0,.16)!important;
+}
+
+/* Cards de métricas */
+.main > div > section > .dash-zone .quick-cards .card,
+.main > div > section > .dash-zone .time-cards .card{
+  background:
+    linear-gradient(145deg,rgba(193,158,83,.048),rgba(193,158,83,.014) 55%,rgba(255,255,255,.006)),
+    #0c0d0f!important;
+  border:1px solid rgba(193,158,83,.24)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    inset 0 0 24px rgba(193,158,83,.018)!important;
+}
+
+/* Hover com dourado elegante */
+.main > div > section > .dash-zone .quick-cards .card:hover,
+.main > div > section > .dash-zone .time-cards .card:hover{
+  background:
+    linear-gradient(145deg,rgba(193,158,83,.075),rgba(193,158,83,.022) 58%,rgba(255,255,255,.01)),
+    #0d0e10!important;
+  border-color:rgba(212,181,109,.42)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    inset 0 0 28px rgba(193,158,83,.028)!important;
+}
+
+/* Rótulos e métricas */
+.main > div > section > .dash-zone .card small{
+  color:#a59b8a!important;
+  text-shadow:none!important;
+}
+
+.main > div > section > .dash-zone .card b{
+  color:#f1eadc!important;
+  text-shadow:0 0 18px rgba(193,158,83,.05)!important;
+}
+
+/* Painéis analíticos inferiores */
+.main > div > section > .grid2 > .panel{
+  background:
+    linear-gradient(145deg,rgba(193,158,83,.04),rgba(193,158,83,.012) 58%,rgba(255,255,255,.006)),
+    #0a0b0d!important;
+  border:1px solid rgba(193,158,83,.22)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.02),
+    inset 0 0 30px rgba(193,158,83,.018),
+    0 16px 34px rgba(0,0,0,.12)!important;
+}
+
+/* Hover dos painéis inferiores */
+.main > div > section > .grid2 > .panel:hover{
+  border-color:rgba(212,181,109,.36)!important;
+  background:
+    linear-gradient(145deg,rgba(193,158,83,.058),rgba(193,158,83,.016) 58%,rgba(255,255,255,.008)),
+    #0b0c0e!important;
+}
+
+/* Títulos dos painéis */
+.main > div > section > .grid2 > .panel > h2{
+  color:#eee7da!important;
+  text-shadow:none!important;
+}
+
+/* Trilhos das barras */
+.main > div > section > .grid2 .bar i{
+  background:#1a1812!important;
+  border:1px solid rgba(193,158,83,.10)!important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.36)!important;
+}
+
+/* Preserva integralmente as cores funcionais das barras */
+.main > div > section > .grid2 .bar em{
+  filter:none!important;
+  opacity:1!important;
+  box-shadow:none!important;
+}
+
+/* Linhas e textos */
+.main > div > section > .grid2 .bar span{
+  color:#c7bdad!important;
+}
+
+.main > div > section > .grid2 .bar b{
+  color:#f0e9dd!important;
+}
+
+/* Filtros somente do Dashboard */
+.main > div > section > .filters select,
+.main > div > section > .filters input{
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.022),transparent),
+    #08090a!important;
+  border-color:rgba(193,158,83,.24)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.018)!important;
+}
+
+.main > div > section > .filters select:hover,
+.main > div > section > .filters input:hover{
+  border-color:rgba(212,181,109,.38)!important;
+}
+
+/* Busca e botão do topo permanecem universais e intactos */
+
+/* ==========================================================================
+   Round150.2D — Barras douradas com brilho LED
+   Escopo exclusivo: gráficos do Dashboard.
+   Mantém cores funcionais apenas em "Post por Status".
+   ========================================================================== */
+
+/* Todas as barras do Dashboard recebem acabamento luminoso discreto */
+.main > div > section > .grid2 .bar em{
+  box-shadow:
+    0 0 5px currentColor,
+    0 0 10px rgba(212,181,109,.18)!important;
+  filter:brightness(1.06) saturate(1.04)!important;
+}
+
+/* Painéis 2, 3 e 4: dourado institucional */
+.main > div > section > .grid2 > .panel:nth-child(2) .bar em,
+.main > div > section > .grid2 > .panel:nth-child(3) .bar em,
+.main > div > section > .grid2 > .panel:nth-child(4) .bar em{
+  background:#d4b56d!important;
+  color:#d4b56d!important;
+  box-shadow:
+    0 0 5px rgba(212,181,109,.72),
+    0 0 11px rgba(212,181,109,.26)!important;
+}
+
+/* Primeiro painel mantém as cores configuradas dos status */
+.main > div > section > .grid2 > .panel:first-child .bar em{
+  box-shadow:
+    0 0 5px currentColor,
+    0 0 10px currentColor!important;
+  filter:brightness(1.08) saturate(1.08)!important;
+}
+
+/* Trilhos permanecem escuros para realçar o efeito */
+.main > div > section > .grid2 .bar i{
+  background:#17150f!important;
+  border-color:rgba(193,158,83,.11)!important;
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,.45),
+    inset 0 0 4px rgba(193,158,83,.025)!important;
+}
+
+/* ==========================================================================
+   Round150.3 — Interativos com gradiente sutil
+   Escopo: controles e elementos claramente clicáveis.
+   Não altera status, prazos, prioridades, estrutura ou dimensões.
+   ========================================================================== */
+
+/* Botões neutros e ações gerais */
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story){
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.045),rgba(193,158,83,.012) 58%,rgba(255,255,255,.005)),
+    #090a0c!important;
+  border-color:rgba(193,158,83,.24)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.018),
+    0 4px 12px rgba(0,0,0,.08)!important;
+}
+
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):hover{
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.075),rgba(193,158,83,.022) 62%,rgba(255,255,255,.008)),
+    #0c0d0f!important;
+  border-color:rgba(212,181,109,.40)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.028),
+    0 6px 16px rgba(0,0,0,.11)!important;
+}
+
+/* Inputs, selects e textareas */
+input,
+select,
+textarea{
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.026),rgba(193,158,83,.007) 58%,transparent),
+    #07080a!important;
+  border-color:rgba(193,158,83,.23)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.014)!important;
+}
+
+input:hover,
+select:hover,
+textarea:hover{
+  border-color:rgba(212,181,109,.34)!important;
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+  border-color:rgba(212,181,109,.52)!important;
+  box-shadow:
+    0 0 0 2px rgba(193,158,83,.055),
+    inset 0 1px 0 rgba(255,255,255,.02)!important;
+}
+
+/* Busca global */
+.search-wrap input,
+.search-input-shell input{
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.032),rgba(193,158,83,.008) 60%,transparent),
+    #07080a!important;
+}
+
+/* Abas e filtros selecionáveis */
+.settings-tabs button,
+.view-tabs button{
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+.settings-tabs button:hover,
+.view-tabs button:hover{
+  background:linear-gradient(180deg,rgba(193,158,83,.055),rgba(193,158,83,.014))!important;
+}
+
+.settings-tabs button.active,
+.view-tabs button.primary{
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.10),rgba(193,158,83,.025)),
+    transparent!important;
+}
+
+/* Cards e linhas realmente clicáveis */
+.search-results button,
+.clean-day-card,
+.legend-row,
+.docs-page-row,
+.docs-folder-row{
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.024),rgba(193,158,83,.006)),
+    transparent!important;
+}
+
+.search-results button:hover,
+.clean-day-card:hover,
+.legend-row:hover,
+.docs-page-row:hover,
+.docs-folder-row:hover{
+  background:
+    linear-gradient(180deg,rgba(193,158,83,.06),rgba(193,158,83,.015)),
+    rgba(255,255,255,.01)!important;
+}
+
+/* Evita qualquer interferência nas cores funcionais */
+.status-pill,
+.priority-pill,
+.notification-item span[style*="color"],
+.task-row small[style*="color"],
+.kcard small[style*="color"],
+.date-field input,
+.status-dot{
+  filter:none!important;
+  opacity:1!important;
+}
+
+/* Foco acessível e consistente */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible{
+  outline:1px solid rgba(212,181,109,.54)!important;
+  outline-offset:2px!important;
+}
+
+/* ==========================================================================
+   Round150.3A — Portfólio sem fundo e aura estável
+   Escopo exclusivo: seletor de perfis do Portfólio.
+   ========================================================================== */
+
+/* Remove a área em volta das fotos para manter aparência de Instagram */
+.team-stories-strip .team-story,
+.team-story{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+
+/* Hover sem criar caixa ao redor do avatar */
+.team-stories-strip .team-story:hover,
+.team-story:hover{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+
+/* Mantém a aura de online exatamente igual, selecionado ou não */
+.team-story-avatar.online,
+.team-story.selected .team-story-avatar.online,
+.team-story.active .team-story-avatar.online{
+  background:linear-gradient(135deg,#22c55e,#e1b12c)!important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.06),
+    0 12px 26px rgba(0,0,0,.28)!important;
+}
+
+/* Seleção não muda a cor da aura */
+.team-story.selected .team-story-avatar,
+.team-story.active .team-story-avatar{
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.06),
+    0 12px 26px rgba(0,0,0,.28)!important;
+}
+
+/* O nome dourado continua sendo o único indicador de perfil ativo */
+.team-story.selected > span:last-of-type,
+.team-story.selected .team-story-name,
+.team-story.active > span:last-of-type,
+.team-story.active .team-story-name{
+  color:var(--gold)!important;
+}
+
+/* ==========================================================================
+   Round150.3B — Portfólio sem quadrinho
+   Escopo exclusivo: botões de seleção dos perfis.
+   ========================================================================== */
+
+/* Vence a regra universal de botões aplicada anteriormente */
+.team-stories-strip button.team-story,
+.team-stories-strip button.team-story:hover,
+.team-stories-strip button.team-story:focus,
+.team-stories-strip button.team-story:focus-visible,
+.team-stories-strip button.team-story.active,
+.team-stories-strip button.team-story.selected{
+  background:none!important;
+  background-color:transparent!important;
+  background-image:none!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+  outline:none!important;
+  filter:none!important;
+}
+
+/* ==========================================================================
+   Round150.3C — Botões do Portfólio separados da regra universal
+   Os .team-story não recebem gradiente, borda ou sombra dos botões gerais.
+   ========================================================================== */
+
+/* ==========================================================================
+   Round150.3D — Botões dourados e contraste
+   Escopo: acabamento e legibilidade dos botões.
+   ========================================================================== */
+
+/* Botões realmente preenchidos de dourado */
+button.primary,
+.modal-actions button.primary,
+.top-actions button.primary,
+.filters button.primary{
+  background:
+    linear-gradient(
+      180deg,
+      #ddc17d 0%,
+      #c8a65b 48%,
+      #b58f43 100%
+    )!important;
+  border-color:#d2b36b!important;
+  color:#070707!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.20)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 0 -1px 0 rgba(79,54,12,.22),
+    0 6px 16px rgba(193,158,83,.12)!important;
+}
+
+button.primary:hover,
+.modal-actions button.primary:hover,
+.top-actions button.primary:hover,
+.filters button.primary:hover{
+  background:
+    linear-gradient(
+      180deg,
+      #e5cc8d 0%,
+      #d0af66 48%,
+      #bd984b 100%
+    )!important;
+  border-color:#e0c27d!important;
+  color:#050505!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 0 -1px 0 rgba(79,54,12,.18),
+    0 8px 20px rgba(193,158,83,.18)!important;
+}
+
+/* Botões escuros devem manter texto claro */
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story){
+  color:#f1ece2!important;
+}
+
+/* Abas de visualização são escuras, mesmo quando usam a classe primary */
+.view-tabs button.primary{
+  background:
+    linear-gradient(
+      180deg,
+      rgba(193,158,83,.09),
+      rgba(193,158,83,.025)
+    ),
+    #090a0c!important;
+  border-color:rgba(212,181,109,.62)!important;
+  color:#f4efe6!important;
+  text-shadow:none!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 4px 12px rgba(0,0,0,.10)!important;
+}
+
+.view-tabs button.primary:hover{
+  background:
+    linear-gradient(
+      180deg,
+      rgba(193,158,83,.14),
+      rgba(193,158,83,.04)
+    ),
+    #0c0d0f!important;
+  border-color:rgba(224,194,125,.78)!important;
+  color:#fffaf0!important;
+}
+
+/* Botões desabilitados continuam legíveis */
+button:disabled{
+  text-shadow:none!important;
+}
+
+/* ==========================================================================
+   Round150.3E — Contraste dos prazos restaurado
+   Escopo exclusivo: campos de prazo.
+   ========================================================================== */
+
+/* Atrasado */
+.date-field.late input{
+  border-color:#ef4444!important;
+  color:#fecaca!important;
+  background:
+    linear-gradient(180deg,rgba(239,68,68,.11),rgba(239,68,68,.045)),
+    #0a0809!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.018),
+    0 0 0 1px rgba(239,68,68,.045)!important;
+}
+
+/* Urgente */
+.date-field.hot input{
+  border-color:#f97316!important;
+  color:#fed7aa!important;
+  background:
+    linear-gradient(180deg,rgba(249,115,22,.11),rgba(249,115,22,.045)),
+    #0a0908!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.018),
+    0 0 0 1px rgba(249,115,22,.045)!important;
+}
+
+/* Alta */
+.date-field.warn input{
+  border-color:#eab308!important;
+  color:#fef08a!important;
+  background:
+    linear-gradient(180deg,rgba(234,179,8,.10),rgba(234,179,8,.04)),
+    #0a0a07!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.018),
+    0 0 0 1px rgba(234,179,8,.04)!important;
+}
+
+/* Baixa / normal */
+.date-field.ok input{
+  border-color:#22c55e!important;
+  color:#bbf7d0!important;
+  background:
+    linear-gradient(180deg,rgba(34,197,94,.10),rgba(34,197,94,.04)),
+    #070a08!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.018),
+    0 0 0 1px rgba(34,197,94,.04)!important;
+}
+
+/* Hover e foco mantêm a mesma linguagem funcional */
+.date-field.late input:hover,
+.date-field.late input:focus{
+  border-color:#f87171!important;
+  box-shadow:0 0 0 2px rgba(239,68,68,.09)!important;
+}
+
+.date-field.hot input:hover,
+.date-field.hot input:focus{
+  border-color:#fb923c!important;
+  box-shadow:0 0 0 2px rgba(249,115,22,.09)!important;
+}
+
+.date-field.warn input:hover,
+.date-field.warn input:focus{
+  border-color:#facc15!important;
+  box-shadow:0 0 0 2px rgba(234,179,8,.085)!important;
+}
+
+.date-field.ok input:hover,
+.date-field.ok input:focus{
+  border-color:#4ade80!important;
+  box-shadow:0 0 0 2px rgba(34,197,94,.085)!important;
+}
+
+/* Ícone do calendário continua legível */
+.date-field input[type="date"]::-webkit-calendar-picker-indicator{
+  opacity:.92!important;
+  filter:invert(1) grayscale(1) contrast(1.25)!important;
+}
