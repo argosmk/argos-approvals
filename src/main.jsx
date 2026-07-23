@@ -1721,36 +1721,74 @@ function App(){
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady) return;
     let alive=true;
-    const interval=setInterval(async()=>{
-      if(taskSyncBusyRef.current) return;
+    let refreshInFlight=false;
+
+    async function refreshTasks(){
+      if(!alive || document.visibilityState==='hidden' || taskSyncBusyRef.current || refreshInFlight) return;
+      refreshInFlight=true;
       try{
-        const latest = await loadTaskRecords(auth.organizationId);
+        const latest=await loadTaskRecords(auth.organizationId);
         if(alive) setTasksState(latest);
       }catch(err){
-        console.warn('task table refresh failed', err);
+        console.warn('task table refresh failed',err);
+      }finally{
+        refreshInFlight=false;
       }
-    },5000);
-    return ()=>{ alive=false; clearInterval(interval); };
-  },[cloudReady, auth?.organizationId, taskTablesReady]);
+    }
+
+    function refreshWhenVisible(){
+      if(document.visibilityState==='visible') refreshTasks();
+    }
+
+    const interval=setInterval(refreshTasks,60000);
+    window.addEventListener('focus',refreshTasks);
+    document.addEventListener('visibilitychange',refreshWhenVisible);
+
+    return()=>{
+      alive=false;
+      clearInterval(interval);
+      window.removeEventListener('focus',refreshTasks);
+      document.removeEventListener('visibilitychange',refreshWhenVisible);
+    };
+  },[cloudReady,auth?.organizationId,taskTablesReady]);
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
     let alive=true;
+    let refreshInFlight=false;
+
     async function refreshProfiles(){
+      if(!alive || document.visibilityState==='hidden' || refreshInFlight) return;
+      refreshInFlight=true;
       try{
-        const profileUsers = await loadOrganizationProfiles(auth.organizationId);
+        const profileUsers=await loadOrganizationProfiles(auth.organizationId);
         if(!alive || !profileUsers.length) return;
-        setUsersState(prev=>mergeProfileRowsIntoUsers(prev, profileUsers));
-        const freshAuth = profileUsers.find(u=>u.id===auth.id);
-        if(freshAuth) setAuth(prev=>prev && prev.id===freshAuth.id ? mergeProfileWithWorkspaceUser(freshAuth,{users:[prev]}) : prev);
+        setUsersState(prev=>mergeProfileRowsIntoUsers(prev,profileUsers));
+        const freshAuth=profileUsers.find(u=>u.id===auth.id);
+        if(freshAuth) setAuth(prev=>prev&&prev.id===freshAuth.id?mergeProfileWithWorkspaceUser(freshAuth,{users:[prev]}):prev);
       }catch(err){
-        console.warn('profile refresh ignored:', err?.message || err);
+        console.warn('profile refresh ignored:',err?.message||err);
+      }finally{
+        refreshInFlight=false;
       }
     }
+
+    function refreshWhenVisible(){
+      if(document.visibilityState==='visible') refreshProfiles();
+    }
+
     refreshProfiles();
-    const interval=setInterval(refreshProfiles,30000);
-    return ()=>{ alive=false; clearInterval(interval); };
-  },[cloudReady, auth?.organizationId, auth?.id]);
+    const interval=setInterval(refreshProfiles,120000);
+    window.addEventListener('focus',refreshProfiles);
+    document.addEventListener('visibilitychange',refreshWhenVisible);
+
+    return()=>{
+      alive=false;
+      clearInterval(interval);
+      window.removeEventListener('focus',refreshProfiles);
+      document.removeEventListener('visibilitychange',refreshWhenVisible);
+    };
+  },[cloudReady,auth?.organizationId,auth?.id]);
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
