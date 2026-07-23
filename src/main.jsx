@@ -1457,6 +1457,9 @@ function PublicPortfolioTile({item,onReady,onUnavailable}){
       </div>}
       {materials.length>1&&<span className="public-portfolio-paged-counter">{index+1}/{materials.length}</span>}
     </div>
+    <div className="public-portfolio-mobile-actions" aria-hidden="true">
+      <InstagramIcons/>
+    </div>
   </article>;
 }
 
@@ -1466,7 +1469,28 @@ function PublicPortfolioPage({slug='argos'}){
   const [error,setError]=useState('');
   const [visibleIds,setVisibleIds]=useState(()=>new Set());
   const [portfolioPage,setPortfolioPage]=useState(0);
+  const [showBackToTop,setShowBackToTop]=useState(false);
   const portfolioGridRef=useRef(null);
+
+  useEffect(()=>{
+    const html=document.documentElement;
+    const body=document.body;
+    const root=document.getElementById('root');
+    html.classList.add('public-portfolio-scroll-root');
+    body.classList.add('public-portfolio-scroll-root');
+    root?.classList.add('public-portfolio-scroll-root');
+
+    const updateBackToTop=()=>setShowBackToTop(window.scrollY>520);
+    updateBackToTop();
+    window.addEventListener('scroll',updateBackToTop,{passive:true});
+
+    return()=>{
+      window.removeEventListener('scroll',updateBackToTop);
+      html.classList.remove('public-portfolio-scroll-root');
+      body.classList.remove('public-portfolio-scroll-root');
+      root?.classList.remove('public-portfolio-scroll-root');
+    };
+  },[]);
 
   useEffect(()=>{
     let alive=true;
@@ -1579,6 +1603,7 @@ function PublicPortfolioPage({slug='argos'}){
           </>
         : <section className="public-portfolio-empty"><h2>Novos trabalhos em breve</h2><p>O portfólio está sendo atualizado.</p></section>}
     </section>
+    {showBackToTop&&<button type="button" className="public-portfolio-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo">↑</button>}
   </main>;
 }
 
