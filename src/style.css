@@ -4550,3 +4550,36 @@ body.public-portfolio-scroll-root{
     display:none!important;
   }
 }
+
+/* ==========================================================================
+   Round151F.3 — Bio mobile em largura total
+   Escopo exclusivo: cabeçalho público no mobile.
+   ========================================================================== */
+
+@media(max-width:760px){
+  .public-portfolio-profile{
+    display:contents!important;
+    padding-right:0!important;
+  }
+
+  .public-portfolio-title-row{
+    grid-column:2!important;
+    min-width:0!important;
+    padding-right:88px!important;
+  }
+
+  .public-portfolio-bio{
+    grid-column:1 / -1!important;
+    width:100%!important;
+    max-width:none!important;
+    margin:10px 0 0!important;
+    padding:0!important;
+    font-size:11.5px!important;
+    line-height:1.35!important;
+    white-space:pre-line!important;
+  }
+
+  .public-portfolio-cta-wide{
+    grid-column:1 / -1!important;
+  }
+}
