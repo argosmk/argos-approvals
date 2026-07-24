@@ -10,11 +10,12 @@ import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSe
 
 
 function parsePublicPortfolioRoute(){
-  if(typeof window === 'undefined') return null;
-  const raw=String(window.location.hash||'').replace(/^#\/?/,'');
-  const parts=raw.split('/').filter(Boolean).map(part=>decodeURIComponent(part));
-  if(parts[0]!=='portfolio-publico') return null;
-  return {slug:parts[1]||'argos'};
+  if(typeof window==='undefined') return null;
+  const pathParts=String(window.location.pathname||'/').split('/').filter(Boolean).map(part=>decodeURIComponent(part));
+  if(pathParts[0]==='portfolio') return {slug:pathParts[1]||'argos',legacy:false};
+  const hashParts=String(window.location.hash||'').replace(/^#\/?/,'').split('/').filter(Boolean).map(part=>decodeURIComponent(part));
+  if(hashParts[0]==='portfolio-publico') return {slug:hashParts[1]||'argos',legacy:true};
+  return null;
 }
 
 const ROUTE_SCREEN_ALIASES = {
@@ -1424,42 +1425,60 @@ function PublicSocialIcon({type}){
 }
 
 function PublicPortfolioTile({item,onReady,onUnavailable}){
+  const cardRef=useRef(null);
   const materials=useMemo(()=>{
     const all=[item?.previewUrl,...(Array.isArray(item?.materials)?item.materials:[])];
     return [...new Set(all.map(value=>String(value||'').trim()).filter(Boolean))];
   },[item]);
   const [slide,setSlide]=useState(0);
+  const [nearViewport,setNearViewport]=useState(false);
+  const [fullyVisible,setFullyVisible]=useState(false);
+  const [mediaActivated,setMediaActivated]=useState(false);
+  const [thumbFailed,setThumbFailed]=useState(false);
   const reportedRef=useRef('');
   const index=Math.min(slide,Math.max(0,materials.length-1));
   const source=materials[index]||'';
+  const type=String(item?.type||'').toLowerCase();
+  const lower=String(source||'').toLowerCase();
+  const videoLike=type.includes('vídeo')||type.includes('video')||type.includes('reels')||/\.(mp4|webm|mov)(\?|$)/i.test(lower);
 
   useEffect(()=>{
-    if(source && reportedRef.current!=='ready'){
-      reportedRef.current='ready';
-      onReady?.(item.id);
+    const node=cardRef.current;
+    if(!node||typeof IntersectionObserver==='undefined'){
+      setNearViewport(true); setFullyVisible(true); return;
     }
-  },[source,item.id,onReady]);
+    const nearObserver=new IntersectionObserver(([entry])=>{if(entry.isIntersecting)setNearViewport(true);},{rootMargin:'500px 0px',threshold:.01});
+    const visibleObserver=new IntersectionObserver(([entry])=>{
+      const visible=entry.isIntersecting&&entry.intersectionRatio>=.55;
+      setFullyVisible(visible);
+      if(!visible)setMediaActivated(false);
+    },{threshold:[0,.25,.55,.8]});
+    nearObserver.observe(node); visibleObserver.observe(node);
+    return()=>{nearObserver.disconnect();visibleObserver.disconnect();};
+  },[]);
 
-  useEffect(()=>{
-    if(materials.length || reportedRef.current==='unavailable') return;
-    reportedRef.current='unavailable';
-    onUnavailable?.(item.id);
-  },[materials.length,item.id,onUnavailable]);
+  useEffect(()=>{setThumbFailed(false);setMediaActivated(false);},[source]);
+  useEffect(()=>{if(source&&reportedRef.current!=='ready'){reportedRef.current='ready';onReady?.(item.id);}},[source,item.id,onReady]);
+  useEffect(()=>{if(materials.length||reportedRef.current==='unavailable')return;reportedRef.current='unavailable';onUnavailable?.(item.id);},[materials.length,item.id,onUnavailable]);
+  if(!source)return null;
+  function goTo(nextIndex){setSlide(Math.max(0,Math.min(materials.length-1,nextIndex)));setMediaActivated(false);}
+  const showRealMedia=nearViewport&&(!videoLike||mediaActivated);
 
-  if(!source) return null;
-
-  return <article className="public-portfolio-tile is-ready" aria-label={item?.title||'Trabalho da Argos'}>
-    <div className="public-portfolio-paged-media">
-      <Media url={source}/>
+  return <article ref={cardRef} className="public-portfolio-tile is-ready" aria-label={item?.title||'Trabalho da Argos'}>
+    <div className={'public-portfolio-optimized-media '+(fullyVisible?'is-centered':'')}>
+      {showRealMedia
+        ? <div className={'public-portfolio-real-layer '+(fullyVisible?'is-interactive':'')}><Media url={source}/></div>
+        : !thumbFailed
+          ? <img className="public-portfolio-optimized-thumb" src={driveThumb(source)} alt={item?.title||'Trabalho da Argos'} loading="lazy" decoding="async" onError={()=>setThumbFailed(true)}/>
+          : <div className="public-portfolio-optimized-placeholder"><span>ARGOS</span></div>}
+      {videoLike&&!mediaActivated&&nearViewport&&<button type="button" className="public-portfolio-activate-video" onClick={()=>setMediaActivated(true)} aria-label="Ativar vídeo">▶</button>}
       {materials.length>1&&<div className="public-portfolio-paged-arrows">
-        <button type="button" onClick={()=>setSlide(current=>Math.max(0,current-1))} disabled={index<=0} aria-label="Material anterior">‹</button>
-        <button type="button" onClick={()=>setSlide(current=>Math.min(materials.length-1,current+1))} disabled={index>=materials.length-1} aria-label="Próximo material">›</button>
+        <button type="button" onClick={()=>goTo(index-1)} disabled={index<=0} aria-label="Material anterior">‹</button>
+        <button type="button" onClick={()=>goTo(index+1)} disabled={index>=materials.length-1} aria-label="Próximo material">›</button>
       </div>}
       {materials.length>1&&<span className="public-portfolio-paged-counter">{index+1}/{materials.length}</span>}
     </div>
-    <div className="public-portfolio-mobile-actions" aria-hidden="true">
-      <InstagramIcons/>
-    </div>
+    <div className="public-portfolio-mobile-actions" aria-hidden="true"><InstagramIcons/></div>
   </article>;
 }
 
@@ -1612,8 +1631,18 @@ function RootApp(){
   useEffect(()=>{
     const update=()=>setPublicRoute(parsePublicPortfolioRoute());
     window.addEventListener('hashchange',update);
-    return()=>window.removeEventListener('hashchange',update);
+    window.addEventListener('popstate',update);
+    return()=>{
+      window.removeEventListener('hashchange',update);
+      window.removeEventListener('popstate',update);
+    };
   },[]);
+  useEffect(()=>{
+    if(!publicRoute?.legacy) return;
+    const cleanPath=`/portfolio/${encodeURIComponent(publicRoute.slug||'argos')}`;
+    window.history.replaceState(null,'',cleanPath);
+    setPublicRoute({...publicRoute,legacy:false});
+  },[publicRoute]);
   return publicRoute?<PublicPortfolioPage slug={publicRoute.slug}/>:<App/>;
 }
 
