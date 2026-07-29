@@ -7,6 +7,58 @@ import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSettings } from './services/publicPortfolioService';
 
+const APP_ENV = String(import.meta.env.VITE_APP_ENV || 'production').toLowerCase();
+const IS_LOCAL_DEV = APP_ENV === 'localdev';
+const DISABLE_POLLING = String(import.meta.env.VITE_DISABLE_POLLING || '').toLowerCase() === 'true';
+
+const ARGOS_ENVIRONMENT_CSS = `
+.argos-environment-banner{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:99999;
+  min-height:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:5px 44px;
+  box-sizing:border-box;
+  background:#8a5a00;
+  color:#fff4d4;
+  border-bottom:1px solid rgba(255,255,255,.2);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  box-shadow:0 5px 18px rgba(0,0,0,.28);
+}
+.argos-environment-banner + .app{
+  padding-top:28px;
+}
+@media(max-width:760px){
+  .argos-environment-banner{
+    min-height:34px;
+    padding:6px 12px;
+    font-size:10px;
+    text-align:center;
+  }
+  .argos-environment-banner + .app{
+    padding-top:34px;
+  }
+}
+`;
+
+if(typeof document!=='undefined' && IS_LOCAL_DEV){
+  let environmentStyle=document.getElementById('argos-environment-style');
+  if(!environmentStyle){
+    environmentStyle=document.createElement('style');
+    environmentStyle.id='argos-environment-style';
+    document.head.appendChild(environmentStyle);
+  }
+  environmentStyle.textContent=ARGOS_ENVIRONMENT_CSS;
+}
+
 
 
 function parsePublicPortfolioRoute(){
@@ -1748,7 +1800,7 @@ function App(){
   },[cloudReady, auth?.organizationId]);
 
   useEffect(()=>{
-    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady) return;
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady || DISABLE_POLLING) return;
     let alive=true;
     let refreshInFlight=false;
 
@@ -1807,6 +1859,11 @@ function App(){
     }
 
     refreshProfiles();
+
+    if(DISABLE_POLLING){
+      return()=>{ alive=false; };
+    }
+
     const interval=setInterval(refreshProfiles,120000);
     window.addEventListener('focus',refreshProfiles);
     document.addEventListener('visibilitychange',refreshWhenVisible);
@@ -1910,7 +1967,7 @@ function App(){
   },[system?.favicon, system?.title]);
 
   useEffect(()=>{
-    if(!cloudReady || !auth?.id || !['admin','team'].includes(auth.role)) return;
+    if(!cloudReady || !auth?.id || !['admin','team'].includes(auth.role) || IS_LOCAL_DEV) return;
     const touchPresence = () => {
       const stamp = now();
       // Round108: presença é volátil. Atualiza local + profiles, nunca workspace_state.
@@ -2160,7 +2217,9 @@ function App(){
   if(selectedTaskObj && canUserAccessTask(selectedTaskObj, effectiveUser, statuses)){
     taskOpenSessionRef.current[selectedTask] = true;
   }
-  return <div className="app">
+  return <>
+    {IS_LOCAL_DEV&&<div className="argos-environment-banner">Ambiente Local • Supabase Dev • Polling automático desligado</div>}
+    <div className="app">
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {cloudError&&<div className="cloud-banner">{cloudError}</div>}
@@ -2187,6 +2246,7 @@ function App(){
     </main>
     {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)}/>} 
   </div>
+  </>
 }
 
 async function hydrateCloudSession(setAuth,setUsersState,setCompaniesState,setStatusesState,setTasksState,setNotificationsState,setDocumentsState,setSystemState,setCloudReady,setCloudError,setWorkspaceMeta){

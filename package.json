@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --host 0.0.0.0 --mode localdev",
+    "dev:alfa": "vite --host 0.0.0.0 --mode production",
     "build": "vite build",
     "preview": "vite preview"
   },
