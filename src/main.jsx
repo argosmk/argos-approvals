@@ -4,6 +4,7 @@ import './style.css';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { loadWorkspaceRecord, saveWorkspaceState } from './services/workspaceStateService';
 import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './services/taskTableService';
+import { bootstrapNotificationsFromTable, loadNotificationRecords, syncNotificationListDelta } from './services/notificationTableService';
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSettings } from './services/publicPortfolioService';
 
@@ -1560,7 +1561,9 @@ function normalizeWorkspacePayload(payload){
 
 function workspacePayloadForSave(payload){
   const p = normalizeWorkspacePayload(payload);
-  return { ...p, users: (p.users || []).map(userForWorkspace) };
+  // Round157A: notificações vivem em app_notifications.
+  // Mantemos o campo vazio no JSON legado para impedir que notificações concluídas reapareçam.
+  return { ...p, notifications:[], users: (p.users || []).map(userForWorkspace) };
 }
 
 function payloadSignature(payload){
@@ -2314,8 +2317,12 @@ function App(){
   const [saveTick,setSaveTick]=useState(0);
   const [saveStatus,setSaveStatus]=useState('');
   const [taskTablesReady,setTaskTablesReady]=useState(false);
+  const [notificationTablesReady,setNotificationTablesReady]=useState(false);
   const taskTablesReadyRef=useRef(false);
-  const taskSyncBusyRef=useRef(false);
+  const notificationTablesReadyRef=useRef(false);
+  const taskSyncBusyRef=useRef(0);
+  const taskSyncQueueRef=useRef(Promise.resolve());
+  const notificationSyncQueueRef=useRef(Promise.resolve());
   const taskOpenSessionRef=useRef({});
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
@@ -2377,6 +2384,7 @@ function App(){
   },[]);
 
   useEffect(()=>{ taskTablesReadyRef.current = taskTablesReady; },[taskTablesReady]);
+  useEffect(()=>{ notificationTablesReadyRef.current = notificationTablesReady; },[notificationTablesReady]);
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
@@ -2398,12 +2406,64 @@ function App(){
   },[cloudReady, auth?.organizationId]);
 
   useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
+    let alive=true;
+    (async()=>{
+      try{
+        const fromTable=await bootstrapNotificationsFromTable(auth.organizationId, notifications);
+        if(!alive) return;
+        setNotificationsState(fromTable);
+        setNotificationTablesReady(true);
+        setCloudError('');
+      }catch(err){
+        if(!alive) return;
+        setNotificationTablesReady(false);
+        setCloudError(`Tabela de notificações ainda não está pronta: ${err.message||err}`);
+      }
+    })();
+    return()=>{ alive=false; };
+  },[cloudReady,auth?.organizationId]);
+
+  useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !notificationTablesReady || DISABLE_POLLING) return;
+    let alive=true;
+    let refreshInFlight=false;
+
+    async function refreshNotifications(){
+      if(!alive || document.visibilityState==='hidden' || refreshInFlight) return;
+      refreshInFlight=true;
+      try{
+        const latest=await loadNotificationRecords(auth.organizationId);
+        if(alive) setNotificationsState(latest);
+      }catch(err){
+        console.warn('notification table refresh failed',err);
+      }finally{
+        refreshInFlight=false;
+      }
+    }
+
+    function refreshWhenVisible(){
+      if(document.visibilityState==='visible') refreshNotifications();
+    }
+
+    const interval=setInterval(refreshNotifications,60000);
+    window.addEventListener('focus',refreshNotifications);
+    document.addEventListener('visibilitychange',refreshWhenVisible);
+    return()=>{
+      alive=false;
+      clearInterval(interval);
+      window.removeEventListener('focus',refreshNotifications);
+      document.removeEventListener('visibilitychange',refreshWhenVisible);
+    };
+  },[cloudReady,auth?.organizationId,notificationTablesReady]);
+
+  useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady || DISABLE_POLLING) return;
     let alive=true;
     let refreshInFlight=false;
 
     async function refreshTasks(){
-      if(!alive || document.visibilityState==='hidden' || taskSyncBusyRef.current || refreshInFlight) return;
+      if(!alive || document.visibilityState==='hidden' || taskSyncBusyRef.current>0 || refreshInFlight) return;
       refreshInFlight=true;
       try{
         const latest=await loadTaskRecords(auth.organizationId);
@@ -2477,7 +2537,7 @@ function App(){
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
     if(workspaceMetaRef.current.applyingRemote) return;
-    const localPayload=workspacePayloadForSave({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications, documents, system });
+    const localPayload=workspacePayloadForSave({ users, companies, statuses, tasks: taskTablesReady ? [] : tasks, notifications:[], documents, system });
     const localSignature=payloadSignature(localPayload);
     if(localSignature === workspaceMetaRef.current.lastSavedSignature) return;
     if(saveRetryRef.current) clearTimeout(saveRetryRef.current);
@@ -2503,7 +2563,7 @@ function App(){
       }
     },650);
     return()=>clearTimeout(timer);
-  },[users,companies,statuses,notifications,documents,system,cloudReady,auth?.organizationId,saveTick,taskTablesReady]);
+  },[users,companies,statuses,documents,system,cloudReady,auth?.organizationId,saveTick,taskTablesReady]);
 
   // Round106: o polling/merge remoto do workspace_state foi desativado.
   // Motivo: o workspace ainda é um JSON grande. Sincronizar e mesclar esse JSON em abas antigas
@@ -2526,13 +2586,15 @@ function App(){
     setTasksState(prev=>{
       const next = typeof v === 'function' ? v(prev) : v;
       if(isSupabaseConfigured && taskTablesReadyRef.current && auth?.organizationId){
-        taskSyncBusyRef.current = true;
-        syncTaskListDelta(auth.organizationId, prev, next)
+        taskSyncBusyRef.current += 1;
+        taskSyncQueueRef.current = taskSyncQueueRef.current
+          .catch(()=>{})
+          .then(()=>syncTaskListDelta(auth.organizationId, prev, next))
           .catch(err=>{
             console.error('task table sync failed', err);
             setCloudError(`Não foi possível salvar tarefa(s): ${err.message||err}`);
           })
-          .finally(()=>{ taskSyncBusyRef.current = false; });
+          .finally(()=>{ taskSyncBusyRef.current=Math.max(0,taskSyncBusyRef.current-1); });
       } else if(!isSupabaseConfigured){
         save('argos_tasks_r8', next);
       }
@@ -2542,7 +2604,17 @@ function App(){
   const setNotifications=v=>{
     setNotificationsState(prev=>{
       const next = typeof v === 'function' ? v(prev) : v;
-      if(!isSupabaseConfigured) save('argos_notifications_r9',next);
+      if(isSupabaseConfigured && notificationTablesReadyRef.current && auth?.organizationId){
+        notificationSyncQueueRef.current = notificationSyncQueueRef.current
+          .catch(()=>{})
+          .then(()=>syncNotificationListDelta(auth.organizationId,prev,next))
+          .catch(err=>{
+            console.error('notification table sync failed',err);
+            setCloudError(`Não foi possível salvar notificações: ${err.message||err}`);
+          });
+      }else if(!isSupabaseConfigured){
+        save('argos_notifications_r9',next);
+      }
       return next;
     });
   };
@@ -2646,14 +2718,15 @@ function App(){
     const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
     setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null);
   }
-  function notifyTask(task,text,event,statusId=null, actorId=effectiveUser?.id){
+  function notifyTask(task,text,event,statusId=null,actorId=effectiveUser?.id,meta={}){
     if(!task || isSystemNoise(text)) return;
+    const actorName=meta.actorName||effectiveUser?.name||'';
     const recipients = users
       .filter(u=>u.active && u.role!=='client' && (u.role==='admin' || u.id===task.responsibleId))
       .filter(u=>u.id!==actorId)
       .filter(u=>wantsNotification(u,event,statusId));
     if(!recipients.length) return;
-    const stamp=now();
+    const stamp=meta.at||now();
     const created=recipients.map(u=>({
       id:safeUUID(),
       taskId:task.id,
@@ -2662,7 +2735,17 @@ function App(){
       at:stamp,
       done:false,
       event,
-      statusId
+      statusId,
+      actorId:actorId||null,
+      actorName,
+      logId:meta.logId||null,
+      payload:{
+        actorId:actorId||null,
+        actorName,
+        logId:meta.logId||null,
+        fromStatus:meta.fromStatus||null,
+        toStatus:meta.toStatus||null
+      }
     }));
     setNotifications(prev=>[...created,...(Array.isArray(prev)?prev:[])]);
   }
@@ -2670,15 +2753,25 @@ function App(){
     const original=tasks.find(t=>t.id===id);
     const statusChanged=!!(original && patch.status && patch.status!==original.status);
     const nextStatusId=statusChanged ? patch.status : null;
+    const extraLogs=Array.isArray(patch.extraLogs)?patch.extraLogs:[];
+    const hasCommentExtraLog=extraLogs.some(l=>l?.type==='comment');
+    const patchOverridesLogs=Object.prototype.hasOwnProperty.call(patch,'logs');
+    const suppressStatusLog=!!patch.suppressStatusLog||patchOverridesLogs||hasCommentExtraLog;
+    const eventAt=now();
+    const fromStatus=statusChanged?(statusById[original.status]?.name||original.status):'';
+    const toStatus=statusChanged?(statusById[patch.status]?.name||patch.status):'';
+    const statusEventLog=statusChanged&&!suppressStatusLog?{
+      id:safeUUID(),
+      user:effectiveUser.name,
+      userId:effectiveUser.id,
+      type:'status',
+      visibility:'internal',
+      at:eventAt,
+      text:patch.statusLogText||`${effectiveUser.name} alterou de ${fromStatus} para ${toStatus}`
+    }:null;
 
     setTasks(prevTasks=>prevTasks.map(t=>{
       if(t.id!==id) return t;
-
-      const extraLogs = Array.isArray(patch.extraLogs) ? patch.extraLogs : [];
-      const hasCommentExtraLog = extraLogs.some(l=>l?.type==='comment');
-      const patchOverridesLogs = Object.prototype.hasOwnProperty.call(patch,'logs');
-      const statusLogText = patch.statusLogText;
-      const suppressStatusLog = !!patch.suppressStatusLog || patchOverridesLogs || hasCommentExtraLog;
 
       let next={...t,...patch};
       delete next.extraLogs;
@@ -2696,27 +2789,14 @@ function App(){
           userId:effectiveUser.id,
           type:'log',
           visibility:'internal',
-          at:now(),
+          at:eventAt,
           text:`${effectiveUser.name} alterou o responsável de ${fromUser} para ${toUser}`
         });
       }
 
       if(statusChanged){
         if(patch.status==='alteracao' && t.status!=='alteracao') next.alterationCount=(t.alterationCount||0)+1;
-
-        if(!suppressStatusLog){
-          const fromStatus=statusById[t.status]?.name||t.status;
-          const toStatus=statusById[patch.status]?.name||patch.status;
-          logs.push({
-            id:safeUUID(),
-            user:effectiveUser.name,
-            userId:effectiveUser.id,
-            type:'status',
-            visibility:'internal',
-            at:now(),
-            text:statusLogText || `${effectiveUser.name} alterou de ${fromStatus} para ${toStatus}`
-          });
-        }
+        if(statusEventLog) logs.push(statusEventLog);
       }
 
       if(logText && !statusChanged && !isLogNoise(logText)){
@@ -2726,30 +2806,48 @@ function App(){
           userId:effectiveUser.id,
           type:'log',
           visibility:'internal',
-          at:now(),
+          at:eventAt,
           text:logText
         });
       }
 
       if(extraLogs.length) logs.push(...extraLogs);
-      if(patchOverridesLogs) logs = patch.logs;
+      if(patchOverridesLogs) logs=patch.logs;
 
       return {...next,logs};
     }));
 
     if(original && statusChanged){
-      const targetTask = {...original, ...patch};
-      const fromStatus=statusById[original.status]?.name||original.status;
-      const toStatus=statusById[patch.status]?.name||patch.status;
-      notifyTask(targetTask,`Status alterado de ${fromStatus} para ${toStatus}.`,'Status da tarefa',nextStatusId,effectiveUser.id);
+      const targetTask={...original,...patch};
+      notifyTask(
+        targetTask,
+        `Status alterado de ${fromStatus} para ${toStatus}.`,
+        'Status da tarefa',
+        nextStatusId,
+        effectiveUser.id,
+        {
+          actorName:effectiveUser.name,
+          logId:statusEventLog?.id||null,
+          fromStatus:original.status,
+          toStatus:patch.status,
+          at:eventAt
+        }
+      );
     }
   }
 
   function addLog(id,text,type='comment',visibility='internal'){
-    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:now(),text,resolved:false};
+    const eventAt=now();
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:eventAt,text,resolved:false};
     setTasks(prev=>prev.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     const task=tasks.find(t=>t.id===id);
-    if(type==='comment') notifyTask(task,text,'Comentário na tarefa',task?.status,effectiveUser.id);
+    if(type==='comment'){
+      notifyTask(task,text,'Comentário na tarefa',task?.status,effectiveUser.id,{
+        actorName:effectiveUser.name,
+        logId:entry.id,
+        at:eventAt
+      });
+    }
   }
 
   function createWeeklyTasks(companyId, weekStart, force=false){
@@ -3856,6 +3954,36 @@ function TextFieldWithCopy({label,value,onChange,placeholder,minHeight=92}){
   </label>;
 }
 
+function ReadOnlyReadyLinks({title='Links de material pronto',text}){
+  const links=String(text||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  return <div className="readonly-instruction">
+    <label>{title}</label>
+    <div className="instruction-box textarea-like" style={{display:'flex',flexDirection:'column',gap:8}}>
+      {links.length
+        ? links.map((url,index)=><a
+            key={`${url}-${index}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display:'inline-flex',
+              alignItems:'center',
+              width:'fit-content',
+              minHeight:32,
+              padding:'6px 10px',
+              border:'1px solid rgba(225,177,44,.28)',
+              borderRadius:8,
+              background:'rgba(225,177,44,.04)',
+              color:'#d9ad38',
+              textDecoration:'none',
+              fontWeight:700
+            }}
+          >Link {index+1}</a>)
+        : <span className="muted-note">Sem links prontos.</span>}
+    </div>
+  </div>;
+}
+
 function ReadOnlyInstruction({title,text}){
   return <div className="readonly-instruction"><label>{title}</label><div style={{position:'relative'}}><div className="instruction-box textarea-like" style={{paddingRight:48}}>{text?linkify(text):<span className="muted-note">Sem informações.</span>}</div><CopyTextButton text={text}/></div></div>
 }
@@ -4208,7 +4336,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
     {!hiddenTeam&&canViewDetail('usefulLinks')&&(canEditDetail('usefulLinks')?<TextFieldWithCopy label="Links úteis" value={task.usefulLinks||''} onChange={e=>updateTask(task.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/>:<ReadOnlyInstruction title="Links úteis" text={task.usefulLinks||''}/>) }
     {canViewDetail('copy')&&(canEditDetail('copy')?<TextFieldWithCopy label="Copy" value={task.copy||''} onChange={e=>updateTask(task.id,{copy:e.target.value})}/>:<ReadOnlyInstruction title="Copy" text={task.copy||''}/>) }
     {canViewDetail('caption')&&(canEditDetail('caption')?<TextFieldWithCopy label="Legenda" value={task.caption||''} onChange={e=>updateTask(task.id,{caption:e.target.value})}/>:<ReadOnlyInstruction title="Legenda" text={task.caption||''}/>) }
-    {canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material pronto" placeholder="Adicionar material pronto"/>:<ReadOnlyInstruction title="Links de material pronto" text={task.materialLinks||''}/>) }
+    {canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material pronto" placeholder="Adicionar material pronto"/>:<ReadOnlyReadyLinks title="Links de material pronto" text={task.materialLinks||''}/>) }
   </div>
 </div><aside className="task-side">{['companyId','responsibleId','type','status','internalDate','postDate'].some(canViewDetail)&&<div className="panel panel-config"><h2>Configurações</h2>
   {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
@@ -5667,9 +5795,12 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     const withoutTitle=rawText.startsWith(currentPrefix)
       ? rawText.slice(currentPrefix.length).trim()
       : rawText.replace(/^[^:\n]{1,160}:\s*/, '').trim();
-    const sourceLog=closestLog(task,n,withoutTitle);
-    const actor=(users||[]).find(u=>u.id===sourceLog?.userId);
-    const actorName=actor?.name||sourceLog?.user||'';
+    const exactLogId=n.logId||n.payload?.logId||null;
+    const exactLog=exactLogId?(task.logs||[]).find(log=>String(log.id)===String(exactLogId)):null;
+    const sourceLog=exactLog||closestLog(task,n,withoutTitle);
+    const actorId=n.actorId||n.payload?.actorId||sourceLog?.userId||null;
+    const actor=(users||[]).find(u=>u.id===actorId);
+    const actorName=n.actorName||n.payload?.actorName||actor?.name||sourceLog?.user||'';
     return {
       task,
       content:stripEmbeddedMeta(withoutTitle,actorName),

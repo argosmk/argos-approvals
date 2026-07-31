@@ -165,7 +165,8 @@ export async function softDeleteTaskRecord(organizationId, taskId){
 
 export async function upsertTaskLogs(organizationId, taskId, logs=[]){
   if(!logs.length) return;
-  const rows = logs.filter(Boolean).map(log=>logToRow(organizationId, taskId, log));
+  const uniqueLogs=[...new Map(logs.filter(log=>log?.id).map(log=>[String(log.id),log])).values()];
+  const rows = uniqueLogs.map(log=>logToRow(organizationId, taskId, log));
   const { error } = await supabase.from(LOG_TABLE).upsert(rows, { onConflict: 'organization_id,id' });
   if(error) throw error;
 }
