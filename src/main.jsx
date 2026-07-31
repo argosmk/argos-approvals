@@ -97,6 +97,573 @@ const SCREEN_TO_ROUTE = {
   documents: 'documents',
   settings: 'settings',
 };
+
+// Round155A: catálogo central de painéis.
+// Fundação invisível para permissões futuras, preservando integralmente
+// a ordem e os acessos atuais de Admin, Equipe e Cliente.
+const PANEL_CATALOG = Object.freeze([
+  Object.freeze({ id:'dashboard', label:'Dashboard', defaultRoles:['admin','team'] }),
+  Object.freeze({ id:'notifications', label:'Notificações', defaultRoles:['admin','team'] }),
+  Object.freeze({ id:'planning', label:'Planejamento', defaultRoles:['admin'] }),
+  Object.freeze({ id:'calendar', label:'Calendário', defaultRoles:['admin','client'] }),
+  Object.freeze({ id:'kanban', label:'Kanban', defaultRoles:['admin','team'] }),
+  Object.freeze({ id:'tasks', label:'Tarefas', defaultRoles:['admin','team'] }),
+  Object.freeze({ id:'teamhub', label:'Portfólios', defaultRoles:['admin','team'] }),
+  Object.freeze({ id:'documents', label:'Documentos', defaultRoles:['admin'] }),
+  Object.freeze({ id:'settings', label:'Configurações', defaultRoles:['admin'] }),
+]);
+
+const DASHBOARD_WIDGETS = Object.freeze([
+  Object.freeze({id:'activeCompanies',label:'Clientes ativos',adminOnly:true}),
+  Object.freeze({id:'postCount',label:'Quantidade de posts',teamOnly:true}),
+  Object.freeze({id:'periodPosts',label:'Posts no período / finalizados'}),
+  Object.freeze({id:'alterations',label:'Alterações'}),
+  Object.freeze({id:'reworkRate',label:'Taxa de retrabalho'}),
+  Object.freeze({id:'totalTime',label:'Tempo total'}),
+  Object.freeze({id:'averagePerPost',label:'Média por post'}),
+  Object.freeze({id:'averageEditing',label:'Média em edição'}),
+  Object.freeze({id:'averageAlteration',label:'Média em alteração'}),
+  Object.freeze({id:'statusChart',label:'Gráfico por status'}),
+  Object.freeze({id:'typeChart',label:'Gráfico por tipo'}),
+  Object.freeze({id:'companyChart',label:'Gráfico por cliente'}),
+  Object.freeze({id:'memberChart',label:'Gráfico por membro',adminOnly:true}),
+]);
+
+function fullDashboardVisibility(){
+  return Object.fromEntries(DASHBOARD_WIDGETS.map(item=>[item.id,true]));
+}
+
+const KANBAN_PERMISSION_ITEMS = Object.freeze([
+  Object.freeze({id:'showPeriodFilter',label:'Filtro de período'}),
+  Object.freeze({id:'showCompanyFilter',label:'Filtro de empresa'}),
+  Object.freeze({id:'showResponsibleFilter',label:'Filtro de responsável'}),
+  Object.freeze({id:'showTypeFilter',label:'Filtro de tipo'}),
+  Object.freeze({id:'showSort',label:'Ordenação'}),
+  Object.freeze({id:'showArchivedToggle',label:'Mostrar arquivadas'}),
+  Object.freeze({id:'canOpenTasks',label:'Abrir tarefas'}),
+  Object.freeze({id:'showPostDate',label:'Data do post nos cards'}),
+  Object.freeze({id:'showDeadline',label:'Prazo nos cards'}),
+  Object.freeze({id:'showCompany',label:'Empresa nos cards'}),
+  Object.freeze({id:'showResponsible',label:'Responsável nos cards'}),
+]);
+
+
+const NOTIFICATION_PANEL_PERMISSION_ITEMS = Object.freeze([
+  Object.freeze({id:'showTabs',label:'Pendentes e concluídas'}),
+  Object.freeze({id:'canOpenTasks',label:'Abrir tarefas'}),
+  Object.freeze({id:'canComplete',label:'Concluir notificações'}),
+  Object.freeze({id:'canCompleteAll',label:'Concluir todas as pendentes'}),
+  Object.freeze({id:'canDeleteCompleted',label:'Limpar notificações concluídas'}),
+  Object.freeze({id:'showDateTime',label:'Data e hora'}),
+  Object.freeze({id:'showCompany',label:'Empresa'}),
+  Object.freeze({id:'showResponsible',label:'Responsável'}),
+  Object.freeze({id:'showPostDate',label:'Data do post'}),
+  Object.freeze({id:'showDeadline',label:'Prazo'}),
+  Object.freeze({id:'showStatus',label:'Status'}),
+]);
+
+function builtInNotificationPanelPermissionsForRole(role){
+  if(role==='admin') return Object.fromEntries(NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='team') return {showTabs:true,canOpenTasks:true,canComplete:true,canCompleteAll:true,canDeleteCompleted:false,showDateTime:true,showCompany:true,showResponsible:true,showPostDate:true,showDeadline:true,showStatus:true};
+  return {showTabs:true,canOpenTasks:true,canComplete:true,canCompleteAll:false,canDeleteCompleted:false,showDateTime:true,showCompany:false,showResponsible:false,showPostDate:true,showDeadline:false,showStatus:true};
+}
+
+const TASKS_LIST_PERMISSION_ITEMS = Object.freeze([
+  Object.freeze({id:'showGrouping',label:'Agrupar tarefas'}),
+  Object.freeze({id:'showTypeFilter',label:'Filtro por tipo'}),
+  Object.freeze({id:'showArchivedToggle',label:'Visualizar arquivadas'}),
+  Object.freeze({id:'canSelectTasks',label:'Selecionar tarefas'}),
+  Object.freeze({id:'canBulkEdit',label:'Alterar tarefas em massa'}),
+  Object.freeze({id:'canBulkArchive',label:'Arquivar em massa'}),
+  Object.freeze({id:'canBulkDuplicate',label:'Duplicar em massa'}),
+  Object.freeze({id:'canBulkDelete',label:'Excluir em massa'}),
+  Object.freeze({id:'canCollapseGroups',label:'Recolher e expandir grupos'}),
+  Object.freeze({id:'canOpenTasks',label:'Abrir tarefas'}),
+  Object.freeze({id:'showPostDate',label:'Data do post'}),
+  Object.freeze({id:'showDeadline',label:'Prazo'}),
+  Object.freeze({id:'showStatus',label:'Status'}),
+  Object.freeze({id:'showCompany',label:'Empresa'}),
+  Object.freeze({id:'showResponsible',label:'Responsável'}),
+]);
+
+function builtInTasksListPermissionsForRole(role){
+  if(role==='admin') return Object.fromEntries(TASKS_LIST_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='team') return {
+    showGrouping:true,
+    showTypeFilter:true,
+    showArchivedToggle:false,
+    canSelectTasks:false,
+    canBulkEdit:false,
+    canBulkArchive:false,
+    canBulkDuplicate:false,
+    canBulkDelete:false,
+    canCollapseGroups:true,
+    canOpenTasks:true,
+    showPostDate:true,
+    showDeadline:true,
+    showStatus:true,
+    showCompany:true,
+    showResponsible:true,
+  };
+  return {
+    showGrouping:true,
+    showTypeFilter:true,
+    showArchivedToggle:false,
+    canSelectTasks:false,
+    canBulkEdit:false,
+    canBulkArchive:false,
+    canBulkDuplicate:false,
+    canBulkDelete:false,
+    canCollapseGroups:true,
+    canOpenTasks:true,
+    showPostDate:true,
+    showDeadline:false,
+    showStatus:true,
+    showCompany:false,
+    showResponsible:false,
+  };
+}
+
+const DOCUMENT_PERMISSION_ITEMS = Object.freeze([
+  Object.freeze({id:'showSearch',label:'Pesquisar documentos'}),
+  Object.freeze({id:'showFolders',label:'Visualizar pastas'}),
+  Object.freeze({id:'canOpenDocuments',label:'Abrir documentos'}),
+  Object.freeze({id:'canCreateDocuments',label:'Criar documentos'}),
+  Object.freeze({id:'canCreateFolders',label:'Criar pastas'}),
+  Object.freeze({id:'canReorder',label:'Reorganizar pastas e documentos'}),
+  Object.freeze({id:'canEditTitle',label:'Editar título'}),
+  Object.freeze({id:'canEditContent',label:'Editar conteúdo'}),
+  Object.freeze({id:'canEditMetadata',label:'Editar pasta e vínculo'}),
+  Object.freeze({id:'showLinkedEntity',label:'Visualizar vínculo do documento'}),
+  Object.freeze({id:'canDeleteDocuments',label:'Excluir documentos'}),
+  Object.freeze({id:'canDeleteFolders',label:'Excluir pastas'}),
+]);
+
+function builtInDocumentPermissionsForRole(role){
+  if(role==='admin') return Object.fromEntries(DOCUMENT_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='team') return {
+    showSearch:true,
+    showFolders:true,
+    canOpenDocuments:true,
+    canCreateDocuments:false,
+    canCreateFolders:false,
+    canReorder:false,
+    canEditTitle:false,
+    canEditContent:false,
+    canEditMetadata:false,
+    showLinkedEntity:true,
+    canDeleteDocuments:false,
+    canDeleteFolders:false,
+  };
+  return {
+    showSearch:true,
+    showFolders:true,
+    canOpenDocuments:true,
+    canCreateDocuments:false,
+    canCreateFolders:false,
+    canReorder:false,
+    canEditTitle:false,
+    canEditContent:false,
+    canEditMetadata:false,
+    showLinkedEntity:false,
+    canDeleteDocuments:false,
+    canDeleteFolders:false,
+  };
+}
+
+const PLANNING_PERMISSION_ITEMS = Object.freeze([
+  Object.freeze({id:'showWeekControls',label:'Selecionar semana'}),
+  Object.freeze({id:'showIndicators',label:'Período e indicadores'}),
+  Object.freeze({id:'showCompanies',label:'Visualizar empresas'}),
+  Object.freeze({id:'showTemplateSummary',label:'Resumo do template'}),
+  Object.freeze({id:'canGenerateAll',label:'Gerar todos os pendentes'}),
+  Object.freeze({id:'canGenerateCompany',label:'Gerar tarefas por empresa'}),
+  Object.freeze({id:'canRegenerate',label:'Gerar novamente'}),
+  Object.freeze({id:'canEditTemplate',label:'Criar ou editar template'}),
+  Object.freeze({id:'canOpenGeneratedTasks',label:'Abrir tarefas geradas'}),
+]);
+
+function builtInPlanningPermissionsForRole(role){
+  if(role==='admin') return Object.fromEntries(PLANNING_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='team') return {
+    showWeekControls:true,
+    showIndicators:true,
+    showCompanies:true,
+    showTemplateSummary:true,
+    canGenerateAll:false,
+    canGenerateCompany:false,
+    canRegenerate:false,
+    canEditTemplate:false,
+    canOpenGeneratedTasks:true,
+  };
+  return {
+    showWeekControls:false,
+    showIndicators:false,
+    showCompanies:false,
+    showTemplateSummary:false,
+    canGenerateAll:false,
+    canGenerateCompany:false,
+    canRegenerate:false,
+    canEditTemplate:false,
+    canOpenGeneratedTasks:false,
+  };
+}
+
+const PORTFOLIO_PERMISSION_ITEMS = Object.freeze([
+  Object.freeze({id:'showMemberSelector',label:'Seletor de membros'}),
+  Object.freeze({id:'canViewOtherMembers',label:'Visualizar outros membros'}),
+  Object.freeze({id:'showProfileHeader',label:'Cabeçalho do perfil'}),
+  Object.freeze({id:'showStats',label:'Estatísticas do perfil'}),
+  Object.freeze({id:'canEditOwnProfile',label:'Editar o próprio recado e Instagram'}),
+  Object.freeze({id:'showPosts',label:'Visualizar trabalhos'}),
+  Object.freeze({id:'canOpenPosts',label:'Abrir tarefas pelos trabalhos'}),
+  Object.freeze({id:'showPagination',label:'Paginação dos trabalhos'}),
+]);
+
+function builtInPortfolioPermissionsForRole(role){
+  if(role==='admin') return Object.fromEntries(PORTFOLIO_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='team') return {
+    showMemberSelector:true,
+    canViewOtherMembers:true,
+    showProfileHeader:true,
+    showStats:true,
+    canEditOwnProfile:true,
+    showPosts:true,
+    canOpenPosts:true,
+    showPagination:true,
+  };
+  return {
+    showMemberSelector:false,
+    canViewOtherMembers:false,
+    showProfileHeader:true,
+    showStats:false,
+    canEditOwnProfile:false,
+    showPosts:true,
+    canOpenPosts:true,
+    showPagination:true,
+  };
+}
+
+const CALENDAR_PERMISSION_ITEMS = Object.freeze([
+  Object.freeze({id:'showViewTabs',label:'Alternar entre mês, semana e dia'}),
+  Object.freeze({id:'showCompanyFilter',label:'Filtro de empresa'}),
+  Object.freeze({id:'showResponsibleFilter',label:'Filtro de responsável'}),
+  Object.freeze({id:'showTypeFilter',label:'Filtro de tipo'}),
+  Object.freeze({id:'showStatusFilter',label:'Filtro de status'}),
+  Object.freeze({id:'showArchivedToggle',label:'Mostrar arquivadas'}),
+  Object.freeze({id:'showLegend',label:'Legenda de status'}),
+  Object.freeze({id:'canNavigateDates',label:'Navegar entre datas'}),
+  Object.freeze({id:'canOpenTasks',label:'Abrir tarefas'}),
+  Object.freeze({id:'showTaskTitle',label:'Título das tarefas'}),
+  Object.freeze({id:'showCompany',label:'Empresa nas tarefas'}),
+  Object.freeze({id:'showResponsible',label:'Responsável nas tarefas'}),
+  Object.freeze({id:'showStatus',label:'Status nas tarefas'}),
+  Object.freeze({id:'showDeadline',label:'Prazo nas tarefas'}),
+]);
+
+function builtInCalendarPermissionsForRole(role){
+  if(role==='admin') return Object.fromEntries(CALENDAR_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='team') return {
+    showViewTabs:true,
+    showCompanyFilter:false,
+    showResponsibleFilter:false,
+    showTypeFilter:true,
+    showStatusFilter:true,
+    showArchivedToggle:true,
+    showLegend:true,
+    canNavigateDates:true,
+    canOpenTasks:true,
+    showTaskTitle:true,
+    showCompany:true,
+    showResponsible:true,
+    showStatus:true,
+    showDeadline:true,
+  };
+  return {
+    showViewTabs:true,
+    showCompanyFilter:false,
+    showResponsibleFilter:false,
+    showTypeFilter:true,
+    showStatusFilter:true,
+    showArchivedToggle:false,
+    showLegend:true,
+    canNavigateDates:true,
+    canOpenTasks:true,
+    showTaskTitle:true,
+    showCompany:false,
+    showResponsible:false,
+    showStatus:true,
+    showDeadline:false,
+  };
+}
+
+function builtInKanbanPermissionsForRole(role){
+  if(role==='admin') return Object.fromEntries(KANBAN_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='team') return {
+    showPeriodFilter:true,
+    showCompanyFilter:false,
+    showResponsibleFilter:false,
+    showTypeFilter:true,
+    showSort:true,
+    showArchivedToggle:true,
+    canOpenTasks:true,
+    showPostDate:true,
+    showDeadline:true,
+    showCompany:true,
+    showResponsible:true,
+  };
+  return {
+    showPeriodFilter:true,
+    showCompanyFilter:false,
+    showResponsibleFilter:false,
+    showTypeFilter:true,
+    showSort:true,
+    showArchivedToggle:false,
+    canOpenTasks:true,
+    showPostDate:true,
+    showDeadline:false,
+    showCompany:false,
+    showResponsible:false,
+  };
+}
+
+const CREATE_TASK_FIELDS = Object.freeze([
+  Object.freeze({id:'companyId',label:'Empresa'}),
+  Object.freeze({id:'responsibleId',label:'Responsável'}),
+  Object.freeze({id:'type',label:'Tipo de tarefa'}),
+  Object.freeze({id:'status',label:'Status inicial'}),
+  Object.freeze({id:'postDate',label:'Data do post'}),
+  Object.freeze({id:'internalDate',label:'Prazo interno'}),
+  Object.freeze({id:'copyInstructions',label:'Instruções ao copy'}),
+  Object.freeze({id:'editorInstructions',label:'Instruções ao editor'}),
+  Object.freeze({id:'copy',label:'Copy'}),
+  Object.freeze({id:'caption',label:'Legenda'}),
+  Object.freeze({id:'usefulLinks',label:'Links úteis'}),
+  Object.freeze({id:'materialLinks',label:'Links de material pronto'}),
+]);
+
+const TASK_DETAIL_FIELDS = Object.freeze([
+  Object.freeze({id:'title',label:'Título da tarefa'}),
+  Object.freeze({id:'preview',label:'Prévia do post'}),
+  Object.freeze({id:'copyInstructions',label:'Instruções ao copy'}),
+  Object.freeze({id:'editorInstructions',label:'Instruções ao editor'}),
+  Object.freeze({id:'copy',label:'Copy'}),
+  Object.freeze({id:'caption',label:'Legenda'}),
+  Object.freeze({id:'usefulLinks',label:'Links úteis'}),
+  Object.freeze({id:'materialLinks',label:'Links de material pronto'}),
+  Object.freeze({id:'companyId',label:'Empresa'}),
+  Object.freeze({id:'responsibleId',label:'Responsável'}),
+  Object.freeze({id:'type',label:'Tipo'}),
+  Object.freeze({id:'status',label:'Status'}),
+  Object.freeze({id:'internalDate',label:'Prazo interno'}),
+  Object.freeze({id:'postDate',label:'Data do post'}),
+  Object.freeze({id:'stats',label:'Estatísticas'}),
+  Object.freeze({id:'comments',label:'Comentários'}),
+  Object.freeze({id:'history',label:'Histórico da tarefa'}),
+]);
+
+function builtInTaskDetailPermissionsForRole(role){
+  const visible=Object.fromEntries(TASK_DETAIL_FIELDS.map(field=>[field.id,true]));
+  const editable=Object.fromEntries(TASK_DETAIL_FIELDS.map(field=>[field.id,false]));
+  if(role==='admin'){
+    TASK_DETAIL_FIELDS.forEach(field=>{ editable[field.id]=!['preview','stats','history'].includes(field.id); });
+  }else if(role==='team'){
+    ['usefulLinks','materialLinks'].forEach(id=>{editable[id]=true;});
+    editable.comments=true;
+  }else{
+    ['copyInstructions','editorInstructions','companyId','responsibleId','type','status','internalDate','stats','history'].forEach(id=>{visible[id]=false;});
+    editable.usefulLinks=true;
+    editable.comments=true;
+  }
+  return {visible,editable};
+}
+
+function builtInTaskPermissionsForRole(role){
+  const isClient=role==='client';
+  const visible=Object.fromEntries(CREATE_TASK_FIELDS.map(field=>[field.id,!isClient]));
+  if(isClient){
+    visible.companyId=true;
+    visible.type=true;
+    visible.postDate=true;
+    visible.editorInstructions=true;
+    visible.usefulLinks=true;
+    visible.materialLinks=false;
+  }
+  return {
+    canCreate:role!=='client',
+    creationMode:isClient?'request':'task',
+    createFields:visible,
+    canApprovePosts:role==='admin'||role==='client',
+    detailFields:builtInTaskDetailPermissionsForRole(role),
+  };
+}
+
+function defaultPanelNavigationForRole(role){
+  const normalizedRole = ['admin','team','client'].includes(role) ? role : 'client';
+  return PANEL_CATALOG
+    .filter(panel=>panel.defaultRoles.includes(normalizedRole))
+    .map(panel=>[panel.id,panel.label]);
+}
+
+// Round155B: resolve permissões opcionais por usuário sem mudar os padrões atuais.
+// Formato futuro esperado:
+// panelPermissions: {
+//   mode: 'custom',
+//   visible: { dashboard:true, planning:false },
+//   order: ['dashboard','tasks']
+// }
+// Usuários sem esse objeto continuam exatamente com o acesso definido pela função.
+function builtInAccessDefaultForRole(role){
+  const normalizedRole=['admin','team','client'].includes(role)?role:'client';
+  const panelIds=defaultPanelNavigationForRole(normalizedRole).map(([id])=>id);
+  return {
+    panels:{
+      visible:Object.fromEntries(PANEL_CATALOG.map(panel=>[panel.id,panelIds.includes(panel.id)])),
+      order:panelIds,
+    },
+    visibleStatuses:normalizedRole==='admin'?[]:(normalizedRole==='team'?[...TEAM_DEFAULT]:[...CLIENT_DEFAULT]),
+    notificationPrefs:normalizedRole==='client'?[]:[...NOTIFICATION_VISIBLE_EVENTS],
+    notificationStatusPrefs:{},
+    notificationPanel:builtInNotificationPanelPermissionsForRole(normalizedRole),
+    dashboard:{visible:fullDashboardVisibility()},
+    tasks:builtInTaskPermissionsForRole(normalizedRole),
+    kanban:builtInKanbanPermissionsForRole(normalizedRole),
+    calendar:builtInCalendarPermissionsForRole(normalizedRole),
+    portfolio:builtInPortfolioPermissionsForRole(normalizedRole),
+    planning:builtInPlanningPermissionsForRole(normalizedRole),
+    documents:builtInDocumentPermissionsForRole(normalizedRole),
+    tasksList:builtInTasksListPermissionsForRole(normalizedRole),
+  };
+}
+
+function accessDefaultForRole(system,role){
+  const builtIn=builtInAccessDefaultForRole(role);
+  const saved=system?.accessDefaults?.[role];
+  if(!saved||typeof saved!=='object') return builtIn;
+  return {
+    panels:{
+      visible:{...builtIn.panels.visible,...(saved.panels?.visible||{})},
+      order:Array.isArray(saved.panels?.order)?saved.panels.order:builtIn.panels.order,
+    },
+    visibleStatuses:Array.isArray(saved.visibleStatuses)?saved.visibleStatuses:builtIn.visibleStatuses,
+    notificationPrefs:Array.isArray(saved.notificationPrefs)?saved.notificationPrefs:builtIn.notificationPrefs,
+    notificationStatusPrefs:saved.notificationStatusPrefs&&typeof saved.notificationStatusPrefs==='object'?saved.notificationStatusPrefs:builtIn.notificationStatusPrefs,
+    notificationPanel:{...builtIn.notificationPanel,...(saved.notificationPanel||{})},
+    dashboard:{
+      visible:{...builtIn.dashboard.visible,...(saved.dashboard?.visible||{})}
+    },
+    tasks:{
+      ...builtIn.tasks,
+      ...(saved.tasks||{}),
+      createFields:{...builtIn.tasks.createFields,...(saved.tasks?.createFields||{})},
+      detailFields:{
+        visible:{...builtIn.tasks.detailFields.visible,...(saved.tasks?.detailFields?.visible||{})},
+        editable:{...builtIn.tasks.detailFields.editable,...(saved.tasks?.detailFields?.editable||{})},
+      }
+    },
+    kanban:{...builtIn.kanban,...(saved.kanban||{})},
+    calendar:{...builtIn.calendar,...(saved.calendar||{})},
+    portfolio:{...builtIn.portfolio,...(saved.portfolio||{})},
+    planning:{...builtIn.planning,...(saved.planning||{})},
+    documents:{...builtIn.documents,...(saved.documents||{})},
+    tasksList:{...builtIn.tasksList,...(saved.tasksList||{})},
+  };
+}
+
+function resolveUserAccess(user,system){
+  if(!user) return user;
+  const defaults=accessDefaultForRole(system,user.role);
+  const inheritance=user.accessInheritance||{};
+  return {
+    ...user,
+    visibleStatuses:inheritance.statuses==='custom'?(user.visibleStatuses||[]):defaults.visibleStatuses,
+    notificationPrefs:inheritance.notifications==='custom'?(user.notificationPrefs||[]):defaults.notificationPrefs,
+    notificationStatusPrefs:inheritance.notifications==='custom'?(user.notificationStatusPrefs||{}):defaults.notificationStatusPrefs,
+    notificationPanelPermissions:inheritance.notifications==='custom'
+      ? {...defaults.notificationPanel,...(user.notificationPanelPermissions||{})}
+      : defaults.notificationPanel,
+    dashboardPermissions:inheritance.dashboard==='custom'
+      ? {visible:{...defaults.dashboard.visible,...(user.dashboardPermissions?.visible||{})}}
+      : defaults.dashboard,
+    taskPermissions:{
+      ...defaults.tasks,
+      ...((inheritance.actions==='custom'||inheritance.tasks==='custom')?{
+        canCreate:user.taskPermissions?.canCreate??defaults.tasks.canCreate,
+        creationMode:user.taskPermissions?.creationMode||defaults.tasks.creationMode,
+        createFields:{...defaults.tasks.createFields,...(user.taskPermissions?.createFields||{})},
+      }:{}),
+      ...((inheritance.taskDetail==='custom'||inheritance.tasks==='custom')?{
+        canApprovePosts:user.taskPermissions?.canApprovePosts??defaults.tasks.canApprovePosts,
+        detailFields:{
+          visible:{...defaults.tasks.detailFields.visible,...(user.taskPermissions?.detailFields?.visible||{})},
+          editable:{...defaults.tasks.detailFields.editable,...(user.taskPermissions?.detailFields?.editable||{})},
+        }
+      }:{})
+    },
+    kanbanPermissions:inheritance.kanban==='custom'
+      ? {...defaults.kanban,...(user.kanbanPermissions||{})}
+      : defaults.kanban,
+    calendarPermissions:inheritance.calendar==='custom'
+      ? {...defaults.calendar,...(user.calendarPermissions||{})}
+      : defaults.calendar,
+    portfolioPermissions:inheritance.portfolio==='custom'
+      ? {...defaults.portfolio,...(user.portfolioPermissions||{})}
+      : defaults.portfolio,
+    planningPermissions:inheritance.planning==='custom'
+      ? {...defaults.planning,...(user.planningPermissions||{})}
+      : defaults.planning,
+    documentPermissions:inheritance.documents==='custom'
+      ? {...defaults.documents,...(user.documentPermissions||{})}
+      : defaults.documents,
+    tasksListPermissions:inheritance.tasksList==='custom'
+      ? {...defaults.tasksList,...(user.tasksListPermissions||{})}
+      : defaults.tasksList,
+    panelPermissions:user.role==='admin'
+      ? user.panelPermissions
+      : {
+          ...(user.panelPermissions||{}),
+          visible:{
+            ...(user.panelPermissions?.visible||{}),
+            settings:false
+          }
+        },
+  };
+}
+
+function panelNavigationForUser(user,system){
+  const defaults=accessDefaultForRole(system,user?.role);
+  const fallback=PANEL_CATALOG
+    .filter(panel=>defaults.panels.visible?.[panel.id]===true)
+    .map(panel=>[panel.id,panel.label]);
+  const permissions=user?.panelPermissions;
+  if(!permissions||permissions.mode!=='custom') return fallback.length?fallback:defaultPanelNavigationForRole(user?.role);
+
+  const visible=permissions.visible&&typeof permissions.visible==='object'?permissions.visible:{};
+  const requestedOrder=Array.isArray(permissions.order)?permissions.order.filter(id=>PANEL_CATALOG.some(panel=>panel.id===id)):[];
+  const defaultIds=new Set(fallback.map(([id])=>id));
+  const allowedPanels=PANEL_CATALOG.filter(panel=>{
+    const explicit=visible[panel.id];
+    if(typeof explicit==='boolean') return explicit;
+    return defaultIds.has(panel.id);
+  });
+
+  const orderIndex=new Map(requestedOrder.map((id,index)=>[id,index]));
+  const defaultOrderIndex=new Map((defaults.panels.order||[]).map((id,index)=>[id,index]));
+  const catalogIndex=new Map(PANEL_CATALOG.map((panel,index)=>[panel.id,index]));
+  allowedPanels.sort((a,b)=>{
+    const aCustom=orderIndex.has(a.id), bCustom=orderIndex.has(b.id);
+    if(aCustom&&bCustom) return orderIndex.get(a.id)-orderIndex.get(b.id);
+    if(aCustom) return -1;
+    if(bCustom) return 1;
+    const aDefault=defaultOrderIndex.has(a.id), bDefault=defaultOrderIndex.has(b.id);
+    if(aDefault&&bDefault) return defaultOrderIndex.get(a.id)-defaultOrderIndex.get(b.id);
+    if(aDefault) return -1;
+    if(bDefault) return 1;
+    return (catalogIndex.get(a.id)??999)-(catalogIndex.get(b.id)??999);
+  });
+  if(!allowedPanels.length) return fallback.length?fallback:defaultPanelNavigationForRole(user?.role);
+  return allowedPanels.map(panel=>[panel.id,panel.label]);
+}
 function parseAppRoute(){
   const raw = (typeof window !== 'undefined' ? window.location.hash : '') || '';
   const clean = raw.replace(/^#/, '').replace(/^\/?/, '');
@@ -803,6 +1370,7 @@ input[type="date"]:disabled::-webkit-calendar-picker-indicator{
 }
 .nav-notification-badge{
   margin-left:auto!important;
+  font-style:normal!important;
   min-width:17px!important;
   height:17px!important;
   padding:0 5px!important;
@@ -1201,6 +1769,7 @@ const seedTasks = rawTasks.map((t,i)=>({
   editorInstructions:'Referências visuais, orientação de design, formatos e observações para edição.',
   copy:'Copy do post para aprovação quando necessário.',
   caption:'Legenda com quebras de linha preservadas.\n\nChamada principal aqui.\nCTA no final.',
+  usefulLinks:'',
   materialLinks:'',
   logs:[{id:'log'+i, user:'Argos Admin', userId:'admin', type:'log', visibility:'internal', at:new Date().toISOString(), text:'Tarefa criada.'}]
 }));
@@ -1341,8 +1910,14 @@ function applyFilters(tasks, filters={}){
     return true;
   });
 }
+function taskLinkList(task,field){
+  return String(task?.[field]||'').split('\n').map(x=>x.trim()).filter(Boolean);
+}
 function taskMaterialLinks(task){
-  return String(task?.materialLinks||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  const legacyReady=taskLinkList(task,'materialLinks');
+  if(legacyReady.length) return legacyReady;
+  // Compatibilidade temporária com a Round156A, caso algum link tenha sido salvo em readyLinks.
+  return taskLinkList(task,'readyLinks');
 }
 function isUserOnline(user, thresholdMs=150000){
   const ts = user?.lastSeenAt || user?.last_seen_at || '';
@@ -1698,6 +2273,29 @@ function RootApp(){
   return publicRoute?<PublicPortfolioPage slug={publicRoute.slug}/>:<App/>;
 }
 
+
+const ARGOS_ROUND156C1_NOTIFICATION_BADGE_CSS = `
+.notification-badge,
+.sidebar-badge,
+.nav-badge,
+.menu-badge,
+.badge-notification,
+.notification-count,
+.notifications-count{
+  font-style:normal!important;
+}
+`;
+
+if(typeof document!=='undefined'){
+  let style156C1=document.getElementById('argos-round156c1-notification-badge');
+  if(!style156C1){
+    style156C1=document.createElement('style');
+    style156C1.id='argos-round156c1-notification-badge';
+    document.head.appendChild(style156C1);
+  }
+  style156C1.textContent=ARGOS_ROUND156C1_NOTIFICATION_BADGE_CSS;
+}
+
 function App(){
   const [users,setUsersState]=useState(()=>load('argos_users_r8', seedUsers));
   const [companies,setCompaniesState]=useState(()=>load('argos_companies_r8', seedCompanies));
@@ -2012,7 +2610,9 @@ function App(){
   if(!auth) return <SetupRequired/>;
   const authUser=users.find(u=>u.id===auth.id)||auth;
   const simulatedUser=viewAs ? (users.find(u=>u.id===viewAs.id)||viewAs) : null;
-  const effectiveUser=simulatedUser||authUser; const realAdmin=authUser.role==='admin'; const isAdmin=effectiveUser.role==='admin';
+  const rawEffectiveUser=simulatedUser||authUser;
+  const effectiveUser=resolveUserAccess(rawEffectiveUser,system);
+  const realAdmin=authUser.role==='admin'; const isAdmin=effectiveUser.role==='admin';
   const statusById=Object.fromEntries(statuses.map(s=>[s.id,s]));
   const visibleTasks=baseVisibleTasks(tasks,effectiveUser,statuses);
   async function reset(){
@@ -2026,10 +2626,24 @@ function App(){
       location.reload();
     }
   }
-  function openCreate(){ const firstResponsible=users.find(u=>u.active&&(u.role==='team'||u.role==='admin')); setForm({ title:'', companyId:companies.find(c=>c.active)?.id||'', responsibleId:firstResponsible?.id||'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:'', internalDate:'', copyInstructions:'', editorInstructions:'', copy:'', caption:'', materialLinks:'' }); setCreateOpen(true); }
+  function openCreate(){
+    const permissions=effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role);
+    if(!permissions.canCreate) return;
+    const linkedCompanies=effectiveUser.role==='client'
+      ? companies.filter(c=>c.active&&(effectiveUser.companyIds||[]).includes(c.id))
+      : companies.filter(c=>c.active);
+    const firstResponsible=users.find(u=>u.active&&(u.role==='team'||u.role==='admin'));
+    setForm({ title:'', companyId:linkedCompanies[0]?.id||'', responsibleId:firstResponsible?.id||'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:'', internalDate:'', copyInstructions:'', editorInstructions:'', usefulLinks:'', copy:'', caption:'', materialLinks:'' });
+    setCreateOpen(true);
+  }
   function createTask(){
-    if(!form.title||!form.companyId||!form.responsibleId||!form.type||!form.status){ alert('Preencha os campos principais.'); return; }
-    const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:auth.name,userId:auth.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
+    const permissions=effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role);
+    const fields=permissions.createFields||{};
+    if(!form?.title || (fields.companyId&&!form.companyId) || (fields.responsibleId&&!form.responsibleId) || (fields.type&&!form.type) || (fields.status&&!form.status)){
+      alert('Preencha os campos principais disponíveis.');
+      return;
+    }
+    const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
     setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null);
   }
   function notifyTask(task,text,event,statusId=null, actorId=effectiveUser?.id){
@@ -2181,6 +2795,7 @@ function App(){
           editorInstructions:item.editorInstructions || '',
           copy:'',
           caption:'',
+          usefulLinks:'',
           materialLinks:'',
           generatedWeek:weekStart,
           generatedFromTemplate:true,
@@ -2192,10 +2807,9 @@ function App(){
     setTasks(prev=>[...prev,...created]);
     alert(`${created.length} tarefa(s) gerada(s) para ${company.name}.`);
   }
-  const navAdmin=[['dashboard','Dashboard'],['notifications','Notificações'],['planning','Planejamento'],['calendar','Calendário'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios'],['documents','Documentos'],['settings','Configurações']];
-  const navTeam=[['dashboard','Dashboard'],['notifications','Notificações'],['kanban','Kanban'],['tasks','Tarefas'],['teamhub','Portfólios']];
-  const navClient=[['calendar','Calendário']];
-  const nav=isAdmin?navAdmin:(effectiveUser.role==='team'?navTeam:navClient);
+  // Round155B: usa personalização somente quando o usuário possuir
+  // panelPermissions.mode === 'custom'. Sem isso, mantém os padrões atuais.
+  const nav=panelNavigationForUser(effectiveUser,system);
   const activeScreen = nav.some(([id])=>id===screen) ? screen : nav[0][0];
   function navigateScreen(nextScreen){
     setSelectedTask(null);
@@ -2231,20 +2845,20 @@ function App(){
       <div style={selectedTask ? {display:'none'} : undefined}>
         <div className="top-actions">
           <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={openTaskRoute}/>
-          {effectiveUser.role!=='client' && <button className="new-btn" onClick={openCreate}>+ Nova tarefa</button>}
+          {(effectiveUser.taskPermissions?.canCreate??(effectiveUser.role!=='client'))&&<button className="new-btn" onClick={openCreate}>+ {effectiveUser.taskPermissions?.creationMode==='request'?'Nova solicitação':'Nova tarefa'}</button>}
         </div>
         {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
         {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} setAuth={setAuth} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser} open={openTaskRoute}/>}
         {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
-        {activeScreen==='planning' && isAdmin && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute}/>} 
+        {activeScreen==='planning' && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute} user={effectiveUser}/>} 
         {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
         {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
-        {activeScreen==='documents' && isAdmin && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
+        {activeScreen==='documents' && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
         {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
         {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} companies={companies} users={users} statuses={statuses} user={effectiveUser} auth={auth}/>} 
       </div>
     </main>
-    {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)}/>} 
+    {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)} user={effectiveUser} permissions={effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role)}/>} 
   </div>
   </>
 }
@@ -2382,17 +2996,139 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
       </div>
       <div className="user-card user-clean"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{roleLabel}</small></div></div>
       {realAdmin&&<div className="impersonate"><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>────────────</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup><option disabled>────────────</option><optgroup label="Usuários clientes">{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</optgroup></select></div>}
-      <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<i className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</i>}</button>)}</nav>
+      <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<span className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</span>}</button>)}</nav>
       <div className="spacer"/>
       <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
     </div>
   </aside> 
 }
-function CreateModal({form,setForm,companies,users,statuses,types,createTask,close}){ const F=(k,v)=>setForm({...form,[k]:v}); const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')); return <div className="modal-bg"><div className="modal create"><button className="x" onClick={close}>×</button><h2>Nova tarefa</h2><p>Organize briefing, prazos e materiais da produção.</p><label>Nome da tarefa<input value={form.title} onChange={e=>F('title',e.target.value)} placeholder="Ex: Reels | Oferta Junho"/></label><div className="form-two"><label>Cliente / Empresa<div className="select-entity"><EntityLabel value={companies.find(c=>c.id===form.companyId)?.logo} label={companies.find(c=>c.id===form.companyId)?.name||'Empresa'}/><select value={form.companyId} onChange={e=>F('companyId',e.target.value)}>{companies.filter(c=>c.active).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={teams.find(u=>u.id===form.responsibleId)?.avatar} label={teams.find(u=>u.id===form.responsibleId)?.name||'Responsável'}/><select value={form.responsibleId} onChange={e=>F('responsibleId',e.target.value)}>{teams.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label></div><div className="form-two"><label>Tipo de post<select value={form.type} onChange={e=>F('type',e.target.value)}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select">{statusDot(statuses.find(s=>s.id===form.status))}<select value={form.status} onChange={e=>F('status',e.target.value)}>{statuses.filter(s=>s.active).map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label></div><div className="form-two"><label>Data do post<input type="date" value={form.postDate} onChange={e=>F('postDate',e.target.value)}/></label><label className={'date-field '+priorityClass(form.internalDate)}>Prazo<input type="date" value={form.internalDate} onChange={e=>F('internalDate',e.target.value)}/><small>{priorityText(form.internalDate)}</small></label></div><label>Instruções ao copy<textarea value={form.copyInstructions||''} onChange={e=>F('copyInstructions',e.target.value)} placeholder="Objetivo, tom, CTA, ideias e referências para o copy..."/></label><label>Instruções ao editor<textarea value={form.editorInstructions||''} onChange={e=>F('editorInstructions',e.target.value)} placeholder="Referências visuais, formato, identidade, imagens, links e observações para edição..."/></label><label>Copy<textarea value={form.copy} onChange={e=>F('copy',e.target.value)} placeholder="Opcional. Use quando a copy precisa ser criada ou aprovada antes do design."/></label><label>Legenda<textarea value={form.caption} onChange={e=>F('caption',e.target.value)} placeholder="Opcional. Pode ser preenchida agora ou depois."/></label><label>Links do material, um por linha<textarea value={form.materialLinks} onChange={e=>F('materialLinks',e.target.value)} placeholder="Cole um link por linha. Imagem, vídeo ou Drive público."/></label><div className="modal-actions"><button onClick={close}>Cancelar</button><button className="primary" onClick={createTask}>+ Criar tarefa</button></div></div></div> }
+function CreateModal({form,setForm,companies,users,statuses,types,createTask,close,user,permissions}){
+  const F=(k,v)=>setForm({...form,[k]:v});
+  const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
+  const fields=permissions?.createFields||{};
+  const allowedCompanies=user?.role==='client'
+    ? companies.filter(c=>c.active&&(user.companyIds||[]).includes(c.id))
+    : companies.filter(c=>c.active);
+  const isRequest=permissions?.creationMode==='request';
+
+  return <div className="modal-bg"><div className="modal create">
+    <button className="x" onClick={close}>×</button>
+    <h2>{isRequest?'Nova solicitação':'Nova tarefa'}</h2>
+    <p>{isRequest?'Envie as informações necessárias para a produção.':'Organize briefing, prazos e materiais da produção.'}</p>
+
+    <label>Nome da {isRequest?'solicitação':'tarefa'}
+      <input
+        value={form.title}
+        onChange={e=>F('title',e.target.value)}
+        placeholder={isRequest?'Ex: Campanha de agosto':'Ex: Reels | Oferta Junho'}
+      />
+    </label>
+
+    {(fields.companyId||fields.responsibleId)&&<div className="form-two">
+      {fields.companyId&&<label>Cliente / Empresa
+        <div className="select-entity">
+          <EntityLabel value={allowedCompanies.find(c=>c.id===form.companyId)?.logo} label={allowedCompanies.find(c=>c.id===form.companyId)?.name||'Empresa'}/>
+          <select value={form.companyId} onChange={e=>F('companyId',e.target.value)}>
+            {allowedCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+      </label>}
+      {fields.responsibleId&&<label>Responsável
+        <div className="select-entity">
+          <EntityLabel value={teams.find(u=>u.id===form.responsibleId)?.avatar} label={teams.find(u=>u.id===form.responsibleId)?.name||'Responsável'}/>
+          <select value={form.responsibleId} onChange={e=>F('responsibleId',e.target.value)}>
+            {teams.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+      </label>}
+    </div>}
+
+    {(fields.type||fields.status)&&<div className="form-two">
+      {fields.type&&<label>Tipo
+        <select value={form.type} onChange={e=>F('type',e.target.value)}>
+          {types.map(t=><option key={t}>{t}</option>)}
+        </select>
+      </label>}
+      {fields.status&&<label>Status
+        <div className="status-select">
+          {statusDot(statuses.find(s=>s.id===form.status))}
+          <select value={form.status} onChange={e=>F('status',e.target.value)}>
+            {statuses.filter(s=>s.active).map(s=><option value={s.id} key={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+      </label>}
+    </div>}
+
+    {(fields.postDate||fields.internalDate)&&<div className="form-two">
+      {fields.postDate&&<label>Data desejada
+        <input type="date" value={form.postDate} onChange={e=>F('postDate',e.target.value)}/>
+      </label>}
+      {fields.internalDate&&<label className={'date-field '+priorityClass(form.internalDate)}>Prazo
+        <input type="date" value={form.internalDate} onChange={e=>F('internalDate',e.target.value)}/>
+        <small>{priorityText(form.internalDate)}</small>
+      </label>}
+    </div>}
+
+    {fields.copyInstructions&&<label>Instruções ao copy
+      <AutoTextarea
+        value={form.copyInstructions||''}
+        onChange={e=>F('copyInstructions',e.target.value)}
+        placeholder="Explique o objetivo, a abordagem, o tom, o CTA e outras orientações para o texto."
+      />
+    </label>}
+
+    {fields.editorInstructions&&<label>Instruções ao editor
+      <AutoTextarea
+        value={form.editorInstructions||''}
+        onChange={e=>F('editorInstructions',e.target.value)}
+        placeholder="Explique o formato, a identidade visual, as imagens e outras orientações para a edição."
+      />
+    </label>}
+
+    {fields.usefulLinks&&<label>Links úteis
+      <AutoTextarea
+        value={form.usefulLinks||''}
+        onChange={e=>F('usefulLinks',e.target.value)}
+        placeholder="Cole links e descreva para que serve cada um."
+      />
+    </label>}
+
+    {fields.copy&&<label>Copy
+      <AutoTextarea
+        value={form.copy||''}
+        onChange={e=>F('copy',e.target.value)}
+        placeholder="Insira o texto do post."
+      />
+    </label>}
+
+    {fields.caption&&<label>Legenda
+      <AutoTextarea
+        value={form.caption||''}
+        onChange={e=>F('caption',e.target.value)}
+        placeholder="Insira a legenda do post."
+      />
+    </label>}
+
+    {fields.materialLinks&&<label>Links de material pronto
+      <AutoTextarea
+        value={form.materialLinks||''}
+        onChange={e=>F('materialLinks',e.target.value)}
+        placeholder="Cole um link por linha para artes, vídeos ou arquivos finalizados."
+      />
+    </label>}
+
+    <div className="modal-actions">
+      <button onClick={close}>Cancelar</button>
+      <button className="primary" onClick={createTask}>+ {isRequest?'Enviar solicitação':'Criar tarefa'}</button>
+    </div>
+  </div></div>;
+}
+
 function PeriodFilters({period,setPeriod,from,setFrom,to,setTo}){ return <><label>Período<select value={period} onChange={e=>setPeriod(e.target.value)}><option value="current">Atualmente</option><option value="month">Mês corrente</option><option value="lastmonth">Mês passado</option><option value="week">Essa semana</option><option value="lastweek">Semana passada</option><option value="today">Hoje</option><option value="custom">Personalizado</option></select></label>{period==='custom'&&<><label>De<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>Até<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></>}</> }
 function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){ 
   const [period,setPeriod]=useState('current'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'); 
   const isAdmin=user.role==='admin'; 
+  const visible={...fullDashboardVisibility(),...(user.dashboardPermissions?.visible||{})};
   const activeCompanies=companies.filter(c=>c.active);
   const activeUsers=sortMembersAdminFirst(users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')));
   // No Dashboard da equipe, os números precisam considerar todos os posts atribuídos ao membro,
@@ -2400,8 +3136,31 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){
   const dashboardScope = user.role==='team' ? (tasks||[]).filter(t=>t.responsibleId===user.id) : (tasks||[]);
   const operationalTasks=dashboardScope.filter(t=>activeCompanies.some(c=>c.id===t.companyId) && activeUsers.some(u=>u.id===t.responsibleId));
   const filtered=applyFilters(operationalTasks,{period,from,to,company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,search,showArchived:true}); 
-  const alterations=filtered.reduce((a,t)=>a+(t.alterationCount||0),0); const finalized=filtered.filter(t=>isFinalStatus(statuses,t.status)).length; const rework=filtered.length?Math.round(alterations/filtered.length*100):0; const total=filtered.reduce((a,t)=>a+(t.totalEditSeconds||0)+(t.totalAlterSeconds||0),0); 
-  return <section><h1>Dashboard</h1><p>Relatório operacional com filtros aplicados em todo o painel.</p><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div><div className="dash-zone"><div className="cards quick-cards">{isAdmin&&<Card title="Clientes ativos" value={activeCompanies.length}/>} {user.role==='team'&&<Card title="Quantidade de posts" value={filtered.length}/>}<Card title={user.role==='team'?'Posts finalizados':'Posts no período'} value={user.role==='team'?finalized:filtered.length}/><Card title="Alterações" value={alterations}/><Card title="Taxa de retrabalho" value={`${rework}%`}/></div><div className="cards time-cards"><Card title="Tempo total" value={fmtSec(total)}/><Card title="Média por post" value={fmtSec(avg(filtered.map(t=>(t.totalEditSeconds||0)+(t.totalAlterSeconds||0))))}/><Card title="Média em edição" value={fmtSec(avg(filtered.map(t=>t.totalEditSeconds||0)))}/><Card title="Média em alteração" value={fmtSec(avg(filtered.map(t=>t.totalAlterSeconds||0)))}/></div></div><div className="grid2"><Bar title="Post por Status" rows={statuses.map(s=>[s.name,filtered.filter(t=>t.status===s.id).length,s.color])}/><Bar title="Por tipo" rows={TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c'])}/><Bar title="Por cliente" rows={activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#6ee7b7',c.logo])}/>{isAdmin&&<Bar title="Por membro" rows={activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#c084fc',u.avatar])}/>}</div></section> }
+  const alterations=filtered.reduce((a,t)=>a+(t.alterationCount||0),0);
+  const finalized=filtered.filter(t=>isFinalStatus(statuses,t.status)).length;
+  const rework=filtered.length?Math.round(alterations/filtered.length*100):0;
+  const total=filtered.reduce((a,t)=>a+(t.totalEditSeconds||0)+(t.totalAlterSeconds||0),0);
+  const quickCards=[
+    isAdmin&&visible.activeCompanies&&<Card key="activeCompanies" title="Clientes ativos" value={activeCompanies.length}/>,
+    user.role==='team'&&visible.postCount&&<Card key="postCount" title="Quantidade de posts" value={filtered.length}/>,
+    visible.periodPosts&&<Card key="periodPosts" title={user.role==='team'?'Posts finalizados':'Posts no período'} value={user.role==='team'?finalized:filtered.length}/>,
+    visible.alterations&&<Card key="alterations" title="Alterações" value={alterations}/>,
+    visible.reworkRate&&<Card key="reworkRate" title="Taxa de retrabalho" value={`${rework}%`}/>
+  ].filter(Boolean);
+  const timeCards=[
+    visible.totalTime&&<Card key="totalTime" title="Tempo total" value={fmtSec(total)}/>,
+    visible.averagePerPost&&<Card key="averagePerPost" title="Média por post" value={fmtSec(avg(filtered.map(t=>(t.totalEditSeconds||0)+(t.totalAlterSeconds||0))))}/>,
+    visible.averageEditing&&<Card key="averageEditing" title="Média em edição" value={fmtSec(avg(filtered.map(t=>t.totalEditSeconds||0)))}/>,
+    visible.averageAlteration&&<Card key="averageAlteration" title="Média em alteração" value={fmtSec(avg(filtered.map(t=>t.totalAlterSeconds||0)))}/>
+  ].filter(Boolean);
+  const charts=[
+    visible.statusChart&&<Bar key="statusChart" title="Post por Status" rows={statuses.map(s=>[s.name,filtered.filter(t=>t.status===s.id).length,s.color])}/>,
+    visible.typeChart&&<Bar key="typeChart" title="Por tipo" rows={TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c'])}/>,
+    visible.companyChart&&<Bar key="companyChart" title="Por cliente" rows={activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#6ee7b7',c.logo])}/>,
+    isAdmin&&visible.memberChart&&<Bar key="memberChart" title="Por membro" rows={activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#c084fc',u.avatar])}/>
+  ].filter(Boolean);
+  return <section><h1>Dashboard</h1><p>Relatório operacional com filtros aplicados em todo o painel.</p><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</section>
+}
 function Card({title,value}){ return <div className="card"><small>{title}</small><b>{value}</b></div> }
 function Bar({title,rows}){
   const max=Math.max(1,...rows.map(r=>r[1]));
@@ -2409,49 +3168,78 @@ function Bar({title,rows}){
 }
 
 function TeamHubPage({users,setUsers,setAuth,tasks,statuses,auth,viewer,open}){
-  const baseMembers = sortMembersAdminFirst(users.filter(u=>u.active && (u.role==='admin'||u.role==='team')));
-  const selfId = viewer?.id || auth?.id || '';
-  const members = selfId ? [...baseMembers.filter(u=>u.id===selfId), ...baseMembers.filter(u=>u.id!==selfId)] : baseMembers;
+  const permissions={...builtInPortfolioPermissionsForRole(viewer?.role||auth?.role),...(viewer?.portfolioPermissions||{})};
+  const allMembers=sortMembersAdminFirst(users.filter(u=>u.active && (u.role==='admin'||u.role==='team')));
+  const selfId=viewer?.id || auth?.id || '';
+  const ownMember=allMembers.find(u=>u.id===selfId)||null;
+  const baseMembers=permissions.canViewOtherMembers?allMembers:(ownMember?[ownMember]:allMembers.slice(0,1));
+  const members=selfId?[...baseMembers.filter(u=>u.id===selfId),...baseMembers.filter(u=>u.id!==selfId)]:baseMembers;
   const [selectedId,setSelectedId]=useState(()=>selfId || members[0]?.id || '');
   const [page,setPage]=useState(0);
-  const selected = members.find(u=>u.id===selectedId) || members[0] || null;
-  useEffect(()=>{ if(selected && selected.id!==selectedId) setSelectedId(selected.id); },[selected?.id]);
+  const selected=members.find(u=>u.id===selectedId) || members[0] || null;
+
+  useEffect(()=>{
+    if(selected && selected.id!==selectedId) setSelectedId(selected.id);
+  },[selected?.id]);
+
   useEffect(()=>{ setPage(0); },[selected?.id]);
-  const portfolio = useMemo(()=>{
+
+  const portfolio=useMemo(()=>{
     if(!selected) return [];
     return (tasks||[])
       .filter(t=>t.responsibleId===selected.id && isPortfolioTask(t,statuses))
       .sort((a,b)=>portfolioDateValue(b)-portfolioDateValue(a));
   },[tasks,statuses,selected?.id]);
-  const selectedStats = useMemo(()=>memberWorkStats(tasks, selected, statuses), [tasks, statuses, selected?.id]);
-  const totalPages=Math.max(1, Math.ceil(portfolio.length/12));
+
+  const selectedStats=useMemo(()=>memberWorkStats(tasks,selected,statuses),[tasks,statuses,selected?.id]);
+  const totalPages=Math.max(1,Math.ceil(portfolio.length/12));
   const safePage=Math.min(page,totalPages-1);
-  const visiblePosts=portfolio.slice(safePage*12, safePage*12+12);
+  const visiblePosts=portfolio.slice(safePage*12,safePage*12+12);
+
   function updateOwnSocial(patch){
-    if(!auth?.id) return;
+    if(!auth?.id || !permissions.canEditOwnProfile) return;
     const normalized={
       ...(Object.prototype.hasOwnProperty.call(patch,'socialInstagram')?{socialInstagram:String(patch.socialInstagram||'').trim()}:{}),
       ...(Object.prototype.hasOwnProperty.call(patch,'socialStatus')?{socialStatus:String(patch.socialStatus||'').trim().slice(0,140)}:{})
     };
     setUsers(prev=>prev.map(u=>u.id===auth.id?{...u,...normalized}:u));
-    if(typeof setAuth==='function') setAuth(prev=>prev && prev.id===auth.id ? {...prev,...normalized} : prev);
+    if(typeof setAuth==='function') setAuth(prev=>prev&&prev.id===auth.id?{...prev,...normalized}:prev);
     if(isSupabaseConfigured){
-      updateProfileSocial(auth.id, normalized).catch(err=>alert('Não foi possível salvar seu perfil social: '+(err.message||err)));
+      updateProfileSocial(auth.id,normalized).catch(err=>alert('Não foi possível salvar seu perfil social: '+(err.message||err)));
     }
   }
+
   if(!members.length) return <section><h1>Portfólios</h1><p>Nenhum membro ativo encontrado.</p></section>;
+
   return <section className="team-hub">
     <div className="team-hub-hero"><div><h1>Portfólios</h1></div></div>
-    <TeamStoriesStrip members={members} selected={selected} tasks={tasks} setSelectedId={setSelectedId}/>
+
+    {permissions.showMemberSelector&&<TeamStoriesStrip members={members} selected={selected} tasks={tasks} setSelectedId={setSelectedId}/>}
+
     <div className="team-profile-area">
-      {selected&&<TeamProfileHeader member={selected} tasks={tasks} statuses={statuses} stats={selectedStats} canEdit={selected.id===auth?.id} updateOwnSocial={updateOwnSocial}/>} 
-      <div className="team-feed-toolbar" aria-hidden="true"></div>
-      {visiblePosts.length?<div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t} open={open}/>)}</div>:<div className="empty-team-feed inline-empty"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>}
-      {portfolio.length>12&&<div className="team-feed-pager">
-        <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
-        <span>Página {safePage+1} de {totalPages}</span>
-        <button disabled={safePage>=totalPages-1} onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))}>Próximos →</button>
-      </div>}
+      {selected&&permissions.showProfileHeader&&<TeamProfileHeader
+        member={selected}
+        tasks={tasks}
+        statuses={statuses}
+        stats={selectedStats}
+        showStats={permissions.showStats}
+        canEdit={permissions.canEditOwnProfile&&selected.id===auth?.id}
+        updateOwnSocial={updateOwnSocial}
+      />}
+
+      {permissions.showPosts&&<>
+        <div className="team-feed-toolbar" aria-hidden="true"></div>
+        {visiblePosts.length
+          ? <div className="team-feed-grid">{visiblePosts.map(t=><TeamFeedItem key={t.id} task={t} open={open} canOpen={permissions.canOpenPosts}/>)}</div>
+          : <div className="empty-team-feed inline-empty"><p>Nenhum trabalho agendado/finalizado com material ainda.</p></div>
+        }
+
+        {permissions.showPagination&&portfolio.length>12&&<div className="team-feed-pager">
+          <button disabled={safePage<=0} onClick={()=>setPage(p=>Math.max(0,p-1))}>← Anteriores</button>
+          <span>Página {safePage+1} de {totalPages}</span>
+          <button disabled={safePage>=totalPages-1} onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))}>Próximos →</button>
+        </div>}
+      </>}
     </div>
   </section>;
 }
@@ -2491,7 +3279,7 @@ function OwnSocialEditor({user,update}){
   </div>;
 }
 
-function TeamProfileHeader({member,tasks,statuses,stats,canEdit=false,updateOwnSocial}){
+function TeamProfileHeader({member,tasks,statuses,stats,showStats=true,canEdit=false,updateOwnSocial}){
   const online=isUserOnline(member);
   const activeTask=activeTimerTaskForUser(tasks,member);
   const [editing,setEditing]=useState(false);
@@ -2529,11 +3317,11 @@ function TeamProfileHeader({member,tasks,statuses,stats,canEdit=false,updateOwnS
         {canEdit&&!editing&&<button className="profile-gear" type="button" onClick={()=>setEditing(true)} title="Editar recado e Instagram">⚙</button>}
         {editing&&<div className="inline-edit-actions"><button type="button" className="mini-save" onClick={save}>Salvar</button><button type="button" className="mini-cancel" onClick={cancel}>Cancelar</button></div>}
       </div>
-      <div className="team-profile-stats insta-stats">
+      {showStats&&<div className="team-profile-stats insta-stats">
         <span><b>{stats?.assigned||0}</b> atribuídos</span>
         <span><b>{stats?.scheduled||0}</b> agendados</span>
         <span><b>{stats?.finished||0}</b> finalizados</span>
-      </div>
+      </div>}
       <b className="profile-display-name">{displayName}</b>
       <p className="profile-role-text">{roleText}</p>
       {editing?
@@ -2545,7 +3333,7 @@ function TeamProfileHeader({member,tasks,statuses,stats,canEdit=false,updateOwnS
   </div>;
 }
 
-function TeamFeedItem({task,open}){
+function TeamFeedItem({task,open,canOpen=true}){
   const links=taskMaterialLinks(task);
   const [slide,setSlide]=useState(0);
   const index=Math.min(slide, Math.max(0, links.length-1));
@@ -2554,7 +3342,7 @@ function TeamFeedItem({task,open}){
     <div className="team-feed-media"><Media url={links[index]} type={task.type} slide={index} total={links.length}/>{links.length>1&&<div className="team-feed-arrows"><button className="feed-arrow prev" onClick={()=>setSlide(i=>Math.max(0,i-1))} disabled={index<=0} aria-label="Arte anterior">‹</button><button className="feed-arrow next" onClick={()=>setSlide(i=>Math.min(links.length-1,i+1))} disabled={index>=links.length-1} aria-label="Próxima arte">›</button></div>}</div>
     <footer className="team-feed-task-link">
       <span title={task.title}>{task.title}</span>
-      <button type="button" onClick={()=>open?.(task.id)}>Abrir tarefa ↗</button>
+      {canOpen&&<button type="button" onClick={()=>open?.(task.id)}>Abrir tarefa ↗</button>}
     </footer>
   </article>;
 }
@@ -2563,11 +3351,12 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
   const collapseStorageKey=`argos_tasks_collapsed_${user?.id||'anonymous'}`;
   const preferencesStorageKey=`argos_tasks_preferences_${user?.id||'anonymous'}`;
   const initialPreferences=load(preferencesStorageKey,{mode:'priority',type:'all',showArchived:false});
-  const [mode,setMode]=useState(initialPreferences.mode||'priority'),[type,setType]=useState(initialPreferences.type||'all'),[showArchived,setShowArchived]=useState(!!initialPreferences.showArchived),[selected,setSelected]=useState([]),[bulkEdit,setBulkEdit]=useState(null),[bulkValue,setBulkValue]=useState(''),[collapsedGroups,setCollapsedGroups]=useState(()=>load(collapseStorageKey,{}));
+  const [mode,setMode]=useState(initialPreferences.mode==='date'?'priority':(initialPreferences.mode||'priority')),[type,setType]=useState(initialPreferences.type||'all'),[showArchived,setShowArchived]=useState(!!initialPreferences.showArchived),[selected,setSelected]=useState([]),[bulkEdit,setBulkEdit]=useState(null),[bulkValue,setBulkValue]=useState(''),[collapsedGroups,setCollapsedGroups]=useState(()=>load(collapseStorageKey,{}));
   const isAdmin=user.role==='admin';
+  const permissions={...builtInTasksListPermissionsForRole(user.role),...(user.tasksListPermissions||{})};
   const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
   const activeStatuses=statuses.filter(s=>s.active!==false);
-  const visibleForArchive = isAdmin && showArchived ? tasks.filter(t=>t.archived) : tasks.filter(t=>!t.archived);
+  const visibleForArchive = permissions.showArchivedToggle && showArchived ? tasks.filter(t=>t.archived) : tasks.filter(t=>!t.archived);
   const filtered=visibleForArchive
     .filter(t=>type==='all'||t.type===type)
     .filter(t=>showArchived || mode==='status' || !isFinishedTask(t,statuses));
@@ -2579,11 +3368,10 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     status:t=>statusById[t.status]?.name||t.status,
     client:t=>companies.find(c=>c.id===t.companyId)?.name||'Sem cliente',
     type:t=>t.type,
-    date:t=>fmtDate(t.internalDate),
     responsible:t=>users.find(u=>u.id===t.responsibleId)?.name||'Sem responsável'
   };
   const sorted=[...filtered].sort((a,b)=>{
-    if(showArchived && isAdmin && (a.archived!==b.archived)) return a.archived?1:-1;
+    if(showArchived && permissions.showArchivedToggle && (a.archived!==b.archived)) return a.archived?1:-1;
     return priorityOrder[taskPriorityClass(a,statuses)]-priorityOrder[taskPriorityClass(b,statuses)] || String(a.internalDate||'').localeCompare(String(b.internalDate||'')) || a.title.localeCompare(b.title);
   });
   const groups={}; sorted.forEach(t=>{const k=(groupers[mode]||groupers.priority)(t); (groups[k] ||= []).push(t)});
@@ -2693,27 +3481,108 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     clearSelected();
   }
   const totalArchived=tasks.filter(t=>t.archived).length;
-  return <section><h1>Tarefas</h1><p>Visão rápida das tarefas atribuídas e filtradas.</p><div className="filters tasks-filters"><label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="date">Prazo</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label><label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>{isAdmin&&<label className="toggle-archived tasks-archive-toggle"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span>Mostrar arquivadas{totalArchived?` (${totalArchived})`:''}</span></label>}</div>{isAdmin&&<div className="panel task-bulk-panel"><div className="task-bulk-left"><label className="task-select-all"><input type="checkbox" checked={filtered.length>0 && filtered.every(t=>selected.includes(t.id))} onChange={selectAllVisible}/><span></span></label><small>{selectedFiltered.length} selecionada(s)</small></div><div className="task-bulk-actions task-bulk-edit-actions"><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('responsibleId')}>Responsável</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('status')}>Status</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('internalDate')}>Prazo</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('postDate')}>Data</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(true)}>Arquivar</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(false)}>Desarquivar</button><button disabled={!selectedFiltered.length} onClick={bulkDuplicate}>Duplicar</button><button className="danger" disabled={!selectedFiltered.length} onClick={bulkDelete}>Excluir</button></div></div>}{bulkEdit&&<div className="modal-bg"><div className="modal bulk-edit-modal"><h2>Alterar {bulkLabel(bulkEdit)}</h2><p>{selectedFiltered.length} tarefa(s) selecionada(s).</p>{bulkEdit==='responsibleId'&&<label>Novo responsável<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}{bulkEdit==='status'&&<label>Novo status<div className="status-select">{statusDot(activeStatuses.find(s=>s.id===bulkValue))}<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{activeStatuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>}{bulkEdit==='internalDate'&&<label>Novo prazo<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}{bulkEdit==='postDate'&&<label>Nova data do post<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}<div className="modal-actions"><button onClick={()=>{setBulkEdit(null);setBulkValue('')}}>Cancelar</button><button className="primary" onClick={applyBulkEdit}>Aplicar</button></div></div></div>}<div className="tasks-board" style={{display:'flex',flexDirection:'column',gap:16}}>{groupEntries.length?groupEntries.map(([group,items])=>{const collapsed=isGroupCollapsed(group);const groupStatus=mode==='status'?activeStatuses.find(s=>s.name===group):null;return <div className="panel task-group" style={{width:'100%',borderColor:groupStatus?.color||undefined}} key={group}><button type="button" onClick={()=>toggleGroup(group)} aria-expanded={!collapsed} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:0,background:'transparent',border:0,textAlign:'left'}}><h2 style={{margin:0,display:'flex',alignItems:'center',gap:8,color:groupStatus?.color||undefined}}><span style={{display:'inline-block',transform:collapsed?'rotate(-90deg)':'rotate(0deg)',transition:'transform .18s ease'}}>▾</span>{group}<small>{items.length}</small></h2><small>{collapsed?'Expandir':'Minimizar'}</small></button>{!collapsed&&<div style={{marginTop:12}}>{items.map(t=>{const c=companies.find(x=>x.id===t.companyId);const r=users.find(x=>x.id===t.responsibleId);const statusColor=statusById[t.status]?.color||'#9ca3af';const deadlineColor=taskDeadlineColor(t,statuses,statusById);return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>{isAdmin&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>}<button className="task-row" onClick={()=>open(t.id)}><b>{t.title}{t.archived?' • Arquivada':''}</b><span style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-  <small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:'1px solid rgba(156,163,175,.38)',background:'rgba(156,163,175,.08)',color:'#aeb4bd',fontSize:12,fontWeight:400,lineHeight:1.2}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>
-  <small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${deadlineColor}66`,background:`${deadlineColor}18`,color:deadlineColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{fmtDate(t.internalDate)}</small>
-  <small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${statusColor}66`,background:`${statusColor}18`,color:statusColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{statusById[t.status]?.name||t.status}</small>
-</span><span className="avatars"><AvatarMini value={c?.logo} label={c?.name}/><AvatarMini value={r?.avatar} label={r?.name}/></span></button></div>})}</div>}</div>}):<div className="panel"><p className="muted-note">Nenhuma tarefa encontrada.</p></div>}</div></section>
+  return <section><h1>Tarefas</h1><p>Visão rápida das tarefas atribuídas e filtradas.</p>
+  {(permissions.showGrouping||permissions.showTypeFilter||permissions.showArchivedToggle)&&<div className="filters tasks-filters">
+    {permissions.showGrouping&&<label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label>}
+    {permissions.showTypeFilter&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}
+    {permissions.showArchivedToggle&&<label className="toggle-archived tasks-archive-toggle"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span>Mostrar arquivadas{totalArchived?` (${totalArchived})`:''}</span></label>}
+  </div>}
+
+  {permissions.canSelectTasks&&<div className="panel task-bulk-panel">
+    <div className="task-bulk-left"><label className="task-select-all"><input type="checkbox" checked={filtered.length>0&&filtered.every(t=>selected.includes(t.id))} onChange={selectAllVisible}/><span></span></label><small>{selectedFiltered.length} selecionada(s)</small></div>
+    {(permissions.canBulkEdit||permissions.canBulkArchive||permissions.canBulkDuplicate||permissions.canBulkDelete)&&<div className="task-bulk-actions task-bulk-edit-actions">
+      {permissions.canBulkEdit&&<><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('responsibleId')}>Responsável</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('status')}>Status</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('internalDate')}>Prazo</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('postDate')}>Data</button></>}
+      {permissions.canBulkArchive&&<><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(true)}>Arquivar</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(false)}>Desarquivar</button></>}
+      {permissions.canBulkDuplicate&&<button disabled={!selectedFiltered.length} onClick={bulkDuplicate}>Duplicar</button>}
+      {permissions.canBulkDelete&&<button className="danger" disabled={!selectedFiltered.length} onClick={bulkDelete}>Excluir</button>}
+    </div>}
+  </div>}
+
+  {bulkEdit&&permissions.canBulkEdit&&<div className="modal-bg"><div className="modal bulk-edit-modal"><h2>Alterar {bulkLabel(bulkEdit)}</h2><p>{selectedFiltered.length} tarefa(s) selecionada(s).</p>{bulkEdit==='responsibleId'&&<label>Novo responsável<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}{bulkEdit==='status'&&<label>Novo status<div className="status-select">{statusDot(activeStatuses.find(s=>s.id===bulkValue))}<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{activeStatuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>}{bulkEdit==='internalDate'&&<label>Novo prazo<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}{bulkEdit==='postDate'&&<label>Nova data do post<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}<div className="modal-actions"><button onClick={()=>{setBulkEdit(null);setBulkValue('')}}>Cancelar</button><button className="primary" onClick={applyBulkEdit}>Aplicar</button></div></div></div>}
+
+  <div className="tasks-board" style={{display:'flex',flexDirection:'column',gap:16}}>
+    {groupEntries.length?groupEntries.map(([group,items])=>{
+      const collapsed=permissions.canCollapseGroups?isGroupCollapsed(group):false;
+      const groupStatus=mode==='status'?activeStatuses.find(s=>s.name===group):null;
+      return <div className="panel task-group" style={{width:'100%',borderColor:groupStatus?.color||undefined}} key={group}>
+        <button type="button" disabled={!permissions.canCollapseGroups} onClick={()=>permissions.canCollapseGroups&&toggleGroup(group)} aria-expanded={!collapsed} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:0,background:'transparent',border:0,textAlign:'left',cursor:permissions.canCollapseGroups?'pointer':'default'}}>
+          <h2 style={{margin:0,display:'flex',alignItems:'center',gap:8,color:groupStatus?.color||undefined}}>{permissions.canCollapseGroups&&<span style={{display:'inline-block',transform:collapsed?'rotate(-90deg)':'rotate(0deg)',transition:'transform .18s ease'}}>▾</span>}{group}<small>{items.length}</small></h2>
+          {permissions.canCollapseGroups&&<small>{collapsed?'Expandir':'Minimizar'}</small>}
+        </button>
+        {!collapsed&&<div style={{marginTop:12}}>{items.map(t=>{
+          const c=companies.find(x=>x.id===t.companyId);
+          const r=users.find(x=>x.id===t.responsibleId);
+          const statusColor=statusById[t.status]?.color||'#9ca3af';
+          const deadlineColor=taskDeadlineColor(t,statuses,statusById);
+          return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>
+            {permissions.canSelectTasks&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>}
+            <button className="task-row" disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+              <b>{t.title}{t.archived?' • Arquivada':''}</b>
+              {(permissions.showPostDate||permissions.showDeadline||permissions.showStatus)&&<span style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                {permissions.showPostDate&&<small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:'1px solid rgba(156,163,175,.38)',background:'rgba(156,163,175,.08)',color:'#aeb4bd',fontSize:12,fontWeight:400,lineHeight:1.2}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>}
+                {permissions.showDeadline&&<small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${deadlineColor}66`,background:`${deadlineColor}18`,color:deadlineColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{fmtDate(t.internalDate)}</small>}
+                {permissions.showStatus&&<small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${statusColor}66`,background:`${statusColor}18`,color:statusColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{statusById[t.status]?.name||t.status}</small>}
+              </span>}
+              {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars">{permissions.showCompany&&<AvatarMini value={c?.logo} label={c?.name}/>} {permissions.showResponsible&&<AvatarMini value={r?.avatar} label={r?.name}/>}</span>}
+            </button>
+          </div>
+        })}</div>}
+      </div>
+    }):<div className="panel"><p className="muted-note">Nenhuma tarefa encontrada.</p></div>}
+  </div>
+</section>
 }
 function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
   const preferencesStorageKey=`argos_calendar_preferences_${user?.id||'anonymous'}`;
   const initialPreferences=load(preferencesStorageKey,{view:'month',company:'all',resp:'all',type:'all',status:'all',archivedOnly:false});
   const [view,setView]=useState(initialPreferences.view||'month'),[selectedDay,setSelectedDay]=useState(todayStr()),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[status,setStatus]=useState(initialPreferences.status||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly);
+  const permissions={...builtInCalendarPermissionsForRole(user.role),...(user.calendarPermissions||{})};
   useEffect(()=>{ save(preferencesStorageKey,{view,company,resp,type,status,archivedOnly}); },[preferencesStorageKey,view,company,resp,type,status,archivedOnly]); 
-  const isAdmin=user.role==='admin'; 
-  const filtered=applyFilters(tasks,{company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,status,archivedOnly,search}); 
+  const filtered=applyFilters(tasks,{
+    company:permissions.showCompanyFilter?company:'all',
+    resp:permissions.showResponsibleFilter?resp:'all',
+    type:permissions.showTypeFilter?type:'all',
+    status:permissions.showStatusFilter?status:'all',
+    archivedOnly:permissions.showArchivedToggle?archivedOnly:false,
+    search
+  }); 
   const current=dObj(selectedDay)||dObj(todayStr()); 
   const monthStart=new Date(current.getFullYear(),current.getMonth(),1); 
   const days=[...Array(42)].map((_,i)=>{const d=new Date(monthStart); d.setDate(1-monthStart.getDay()+i); return d;}); 
-  const legendStatuses=statuses.filter(s=>user.role==='admin'||(user.visibleStatuses||[]).includes(s.id)); 
-  return <section><div className="calendar-titlebar"><h1>Calendário</h1><div className="view-tabs"><button className={view==='month'?'primary':''} onClick={()=>setView('month')}>Mês</button><button className={view==='week'?'primary':''} onClick={()=>setView('week')}>Semana</button><button className={view==='day'?'primary':''} onClick={()=>setView('day')}>Dia</button></div></div><div className="calendar-layout"><aside className="legend"><h3>Filtros</h3>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Responsável<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="all">Todos</option>{legendStatuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></label><label className="check archive-check"><input type="checkbox" checked={archivedOnly} onChange={e=>setArchivedOnly(e.target.checked)}/><span>Mostrar só arquivados</span></label><h3>Legenda</h3>{legendStatuses.map(s=><button className={'legend-row '+(status===s.id?'selected':'')} key={s.id} onClick={()=>setStatus(status===s.id?'all':s.id)}><i style={{background:s.color}}/><span>{s.name}</span><b>{filtered.filter(t=>t.status===s.id).length}</b></button>)}</aside><div className="calendar-main">{view==='month'&&<MonthView selectedDay={selectedDay} setSelectedDay={setSelectedDay} days={days} tasks={filtered} companies={companies} users={users} statusById={statusById} setDay={d=>{setSelectedDay(d);setView('day')}} open={open}/>} {view==='week'&&<WeekView selectedDay={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open}/>} {view==='day'&&<DayView day={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open}/>}</div></div></section> }
+  const legendStatuses=statuses.filter(s=>user.role==='admin'||(user.visibleStatuses||[]).includes(s.id));
+  const taskDisplayPermissions={
+    canOpenTasks:permissions.canOpenTasks,
+    showTaskTitle:permissions.showTaskTitle,
+    showCompany:permissions.showCompany,
+    showResponsible:permissions.showResponsible,
+    showStatus:permissions.showStatus,
+    showDeadline:permissions.showDeadline,
+    canNavigateDates:permissions.canNavigateDates,
+  };
+  const hasSidebar=permissions.showCompanyFilter||permissions.showResponsibleFilter||permissions.showTypeFilter||permissions.showStatusFilter||permissions.showArchivedToggle||permissions.showLegend;
+  return <section>
+    <div className="calendar-titlebar"><h1>Calendário</h1>{permissions.showViewTabs&&<div className="view-tabs"><button className={view==='month'?'primary':''} onClick={()=>setView('month')}>Mês</button><button className={view==='week'?'primary':''} onClick={()=>setView('week')}>Semana</button><button className={view==='day'?'primary':''} onClick={()=>setView('day')}>Dia</button></div>}</div>
+    <div className="calendar-layout">
+      {hasSidebar&&<aside className="legend">
+        {(permissions.showCompanyFilter||permissions.showResponsibleFilter||permissions.showTypeFilter||permissions.showStatusFilter||permissions.showArchivedToggle)&&<h3>Filtros</h3>}
+        {permissions.showCompanyFilter&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{companies.filter(c=>c.active).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}
+        {permissions.showResponsibleFilter&&<label>Responsável<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}
+        {permissions.showTypeFilter&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}
+        {permissions.showStatusFilter&&<label>Status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="all">Todos</option>{legendStatuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></label>}
+        {permissions.showArchivedToggle&&<label className="check archive-check"><input type="checkbox" checked={archivedOnly} onChange={e=>setArchivedOnly(e.target.checked)}/><span>Mostrar só arquivados</span></label>}
+        {permissions.showLegend&&<><h3>Legenda</h3>{legendStatuses.map(s=><button className={'legend-row '+(status===s.id?'selected':'')} key={s.id} onClick={()=>permissions.showStatusFilter&&setStatus(status===s.id?'all':s.id)}><i style={{background:s.color}}/><span>{s.name}</span><b>{filtered.filter(t=>t.status===s.id).length}</b></button>)}</>}
+      </aside>}
+      <div className="calendar-main">
+        {view==='month'&&<MonthView selectedDay={selectedDay} setSelectedDay={setSelectedDay} days={days} tasks={filtered} companies={companies} users={users} statusById={statusById} setDay={d=>{setSelectedDay(d);if(permissions.showViewTabs)setView('day')}} open={open} permissions={taskDisplayPermissions}/>}
+        {view==='week'&&<WeekView selectedDay={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>}
+        {view==='day'&&<DayView day={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>}
+      </div>
+    </div>
+  </section>
+}
 function AvatarMini({value,label}){ const v=String(value||''); const text=String(label||value||'?').slice(0,2).toUpperCase(); return <span className="avatar-mini">{(/^https?:\/\//.test(v)||v.startsWith('data:'))?<img src={driveDirect(v)} onError={e=>{e.currentTarget.remove();}}/>:text}</span> }
 function EntityLabel({value,label}){ return <span className="entity-label"><AvatarMini value={value} label={label}/><span>{label}</span></span> }
-function TaskButton({t,companies,users,statusById,open}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); return <button className="mini-task" onClick={()=>open(t.id)} style={{borderLeftColor:statusById[t.status]?.color}}><b>{t.title}</b><small>{company?.name} • {resp?.name}</small></button> }
+function TaskButton({t,companies,users,statusById,open,permissions={}}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const meta=[permissions.showCompany?company?.name:null,permissions.showResponsible?resp?.name:null].filter(Boolean).join(' • '); return <button className="mini-task" disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{meta&&<small>{meta}</small>}</button> }
 
 const FIXED_SPECIAL_DATES = [
   { md:'01-01', name:'Ano Novo', type:'feriado', icon:'✦' },
@@ -2827,12 +3696,12 @@ function SpecialDatePanel({items=[]}){
   return <div className="special-date-panel"><h3>Datas especiais</h3>{items.map((item,idx)=><div className={'special-date-line'+(item.market==='us'?' market-us':'')} key={item.name+idx}><b>{item.icon||'✦'}</b><span>{item.name}</span><small>{item.market==='us'?`EUA • ${item.type}`:item.type}</small></div>)}</div>
 }
 
-function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open}){ const cur=dObj(selectedDay); return <div className="month"><div className="month-head"><h2>{monthLabel(selectedDay)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div><small>{tasks.length} tarefa(s)</small></div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
-function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div><div className="month-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div></div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open}/>)}</div>})}</div></div> }
-function DayView({day,setSelectedDay,tasks,companies,users,statusById,open}){ 
+function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); return <div className="month"><div className="month-head"><h2>{monthLabel(selectedDay)}</h2>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div>}<small>{tasks.length} tarefa(s)</small></div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
+function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div><div className="month-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div>}</div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
+function DayView({day,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ 
   const list=tasks.filter(t=>t.postDate===day); 
   const specials=specialDatesFor(day);
-  return <div><div className="month-head"><h2>{fmtDate(day)}</h2><div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div><small>{list.length} tarefa(s) neste dia</small></div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} onClick={()=>open(t.id)} style={{borderColor:statusById[t.status]?.color}}><b>{t.title}</b><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small><span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span></button>)}</div></div> 
+  return <div><div className="month-head"><h2>{fmtDate(day)}</h2>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div>}<small>{list.length} tarefa(s) neste dia</small></div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{permissions.showDeadline&&<><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small></>}{permissions.showStatus!==false&&<span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span>}</button>)}</div></div> 
 }
 function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
   const preferencesStorageKey=`argos_kanban_preferences_${user?.id||'anonymous'}`;
@@ -2840,23 +3709,23 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''})
   const [period,setPeriod]=useState(initialPreferences.period||'current'),[from,setFrom]=useState(initialPreferences.from||''),[to,setTo]=useState(initialPreferences.to||''),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly),[sort,setSort]=useState(initialPreferences.sort||'priority');
   const PAGE_SIZE=10;
   const [visibleByStatus,setVisibleByStatus]=useState({});
+  const permissions={...builtInKanbanPermissionsForRole(user.role),...(user.kanbanPermissions||{})};
   useEffect(()=>{ save(preferencesStorageKey,{period,from,to,company,resp,type,archivedOnly,sort}); },[preferencesStorageKey,period,from,to,company,resp,type,archivedOnly,sort]);
-  const isAdmin=user.role==='admin'; 
   const allowed=statuses.filter(s=>user.role==='admin'||(user.visibleStatuses||[]).includes(s.id));
 
   let filtered=applyFilters(tasks,{
     period:null,
     from,
     to,
-    company:isAdmin?company:'all',
-    resp:isAdmin?resp:'all',
-    type,
-    archivedOnly,
+    company:permissions.showCompanyFilter?company:'all',
+    resp:permissions.showResponsibleFilter?resp:'all',
+    type:permissions.showTypeFilter?type:'all',
+    archivedOnly:permissions.showArchivedToggle?archivedOnly:false,
     search
   });
 
   filtered=filtered.filter(t=>{
-    if(!period) return true;
+    if(!permissions.showPeriodFilter||!period) return true;
     if(!t.postDate) return true;
     return periodMatch(t.postDate,period,from,to);
   });
@@ -2876,63 +3745,201 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''})
 
   filtered=[...filtered].sort(cmp);
 
-  useEffect(()=>{
-    setVisibleByStatus({});
-  },[period,from,to,company,resp,type,archivedOnly,sort,search]);
+  useEffect(()=>{ setVisibleByStatus({}); },[period,from,to,company,resp,type,archivedOnly,sort,search]);
 
-  function visibleLimit(statusId){
-    return visibleByStatus[statusId]||PAGE_SIZE;
-  }
+  function visibleLimit(statusId){ return visibleByStatus[statusId]||PAGE_SIZE; }
+  function loadMore(statusId){ setVisibleByStatus(prev=>({...prev,[statusId]:(prev[statusId]||PAGE_SIZE)+PAGE_SIZE})); }
 
-  function loadMore(statusId){
-    setVisibleByStatus(prev=>({...prev,[statusId]:(prev[statusId]||PAGE_SIZE)+PAGE_SIZE}));
-  }
+  const hasFilters=permissions.showPeriodFilter||permissions.showCompanyFilter||permissions.showResponsibleFilter||permissions.showTypeFilter||permissions.showSort||permissions.showArchivedToggle;
 
-  return <section><h1>Kanban</h1><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Responsável<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="priority">Prioridade</option><option value="client">Cliente</option><option value="type">Tipo de post</option>{isAdmin&&<option value="responsible">Responsável</option>}{isAdmin&&<option value="postDate">Data do post</option>}<option value="internalDate">Prazo</option></select></label><label className="check archive-check inline"><input type="checkbox" checked={archivedOnly} onChange={e=>setArchivedOnly(e.target.checked)}/><span>Mostrar só arquivados</span></label></div><div className="kanban">{allowed.map(s=>{
-    const columnTasks=filtered.filter(t=>t.status===s.id);
-    const limit=visibleLimit(s.id);
-    const visibleTasks=columnTasks.slice(0,limit);
-    return <div className="col" key={s.id} style={{borderTopColor:s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{const company=companies.find(c=>c.id===t.companyId);const respUser=users.find(u=>u.id===t.responsibleId);return <button className="kcard" key={t.id} onClick={()=>open(t.id)}><b className="k-title" title={t.title}>{t.title}</b><div className="k-meta" style={{alignItems:'center',gap:6}}><span style={{display:'flex',gap:4,flexWrap:'nowrap',minWidth:0}}>
-  <small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:'1px solid rgba(156,163,175,.30)',background:'rgba(156,163,175,.06)',color:'#aeb4bd',fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>
-  <small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:`1px solid ${taskDeadlineColor(t,statuses,statusById)}55`,background:`${taskDeadlineColor(t,statuses,statusById)}14`,color:taskDeadlineColor(t,statuses,statusById),fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{fmtDate(t.internalDate)}</small>
-</span><span className="avatars" style={{marginLeft:'auto',flex:'0 0 auto'}}><AvatarMini value={company?.logo} label={company?.name}/><AvatarMini value={respUser?.avatar} label={respUser?.name}/></span></div></button>})}{columnTasks.length>visibleTasks.length&&<button type="button" onClick={()=>loadMore(s.id)} style={{width:'100%',marginTop:10}}>Carregar mais {Math.min(PAGE_SIZE,columnTasks.length-visibleTasks.length)}</button>}</div>;
-  })}</div></section> 
+  return <section><h1>Kanban</h1>
+    {hasFilters&&<div className="filters">
+      {permissions.showPeriodFilter&&<PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>}
+      {permissions.showCompanyFilter&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{companies.filter(c=>c.active).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}
+      {permissions.showResponsibleFilter&&<label>Responsável<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}
+      {permissions.showTypeFilter&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}
+      {permissions.showSort&&<label>Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="priority">Prioridade</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="responsible">Responsável</option><option value="postDate">Data do post</option><option value="internalDate">Prazo</option></select></label>}
+      {permissions.showArchivedToggle&&<label className="check archive-check inline"><input type="checkbox" checked={archivedOnly} onChange={e=>setArchivedOnly(e.target.checked)}/><span>Mostrar só arquivados</span></label>}
+    </div>}
+    <div className="kanban">{allowed.map(s=>{
+      const columnTasks=filtered.filter(t=>t.status===s.id);
+      const visibleTasks=columnTasks.slice(0,visibleLimit(s.id));
+      return <div className="col" key={s.id} style={{borderTopColor:s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{
+        const companyEntity=companies.find(c=>c.id===t.companyId);
+        const respUser=users.find(u=>u.id===t.responsibleId);
+        return <button className="kcard" key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+          <b className="k-title" title={t.title}>{t.title}</b>
+          <div className="k-meta" style={{alignItems:'center',gap:6}}>
+            {(permissions.showPostDate||permissions.showDeadline)&&<span style={{display:'flex',gap:4,flexWrap:'nowrap',minWidth:0}}>
+              {permissions.showPostDate&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:'1px solid rgba(156,163,175,.30)',background:'rgba(156,163,175,.06)',color:'#aeb4bd',fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>}
+              {permissions.showDeadline&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:`1px solid ${taskDeadlineColor(t,statuses,statusById)}55`,background:`${taskDeadlineColor(t,statuses,statusById)}14`,color:taskDeadlineColor(t,statuses,statusById),fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{fmtDate(t.internalDate)}</small>}
+            </span>}
+            {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars" style={{marginLeft:'auto',flex:'0 0 auto'}}>
+              {permissions.showCompany&&<AvatarMini value={companyEntity?.logo} label={companyEntity?.name}/>}
+              {permissions.showResponsible&&<AvatarMini value={respUser?.avatar} label={respUser?.name}/>}
+            </span>}
+          </div>
+        </button>;
+      })}{columnTasks.length>visibleTasks.length&&<button type="button" onClick={()=>loadMore(s.id)} style={{width:'100%',marginTop:10}}>Carregar mais {Math.min(PAGE_SIZE,columnTasks.length-visibleTasks.length)}</button>}</div>;
+    })}</div>
+  </section> 
 }
+
+function CopyTextButton({text}){
+  const [copied,setCopied]=useState(false);
+  async function copy(){
+    const value=String(text||'');
+    if(!value.trim()) return;
+    try{
+      await navigator.clipboard.writeText(value);
+    }catch{
+      const area=document.createElement('textarea');
+      area.value=value;
+      area.setAttribute('readonly','');
+      area.style.position='fixed';
+      area.style.opacity='0';
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand('copy');
+      document.body.removeChild(area);
+    }
+    setCopied(true);
+    setTimeout(()=>setCopied(false),1200);
+  }
+
+  return <button
+    type="button"
+    onClick={copy}
+    disabled={!String(text||'').trim()}
+    title={copied?'Texto copiado':'Copiar todo o texto'}
+    aria-label={copied?'Texto copiado':'Copiar todo o texto'}
+    style={{
+      position:'absolute',
+      top:7,
+      right:7,
+      zIndex:3,
+      width:28,
+      height:28,
+      minHeight:28,
+      padding:0,
+      display:'inline-flex',
+      alignItems:'center',
+      justifyContent:'center',
+      borderRadius:7,
+      border:'1px solid rgba(225,177,44,.2)',
+      background:'rgba(7,7,7,.74)',
+      color:copied?'#d9ad38':'rgba(255,255,255,.62)',
+      opacity:String(text||'').trim()?0.82:0.28,
+      boxShadow:'none'
+    }}
+  >
+    {copied
+      ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+    }
+  </button>;
+}
+
+function TextFieldWithCopy({label,value,onChange,placeholder,minHeight=92}){
+  return <label style={{display:'block'}}>
+    {label}
+    <div style={{position:'relative'}}>
+      <AutoTextarea
+        value={value||''}
+        onChange={onChange}
+        placeholder={placeholder}
+        minHeight={minHeight}
+        style={{paddingRight:48}}
+      />
+      <CopyTextButton text={value}/>
+    </div>
+  </label>;
+}
+
 function ReadOnlyInstruction({title,text}){
-  return <div className="readonly-instruction"><label>{title}</label><div className="instruction-box textarea-like">{text?linkify(text):<span className="muted-note">Sem informações.</span>}</div></div>
+  return <div className="readonly-instruction"><label>{title}</label><div style={{position:'relative'}}><div className="instruction-box textarea-like" style={{paddingRight:48}}>{text?linkify(text):<span className="muted-note">Sem informações.</span>}</div><CopyTextButton text={text}/></div></div>
 }
 
-function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open}){
+function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open,user}){
+  const permissions={...builtInPlanningPermissionsForRole(user?.role),...(user?.planningPermissions||{})};
   const [weekStart,setWeekStart]=useState(nextWeekStartStr());
   const [weeksAhead,setWeeksAhead]=useState(1);
   const [editingTemplate,setEditingTemplate]=useState(null);
-  const targetWeekStart=(ahead)=>addDays(nextWeekStartStr(), (Math.max(1,Number(ahead)||1)-1)*7);
-  function changeWeeksAhead(value){ const n=Math.max(1,Number(value)||1); setWeeksAhead(n); setWeekStart(targetWeekStart(n)); }
+  const targetWeekStart=(ahead)=>addDays(nextWeekStartStr(),(Math.max(1,Number(ahead)||1)-1)*7);
+
+  function changeWeeksAhead(value){
+    const n=Math.max(1,Number(value)||1);
+    setWeeksAhead(n);
+    setWeekStart(targetWeekStart(n));
+  }
+
   const activeCompanies=companies.filter(c=>c.active);
   const weekEnd=weekEndStr(weekStart);
   const totalExpected=activeCompanies.reduce((acc,c)=>acc+(c.weeklyTemplate||[]).reduce((a,item)=>a+(Number(item.quantity)||0),0),0);
   const totalCreated=tasks.filter(t=>t.generatedWeek===weekStart).length;
-  function saveTemplate(companyId, weeklyTemplate){
+
+  function saveTemplate(companyId,weeklyTemplate){
+    if(!permissions.canEditTemplate) return;
     setCompanies(companies.map(c=>c.id===companyId?{...c,weeklyTemplate}:c));
     setEditingTemplate(null);
   }
+
   function generateAll(){
+    if(!permissions.canGenerateAll) return;
     const pending=activeCompanies.filter(c=>{
       const expected=(c.weeklyTemplate||[]).reduce((a,item)=>a+(Number(item.quantity)||0),0);
-      const created=tasks.filter(t=>t.companyId===c.id && t.generatedWeek===weekStart).length;
-      return expected>0 && created===0;
+      const created=tasks.filter(t=>t.companyId===c.id&&t.generatedWeek===weekStart).length;
+      return expected>0&&created===0;
     });
-    if(!pending.length){ alert('Nenhum cliente pendente para a próxima semana.'); return; }
+    if(!pending.length){alert('Nenhum cliente pendente para a próxima semana.');return;}
     const total=pending.reduce((acc,c)=>acc+(c.weeklyTemplate||[]).reduce((a,item)=>a+(Number(item.quantity)||0),0),0);
     if(!confirm(`Gerar ${total} tarefa(s) para ${pending.length} cliente(s) pendente(s)?`)) return;
     pending.forEach(c=>createWeeklyTasks(c.id,weekStart,false));
   }
+
   return <section>
-    <div className="calendar-titlebar"><div><h1>Planejamento Semanal</h1><p>Gere remessas de tarefas por cliente a partir dos templates configurados.</p></div><button className="primary" onClick={generateAll}>Gerar todos pendentes</button></div>
-    <div className="filters planning-top-filters"><label className="planning-date-filter">Remessa<select value={weeksAhead} onChange={e=>changeWeeksAhead(e.target.value)}><option value={1}>Próxima semana</option><option value={2}>Daqui 2 semanas</option><option value={3}>Daqui 3 semanas</option><option value={4}>Daqui 4 semanas</option></select></label><label className="planning-date-filter">Semana começa em<input type="date" value={weekStart} onChange={e=>{ const picked=weekStartStr(e.target.value); const next=nextWeekStartStr(); setWeekStart(picked <= weekStartStr() ? next : picked); const diffDays=Math.round((new Date((picked <= weekStartStr() ? next : picked)+'T00:00:00')-new Date(next+'T00:00:00'))/86400000); const nextOffset=Math.max(1, Math.floor(diffDays/7)+1); if(nextOffset>=1&&nextOffset<=4) setWeeksAhead(nextOffset); }}/></label><div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Total previsto</small><b>{totalExpected}</b></div><div className="panel planning-kpi-card planning-kpi-small"><small>Já geradas</small><b>{totalCreated}</b></div></div>
-    <div className="client-grid compact-admin-grid planning-grid" style={{display:'flex',flexDirection:'column',gap:16}}>{activeCompanies.map(c=>{ const template=c.weeklyTemplate||[]; const expected=template.reduce((a,item)=>a+(Number(item.quantity)||0),0); const createdTasks=tasks.filter(t=>t.companyId===c.id && t.generatedWeek===weekStart); const created=createdTasks.length; return <div className="panel planning-card" key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{expected} tarefa(s) previstas • {created} gerada(s)</small></div></div>{template.length?<div className="template-preview">{template.map(item=><small key={item.id||item.type}>{item.quantity||0}× {item.type} • {WEEK_DAYS.find(d=>d.value===Number(item.postDay))?.label||'Segunda'}</small>)}</div>:<p className="muted-note">Sem template semanal configurado.</p>}<div className="row-actions"><button className="primary" disabled={!expected} onClick={()=>createWeeklyTasks(c.id,weekStart,false)}>{created?'Gerar novamente':'Gerar semana'}</button><button onClick={()=>setEditingTemplate(c)}>{template.length?'Editar template':'Criar template'}</button>{createdTasks.length>0&&<button onClick={()=>open(createdTasks[0].id)}>Ver tarefas</button>}</div></div>})}</div>
-    {editingTemplate&&<WeeklyTemplateEditor company={editingTemplate} users={users} save={saveTemplate} cancel={()=>setEditingTemplate(null)}/>} 
-  </section>
+    <div className="calendar-titlebar">
+      <div><h1>Planejamento Semanal</h1><p>Gere remessas de tarefas por cliente a partir dos templates configurados.</p></div>
+      {permissions.canGenerateAll&&<button className="primary" onClick={generateAll}>Gerar todos pendentes</button>}
+    </div>
+
+    {(permissions.showWeekControls||permissions.showIndicators)&&<div className="filters planning-top-filters">
+      {permissions.showWeekControls&&<>
+        <label className="planning-date-filter">Remessa<select value={weeksAhead} onChange={e=>changeWeeksAhead(e.target.value)}><option value={1}>Próxima semana</option><option value={2}>Daqui 2 semanas</option><option value={3}>Daqui 3 semanas</option><option value={4}>Daqui 4 semanas</option></select></label>
+        <label className="planning-date-filter">Semana começa em<input type="date" value={weekStart} onChange={e=>{const picked=weekStartStr(e.target.value);const next=nextWeekStartStr();setWeekStart(picked<=weekStartStr()?next:picked);const diffDays=Math.round((new Date((picked<=weekStartStr()?next:picked)+'T00:00:00')-new Date(next+'T00:00:00'))/86400000);const nextOffset=Math.max(1,Math.floor(diffDays/7)+1);if(nextOffset>=1&&nextOffset<=4)setWeeksAhead(nextOffset);}}/></label>
+      </>}
+      {permissions.showIndicators&&<>
+        <div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div>
+        <div className="panel planning-kpi-card planning-kpi-small"><small>Total previsto</small><b>{totalExpected}</b></div>
+        <div className="panel planning-kpi-card planning-kpi-small"><small>Já geradas</small><b>{totalCreated}</b></div>
+      </>}
+    </div>}
+
+    {permissions.showCompanies&&<div className="client-grid compact-admin-grid planning-grid" style={{display:'flex',flexDirection:'column',gap:16}}>
+      {activeCompanies.map(c=>{
+        const template=c.weeklyTemplate||[];
+        const expected=template.reduce((a,item)=>a+(Number(item.quantity)||0),0);
+        const createdTasks=tasks.filter(t=>t.companyId===c.id&&t.generatedWeek===weekStart);
+        const created=createdTasks.length;
+        const canGenerate=created?permissions.canRegenerate:permissions.canGenerateCompany;
+
+        return <div className="panel planning-card" key={c.id}>
+          <div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{expected} tarefa(s) previstas • {created} gerada(s)</small></div></div>
+          {permissions.showTemplateSummary&&(template.length
+            ? <div className="template-preview">{template.map(item=><small key={item.id||item.type}>{item.quantity||0}× {item.type} • {WEEK_DAYS.find(d=>d.value===Number(item.postDay))?.label||'Segunda'}</small>)}</div>
+            : <p className="muted-note">Sem template semanal configurado.</p>
+          )}
+          {(canGenerate||permissions.canEditTemplate||(permissions.canOpenGeneratedTasks&&createdTasks.length>0))&&<div className="row-actions">
+            {canGenerate&&<button className="primary" disabled={!expected} onClick={()=>createWeeklyTasks(c.id,weekStart,false)}>{created?'Gerar novamente':'Gerar semana'}</button>}
+            {permissions.canEditTemplate&&<button onClick={()=>setEditingTemplate(c)}>{template.length?'Editar template':'Criar template'}</button>}
+            {permissions.canOpenGeneratedTasks&&createdTasks.length>0&&<button onClick={()=>open(createdTasks[0].id)}>Ver tarefas</button>}
+          </div>}
+        </div>;
+      })}
+    </div>}
+
+    {editingTemplate&&permissions.canEditTemplate&&<WeeklyTemplateEditor company={editingTemplate} users={users} save={saveTemplate} cancel={()=>setEditingTemplate(null)}/>}
+  </section>;
 }
 
 function WeeklyTemplateEditor({company,users,save,cancel}){
@@ -2948,50 +3955,59 @@ function TaskAccessDenied({back}){
   return <section className="task-access-denied"><button onClick={back}>← Voltar</button><div className="panel"><h1>Acesso não permitido</h1><p>Esta tarefa não está disponível para o seu perfil ou não está mais em um status visível para você.</p></div></section>
 }
 
-function AutoTextarea({value,onChange,minHeight=92,...props}){
+function AutoTextarea({value,onChange,minHeight=92,style,...props}){
   const ref=useRef(null);
+
   function resize(){
     const element=ref.current;
     if(!element) return;
     element.style.height='auto';
     element.style.height=`${Math.max(element.scrollHeight,minHeight)}px`;
   }
+
   useEffect(()=>{ resize(); },[value,minHeight]);
-  return <textarea ref={ref} value={value} onChange={onChange} onInput={resize} style={{overflow:'hidden',resize:'vertical',...props.style}} {...props}/>;
+
+  return <textarea
+    {...props}
+    ref={ref}
+    value={value}
+    onChange={onChange}
+    onInput={resize}
+    style={{
+      ...style,
+      minHeight,
+      height:'auto',
+      overflowY:'hidden',
+      resize:'vertical'
+    }}
+  />;
 }
 
-function MaterialLinksEditor({task,updateTask}){
+function TaskLinksEditor({task,updateTask,field,title,placeholder='Cole um link'}) {
   function normalizedItems(){
-    const saved=String(task?.materialLinks||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    const saved=String(task?.[field]||'').split('\n').map(x=>x.trim()).filter(Boolean);
     return [...saved,''];
   }
   const [items,setItems]=useState(normalizedItems);
-  useEffect(()=>{ setItems(normalizedItems()); },[task?.id]);
+  useEffect(()=>{ setItems(normalizedItems()); },[task?.id,field,task?.[field]]);
 
   function persist(next){
     const cleaned=next.map(x=>String(x||'').trim()).filter(Boolean);
-    const visual=[...cleaned,''];
-    setItems(visual);
-    updateTask(task.id,{materialLinks:cleaned.join('\n')});
+    setItems([...cleaned,'']);
+    updateTask(task.id,{[field]:cleaned.join('\n')});
   }
 
   function change(index,value){
     const next=[...items];
     next[index]=value;
-    const isLast=index===next.length-1;
-    if(isLast&&String(value||'').trim()) next.push('');
+    if(index===next.length-1&&String(value||'').trim()) next.push('');
     setItems(next);
     const cleaned=next.map(x=>String(x||'').trim()).filter(Boolean);
-    updateTask(task.id,{materialLinks:cleaned.join('\n')});
-  }
-
-  function add(){
-    setItems(prev=>prev[prev.length-1]===''?prev:[...prev,'']);
+    updateTask(task.id,{[field]:cleaned.join('\n')});
   }
 
   function remove(index){
-    const next=items.filter((_,i)=>i!==index);
-    persist(next);
+    persist(items.filter((_,i)=>i!==index));
   }
 
   function move(index,direction){
@@ -3004,37 +4020,15 @@ function MaterialLinksEditor({task,updateTask}){
 
   return <div className="material-links-editor">
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:8}}>
-      <b>Links de visualização</b>
+      <b>{title}</b>
     </div>
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {items.map((value,index)=>{
         const filled=String(value||'').trim();
         const isTrailingEmpty=index===items.length-1&&!filled;
-        return <div key={index} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto auto auto',gap:8,alignItems:'center'}}>
-          <input type="url" value={value} onChange={e=>change(index,e.target.value)} placeholder={`Link ${index+1}`}/>
-          <a
-            href={filled||undefined}
-            target="_blank"
-            rel="noreferrer"
-            aria-disabled={!filled}
-            onClick={e=>{if(!filled)e.preventDefault();}}
-            style={{
-              pointerEvents:filled?'auto':'none',
-              opacity:filled?1:.45,
-              display:'inline-flex',
-              alignItems:'center',
-              justifyContent:'center',
-              minHeight:36,
-              padding:'0 12px',
-              border:'1px solid rgba(225,177,44,.35)',
-              borderRadius:10,
-              background:'rgba(225,177,44,.04)',
-              color:'#f3e6b2',
-              textDecoration:'none',
-              fontWeight:700,
-              boxSizing:'border-box'
-            }}
-          >Abrir</a>
+        return <div key={`${field}-${index}`} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto auto auto',gap:8,alignItems:'center'}}>
+          <input type="url" value={value} onChange={e=>change(index,e.target.value)} placeholder={isTrailingEmpty?placeholder:`Link ${index+1}`}/>
+          <a href={filled||undefined} target="_blank" rel="noreferrer" aria-disabled={!filled} onClick={e=>{if(!filled)e.preventDefault();}} style={{pointerEvents:filled?'auto':'none',opacity:filled?1:.45,display:'inline-flex',alignItems:'center',justifyContent:'center',minHeight:36,padding:'0 12px',border:'1px solid rgba(225,177,44,.35)',borderRadius:10,background:'rgba(225,177,44,.04)',color:'#f3e6b2',textDecoration:'none',fontWeight:700,boxSizing:'border-box'}}>Abrir</a>
           <button type="button" onClick={()=>move(index,-1)} disabled={!filled||index===0}>↑</button>
           <button type="button" onClick={()=>move(index,1)} disabled={!filled||index>=items.length-2}>↓</button>
           <button type="button" onClick={()=>remove(index)} disabled={isTrailingEmpty}>Remover</button>
@@ -3055,12 +4049,24 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   const currentClientIndex=clientTasks.findIndex(t=>t.id===task.id);
   const previousClientTask=currentClientIndex>0?clientTasks[currentClientIndex-1]:null;
   const nextClientTask=currentClientIndex>=0&&currentClientIndex<clientTasks.length-1?clientTasks[currentClientIndex+1]:null;
-  const links=(task.materialLinks||'').split('\n').map(x=>x.trim()).filter(Boolean); 
+  const links=taskMaterialLinks(task); 
   const [slide,setSlide]=useState(0); 
   const [comment,setComment]=useState(''); 
   const [clientForm,setClientForm]=useState(null); 
   const isClient=effectiveUser.role==='client';
   const isTeam=effectiveUser.role==='team';
+  const taskPermissionSet=effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role);
+  const detailVisible={...builtInTaskDetailPermissionsForRole(effectiveUser.role).visible,...(taskPermissionSet.detailFields?.visible||{})};
+  const detailEditable={...builtInTaskDetailPermissionsForRole(effectiveUser.role).editable,...(taskPermissionSet.detailFields?.editable||{})};
+  const canViewDetail=id=>detailVisible[id]!==false;
+  const canEditDetail=id=>canViewDetail(id)&&detailEditable[id]===true;
+  const canApprovePosts=taskPermissionSet.canApprovePosts===true;
+  const configCompanies=isClient
+    ? companies.filter(c=>c.id===task.companyId||(effectiveUser.companyIds||[]).includes(c.id))
+    : companies;
+  const configResponsibleUsers=isClient
+    ? users.filter(u=>u.id===task.responsibleId)
+    : users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
   const canAccess=isAdmin||task.startedAt; 
   const timeline=(task.logs||[]).filter(l=>!isClient||l.visibility==='client'||l.userId===effectiveUser.id).slice().sort((a,b)=>new Date(b.at)-new Date(a.at)); 
   const comments=timeline.filter(l=>l.type==='comment');
@@ -3193,7 +4199,25 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   }
   function addComment(){ if(!comment.trim()) return; addLog(task.id,comment,'comment',isClient?'client':'internal'); setComment(''); }
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
-  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left"><div className="task-title">{isAdmin?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{!isClient&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div><div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div><div className="content-fields">{!isClient&&!hiddenTeam&&<>{isAdmin?<><label>Instruções ao copy<AutoTextarea value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/></label><label>Instruções ao editor<AutoTextarea value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/></label></>:<><ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/><ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/></>}</>}{(!isTeam || showTeamProtected || isClient || hiddenTeam)&&<>{isAdmin?<><label>Copy<AutoTextarea value={task.copy} onChange={e=>updateTask(task.id,{copy:e.target.value})}/></label><label>Legenda<AutoTextarea value={task.caption} onChange={e=>updateTask(task.id,{caption:e.target.value})}/></label>{!isClient&&<MaterialLinksEditor task={task} updateTask={updateTask}/>}</>:<><ReadOnlyInstruction title="Copy" text={task.copy||''}/><ReadOnlyInstruction title="Legenda" text={task.caption||''}/>{!isClient&&!hiddenTeam&&(isTeam?<MaterialLinksEditor task={task} updateTask={updateTask}/>:<ReadOnlyInstruction title="Links de visualização" text={task.materialLinks||''}/>)}</>}</>}</div></div><aside className="task-side">{!isClient&&<div className="panel panel-config"><h2>Configurações</h2><label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!isAdmin} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label><label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!isAdmin} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label><label>Tipo<select disabled={!isAdmin} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label><label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!isAdmin} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label><label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!isAdmin} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label><label>Data do post<input disabled={!isAdmin} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label></div>}{(isAdmin||showTeamProtected)&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{(isClient||isAdmin)&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {isClient&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2><div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{!isClient&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
+  return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left">
+  {canViewDetail('title')&&<div className="task-title">{canEditDetail('title')?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{canViewDetail('status')&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div>}
+  {canViewDetail('preview')&&<div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div>}
+  <div className="content-fields">
+    {!hiddenTeam&&canViewDetail('copyInstructions')&&(canEditDetail('copyInstructions')?<TextFieldWithCopy label="Instruções ao copy" value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/>) }
+    {!hiddenTeam&&canViewDetail('editorInstructions')&&(canEditDetail('editorInstructions')?<TextFieldWithCopy label="Instruções ao editor" value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/>) }
+    {!hiddenTeam&&canViewDetail('usefulLinks')&&(canEditDetail('usefulLinks')?<TextFieldWithCopy label="Links úteis" value={task.usefulLinks||''} onChange={e=>updateTask(task.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/>:<ReadOnlyInstruction title="Links úteis" text={task.usefulLinks||''}/>) }
+    {canViewDetail('copy')&&(canEditDetail('copy')?<TextFieldWithCopy label="Copy" value={task.copy||''} onChange={e=>updateTask(task.id,{copy:e.target.value})}/>:<ReadOnlyInstruction title="Copy" text={task.copy||''}/>) }
+    {canViewDetail('caption')&&(canEditDetail('caption')?<TextFieldWithCopy label="Legenda" value={task.caption||''} onChange={e=>updateTask(task.id,{caption:e.target.value})}/>:<ReadOnlyInstruction title="Legenda" text={task.caption||''}/>) }
+    {canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material pronto" placeholder="Adicionar material pronto"/>:<ReadOnlyInstruction title="Links de material pronto" text={task.materialLinks||''}/>) }
+  </div>
+</div><aside className="task-side">{['companyId','responsibleId','type','status','internalDate','postDate'].some(canViewDetail)&&<div className="panel panel-config"><h2>Configurações</h2>
+  {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
+  {canViewDetail('responsibleId')&&<label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!canEditDetail('responsibleId')} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label>}
+  {canViewDetail('type')&&<label>Tipo<select disabled={!canEditDetail('type')} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label>}
+  {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label>}
+  {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
+  {canViewDetail('postDate')&&<label>Data do post<input disabled={!canEditDetail('postDate')} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label>}
+</div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2>{canEditDetail('comments')&&<div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{canViewDetail('history')&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6c-1.7-1.9-4.4-2-6.2-.3L12 6.7 9.4 4.3C7.6 2.6 4.9 2.7 3.2 4.6c-1.8 2-1.6 5.1.4 7l8.4 7.8 8.4-7.8c2-1.9 2.2-5 .4-7Z"/></svg>
@@ -3264,8 +4288,9 @@ function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[]
   }
   return <div className="settings-section"><div className="section-header"><h2>Empresas</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivadas</label><SortControl value={sort} setValue={setSort} options={[{value:'created',label:'Data de criação'},{value:'name',label:'Nome'}]}/><button className="primary" onClick={()=>setEditing({id:'',name:'',instagram:'',logo:'',entryDate:'',active:true,createdAt:now()})}>+ Nova empresa</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedCompanies.map(c=><div className={'panel '+(c.active===false?'archived-card':'')} key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{c.instagram || 'Sem Instagram'} {c.active===false?'• Arquivada':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(c)}>Editar</button></div></div>)}</div>{editing&&<CompanyEditor c={editing} users={users} save={save} cancel={()=>setEditing(null)} onArchive={archiveCompany} onDelete={deleteCompany}/>}</div>
 }
-function ClientUsersPage({users,setUsers,companies,statuses}){
+function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,accessDefaults=null}){
   const [editing,setEditing]=useState(null);
+  const [configuring,setConfiguring]=useState(null);
   const [sort,setSort]=useState('company');
   const [showArchived,setShowArchived]=useState(false);
   const clients=users.filter(u=>u.role==='client' && (showArchived ? u.active===false : u.active!==false));
@@ -3331,13 +4356,17 @@ function ClientUsersPage({users,setUsers,companies,statuses}){
       alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
-  return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button></div></div>)}</div>{editing&&<UserEditor u={editing} companies={companies} statuses={statuses} save={save} cancel={()=>setEditing(null)} clientMode onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>}</div>
+  function saveClientSettings(nextUser){
+    setUsers(users.map(x=>x.id===nextUser.id?nextUser:x));
+    setConfiguring(null);
+  }
+  return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div></div>)}</div>{editing&&<UserEditor u={editing} save={save} cancel={()=>setEditing(null)} clientMode currentUser={currentUser} onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={companies} statuses={statuses} save={saveClientSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
 }
-function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
+function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefaults=null}){
   const [editing,setEditing]=useState(null);
   const [sort,setSort]=useState('role');
   const [showArchived,setShowArchived]=useState(false);
-  const [openNotif,setOpenNotif]=useState({});
+  const [configuring,setConfiguring]=useState(null);
   const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived ? u.active===false : u.active!==false));
   const sortedPeople=sortEntities(people,sort,u=>u.name);
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -3361,22 +4390,6 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
       console.error(err);
       alert('Não foi possível excluir o acesso no Supabase Auth. Instale/atualize a Edge Function manage-app-user e tente novamente. Erro: '+(err.message||err));
     }
-  }
-  function canEditNotifications(u){ return !(u.role==='admin' && currentUser?.id && u.id!==currentUser.id); }
-  function toggleNotif(id){ setOpenNotif(prev=>({...prev,[id]:!prev[id]})); }
-  function updateUserPrefs(userId,patch){
-    setUsers(prev=>prev.map(x=>{
-      if(x.id!==userId) return x;
-      const patchValue = typeof patch==='function' ? patch(x) : patch;
-      const nextUser = {...x,...patchValue, notificationPrefsFromProfile:true};
-      if(isSupabaseConfigured){
-        updateProfileNotificationPrefs(userId, {
-          notificationPrefs: nextUser.notificationPrefs || events,
-          notificationStatusPrefs: nextUser.notificationStatusPrefs || {}
-        }).catch(err=>alert('Não foi possível salvar notificações no perfil: '+(err.message||err)));
-      }
-      return nextUser;
-    }));
   }
   async function save(u){
     const role=u.role||'team';
@@ -3421,30 +4434,439 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null}){
       alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
-  return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=>{
-    const isOpen=!!openNotif[u.id];
-    const canEdit=canEditNotifications(u);
-    return <div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
+  function saveTeamSettings(nextUser){
+    setUsers(users.map(x=>x.id===nextUser.id?nextUser:x));
+    if(isSupabaseConfigured){
+      updateProfileNotificationPrefs(nextUser.id, {
+        notificationPrefs: nextUser.notificationPrefs || events,
+        notificationStatusPrefs: nextUser.notificationStatusPrefs || {}
+      }).catch(err=>alert('Não foi possível salvar notificações no perfil: '+(err.message||err)));
+    }
+    setConfiguring(null);
+  }
+  return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=><div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
       <div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small>{u.role==='admin'?'Admin':(u.title||'Equipe')} {u.active===false?'• Arquivado':''}</small></div></div>
-      <div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>toggleNotif(u.id)}>{isOpen?'Minimizar notificações':'Configurar notificações'}</button></div>
-      {isOpen&&<div className="team-notification-box">
-        {!canEdit&&<p className="muted admin-lock-note">Notificações de outro admin não podem ser alteradas.</p>}
-        <div className="notification-prefs-grid">
-          <div><h3>Eventos</h3><div className="checks one-col compact-checks-v3">{events.map(ev=>{
-            const cur=u.notificationPrefs||events;
-            return <label key={ev}><input type="checkbox" disabled={!canEdit} checked={cur.includes(ev)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; updateUserPrefs(u.id,(current)=>{ const currentPrefs=current.notificationPrefs||events; const next=checked?[...new Set([...currentPrefs,ev])]:currentPrefs.filter(x=>x!==ev); return {notificationPrefs:next}; });}}/>{ev}</label>
-          })}</div></div>
-          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" disabled={!canEdit} checked={(u.notificationStatusPrefs?.[st.id]??true)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; updateUserPrefs(u.id,(current)=>({notificationStatusPrefs:{...(current.notificationStatusPrefs||{}),[st.id]:checked}}));}}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
-        </div>
-      </div>}
-    </div>
-  })}</div>{editing&&<UserEditor u={editing} statuses={statuses} save={save} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>}</div>
+      <div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div>
+    </div>)}</div>{editing&&<UserEditor u={editing} save={save} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={[]} statuses={statuses} save={saveTeamSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
 }
 function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
   const [f,setF]=useState(c);
   const set=(k,v)=>setF(prev=>({...prev,[k]:v}));
   const isExisting=!!f.id;
   return <div className="modal-bg"><div className="modal"><h2>Empresa</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Instagram<input value={f.instagram} onChange={e=>set('instagram',e.target.value)}/></label><label>Logo ou link de imagem<input value={f.logo} onChange={e=>set('logo',e.target.value)} placeholder="Inicial, URL pública ou link do Drive"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),`companies/${f.id||slug(f.name)||'pending'}`)}/></label><label>Entrada<input type="date" value={f.entryDate||''} onChange={e=>set('entryDate',e.target.value)}/></label>{isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Use arquivar para esconder sem perder histórico. Excluir remove o cadastro do painel.</p><div className="danger-zone-actions"><button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar empresa':'Arquivar empresa'}</button><button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir empresa</button></div></div>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div>
+}
+
+function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleActive=null,onToggleOpen=null,children,accent=false}){
+  const hasToggle=typeof active==='boolean';
+  return <div className="panel" style={{padding:0,overflow:'hidden',borderColor:open?'rgba(225,177,44,.48)':'var(--line)'}}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={()=>onToggleOpen?.()}
+      onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onToggleOpen?.();}}}
+      style={{display:'flex',alignItems:'center',gap:10,minHeight:52,padding:'0 14px',cursor:'pointer',background:open?'rgba(225,177,44,.045)':'transparent'}}
+    >
+      {hasToggle&&<input
+        type="checkbox"
+        checked={active}
+        disabled={disabled}
+        onClick={e=>e.stopPropagation()}
+        onChange={e=>onToggleActive?.(e.target.checked)}
+        style={{width:16,height:16,minWidth:16,margin:0}}
+      />}
+      <span className="status-dot" style={{background:hasToggle?(active?'#e1b12c':'#5b6472'):(accent?'#e1b12c':'#747d8c')}}></span>
+      <b style={{flex:1,color:'var(--text)',fontSize:14}}>{title}</b>
+      <span aria-hidden="true" style={{fontSize:18,color:open?'#e1b12c':'var(--muted)',transform:open?'rotate(90deg)':'none',transition:'transform .16s ease'}}>›</span>
+    </div>
+    {open&&<div style={{padding:'14px',borderTop:'1px solid var(--line)'}}>{children}</div>}
+  </div>;
+}
+
+function TaskOpenPermissionList({config,onTogglePermission,onToggleApproval,disabled=false}){
+  const nonEditable=['preview','stats','history'];
+  const mainTextStyle={
+    display:'block',
+    flex:1,
+    textAlign:'left',
+    fontSize:12,
+    lineHeight:1.35,
+    color:'var(--muted)'
+  };
+  const editTextStyle={
+    display:'block',
+    flex:1,
+    textAlign:'left',
+    fontSize:11,
+    lineHeight:1.3,
+    color:'var(--muted)'
+  };
+
+  return <div style={{display:'block',width:'100%',textAlign:'left'}}>
+    {TASK_DETAIL_FIELDS.map(field=>{
+      const visible=config?.visible?.[field.id]!==false;
+      const editable=config?.editable?.[field.id]===true;
+      const supportsEdit=!nonEditable.includes(field.id);
+
+      return <div key={field.id} style={{width:'100%',borderBottom:'1px solid rgba(255,255,255,.08)',padding:'8px 4px',boxSizing:'border-box',textAlign:'left'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',width:'100%',gap:8,textAlign:'left'}}>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={visible}
+            onChange={e=>onTogglePermission('visible',field.id,e.target.checked)}
+            style={{width:14,height:14,minWidth:14,margin:0,flex:'0 0 auto'}}
+          />
+          <span style={mainTextStyle}>{field.label}</span>
+        </div>
+
+        {visible&&supportsEdit&&<div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',width:'100%',gap:8,marginTop:6,paddingLeft:22,textAlign:'left',boxSizing:'border-box'}}>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={editable}
+            onChange={e=>onTogglePermission('editable',field.id,e.target.checked)}
+            style={{width:13,height:13,minWidth:13,margin:0,flex:'0 0 auto'}}
+          />
+          <span style={editTextStyle}>Permitir edição</span>
+        </div>}
+      </div>;
+    })}
+
+    <div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',width:'100%',gap:8,padding:'8px 4px',textAlign:'left',boxSizing:'border-box'}}>
+      <input
+        type="checkbox"
+        disabled={disabled}
+        checked={config?.canApprovePosts===true}
+        onChange={e=>onToggleApproval(e.target.checked)}
+        style={{width:14,height:14,minWidth:14,margin:0,flex:'0 0 auto'}}
+      />
+      <span style={mainTextStyle}>Aprovar posts ou solicitar alterações</span>
+    </div>
+  </div>;
+}
+
+function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUser=null,accessDefaults=null}){
+  const [f,setF]=useState(()=>clonePayload(user));
+  const [openSection,setOpenSection]=useState(null);
+  const events=NOTIFICATION_VISIBLE_EVENTS;
+  const editingOtherAdmin=f.role==='admin' && currentUser?.id && f.id!==currentUser.id;
+  const panelPermissionMode=f.panelPermissions?.mode==='custom'?'custom':'default';
+  const roleDefault=accessDefaultForRole({accessDefaults},f.role);
+  const defaultIds=PANEL_CATALOG.filter(panel=>roleDefault.panels.visible?.[panel.id]===true).map(panel=>panel.id);
+  const statusInheritance=f.accessInheritance?.statuses==='custom'?'custom':'default';
+  const notificationInheritance=f.accessInheritance?.notifications==='custom'?'custom':'default';
+  const dashboardInheritance=f.accessInheritance?.dashboard==='custom'?'custom':'default';
+  const actionsInheritance=(f.accessInheritance?.actions==='custom'||f.accessInheritance?.tasks==='custom')?'custom':'default';
+  const taskDetailInheritance=(f.accessInheritance?.taskDetail==='custom'||f.accessInheritance?.tasks==='custom')?'custom':'default';
+  const kanbanInheritance=f.accessInheritance?.kanban==='custom'?'custom':'default';
+  const calendarInheritance=f.accessInheritance?.calendar==='custom'?'custom':'default';
+  const portfolioInheritance=f.accessInheritance?.portfolio==='custom'?'custom':'default';
+  const planningInheritance=f.accessInheritance?.planning==='custom'?'custom':'default';
+  const documentsInheritance=f.accessInheritance?.documents==='custom'?'custom':'default';
+  const tasksListInheritance=f.accessInheritance?.tasksList==='custom'?'custom':'default';
+  const customVisible=f.panelPermissions?.visible&&typeof f.panelPermissions.visible==='object'
+    ? f.panelPermissions.visible
+    : Object.fromEntries(PANEL_CATALOG.map(panel=>[panel.id,defaultIds.includes(panel.id)]));
+  const resolvedVisible=panelPermissionMode==='custom'
+    ? customVisible
+    : Object.fromEntries(PANEL_CATALOG.map(panel=>[panel.id,defaultIds.includes(panel.id)]));
+  const set=(key,value)=>setF(prev=>({...prev,[key]:value}));
+  function setInheritance(section,mode){
+    setF(prev=>({
+      ...prev,
+      accessInheritance:{...(prev.accessInheritance||{}),[section]:mode},
+      ...(section==='statuses'&&mode==='custom'?{visibleStatuses:[...(roleDefault.visibleStatuses||[])]}:{}),
+      ...(section==='notifications'&&mode==='custom'?{
+        notificationPrefs:[...(roleDefault.notificationPrefs||[])],
+        notificationStatusPrefs:{...(roleDefault.notificationStatusPrefs||{})}
+      }:{}),
+      ...(section==='dashboard'&&mode==='custom'?{
+        dashboardPermissions:{visible:{...(roleDefault.dashboard?.visible||fullDashboardVisibility())}}
+      }:{}),
+      ...(section==='actions'&&mode==='custom'?{
+        taskPermissions:{
+          ...(prev.taskPermissions||{}),
+          canCreate:roleDefault.tasks?.canCreate===true,
+          creationMode:roleDefault.tasks?.creationMode||'task',
+          createFields:{...(roleDefault.tasks?.createFields||{})},
+        }
+      }:{}),
+      ...(section==='taskDetail'&&mode==='custom'?{
+        taskPermissions:{
+          ...(prev.taskPermissions||{}),
+          canApprovePosts:roleDefault.tasks?.canApprovePosts===true,
+          detailFields:{
+            visible:{...(roleDefault.tasks?.detailFields?.visible||{})},
+            editable:{...(roleDefault.tasks?.detailFields?.editable||{})},
+          }
+        }
+      }:{}),
+      ...(section==='kanban'&&mode==='custom'?{
+        kanbanPermissions:{...(roleDefault.kanban||builtInKanbanPermissionsForRole(f.role))}
+      }:{}),
+      ...(section==='calendar'&&mode==='custom'?{
+        calendarPermissions:{...(roleDefault.calendar||builtInCalendarPermissionsForRole(f.role))}
+      }:{}),
+      ...(section==='portfolio'&&mode==='custom'?{
+        portfolioPermissions:{...(roleDefault.portfolio||builtInPortfolioPermissionsForRole(f.role))}
+      }:{}),
+      ...(section==='planning'&&mode==='custom'?{
+        planningPermissions:{...(roleDefault.planning||builtInPlanningPermissionsForRole(f.role))}
+      }:{}),
+      ...(section==='documents'&&mode==='custom'?{
+        documentPermissions:{...(roleDefault.documents||builtInDocumentPermissionsForRole(f.role))}
+      }:{}),
+      ...(section==='tasksList'&&mode==='custom'?{
+        tasksListPermissions:{...(roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role))}
+      }:{})
+    }));
+  }
+  function setMode(mode){
+    set('panelPermissions',mode==='default'?{mode:'default'}:{mode:'custom',visible:{...resolvedVisible},order:Array.isArray(f.panelPermissions?.order)?f.panelPermissions.order:[]});
+  }
+  function togglePanel(id,checked){
+    if(editingOtherAdmin) return;
+    if(f.role==='admin'&&id==='settings'&&!checked) return alert('Configurações precisa permanecer visível para o próprio administrador.');
+    const next={...resolvedVisible,[id]:checked};
+    if(!Object.values(next).some(Boolean)) return alert('O usuário precisa ter pelo menos um painel visível.');
+    set('panelPermissions',{mode:'custom',visible:next,order:Array.isArray(f.panelPermissions?.order)?f.panelPermissions.order:[]});
+    if(!checked&&openSection===`panel:${id}`) setOpenSection(null);
+  }
+  function toggleStatus(id,checked){
+    const current=statusInheritance==='custom'?(f.visibleStatuses||[]):(roleDefault.visibleStatuses||[]);
+    set('visibleStatuses',checked?[...new Set([...current,id])]:current.filter(x=>x!==id));
+  }
+  function toggleEvent(ev,checked){
+    const current=notificationInheritance==='custom'?(f.notificationPrefs||[]):(roleDefault.notificationPrefs||events);
+    set('notificationPrefs',checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev));
+  }
+  const notificationPanelConfig=notificationInheritance==='custom'
+    ? {...(roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role)),...(f.notificationPanelPermissions||{})}
+    : (roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role));
+  function toggleNotificationPanelPermission(id,checked){
+    const current=notificationInheritance==='custom'?{...(f.notificationPanelPermissions||{})}:{...(roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role))};
+    set('notificationPanelPermissions',{...current,[id]:checked});
+  }
+  function toggleDashboardWidget(id,checked){
+    const current=dashboardInheritance==='custom'
+      ? {...(f.dashboardPermissions?.visible||{})}
+      : {...(roleDefault.dashboard?.visible||fullDashboardVisibility())};
+    set('dashboardPermissions',{visible:{...current,[id]:checked}});
+  }
+  function setTaskPermission(key,value){
+    const current=actionsInheritance==='custom'?{...(f.taskPermissions||{})}:{...(roleDefault.tasks||{})};
+    set('taskPermissions',{...(f.taskPermissions||{}),...current,[key]:value,createFields:{...(current.createFields||{})},detailFields:{...(f.taskPermissions?.detailFields||current.detailFields||{})}});
+  }
+  function toggleCreateField(id,checked){
+    const current=actionsInheritance==='custom'?{...(f.taskPermissions||{})}:{...(roleDefault.tasks||{})};
+    set('taskPermissions',{...(f.taskPermissions||{}),...current,createFields:{...(current.createFields||{}),[id]:checked},detailFields:{...(f.taskPermissions?.detailFields||current.detailFields||{})}});
+  }
+  function toggleTaskDetailPermission(section,id,checked){
+    const current=taskDetailInheritance==='custom'?{...(f.taskPermissions||{})}:{...(roleDefault.tasks||{})};
+    const detail=current.detailFields||roleDefault.tasks?.detailFields||builtInTaskDetailPermissionsForRole(f.role);
+    const nextDetail={
+      visible:{...(detail.visible||{})},
+      editable:{...(detail.editable||{})},
+    };
+    nextDetail[section][id]=checked;
+    if(section==='visible'&&!checked) nextDetail.editable[id]=false;
+    if(section==='editable'&&checked) nextDetail.visible[id]=true;
+    set('taskPermissions',{...(f.taskPermissions||{}),...current,createFields:{...(f.taskPermissions?.createFields||current.createFields||{})},detailFields:nextDetail});
+  }
+  function setTaskDetailAction(key,value){
+    const current=taskDetailInheritance==='custom'?{...(f.taskPermissions||{})}:{...(roleDefault.tasks||{})};
+    set('taskPermissions',{
+      ...(f.taskPermissions||{}),
+      ...current,
+      [key]:value,
+      createFields:{...(f.taskPermissions?.createFields||current.createFields||{})},
+      detailFields:{
+        visible:{...(current.detailFields?.visible||{})},
+        editable:{...(current.detailFields?.editable||{})},
+      }
+    });
+  }
+
+  const actionConfig=actionsInheritance==='custom'
+    ? {...roleDefault.tasks,...(f.taskPermissions||{}),createFields:{...(roleDefault.tasks?.createFields||{}),...(f.taskPermissions?.createFields||{})}}
+    : roleDefault.tasks;
+  const taskDetailConfig=taskDetailInheritance==='custom'
+    ? {
+        canApprovePosts:f.taskPermissions?.canApprovePosts??roleDefault.tasks?.canApprovePosts,
+        visible:{...(roleDefault.tasks?.detailFields?.visible||{}),...(f.taskPermissions?.detailFields?.visible||{})},
+        editable:{...(roleDefault.tasks?.detailFields?.editable||{}),...(f.taskPermissions?.detailFields?.editable||{})},
+      }
+    : {
+        canApprovePosts:roleDefault.tasks?.canApprovePosts===true,
+        visible:roleDefault.tasks?.detailFields?.visible||{},
+        editable:roleDefault.tasks?.detailFields?.editable||{},
+      };
+  const kanbanConfig=kanbanInheritance==='custom'
+    ? {...(roleDefault.kanban||builtInKanbanPermissionsForRole(f.role)),...(f.kanbanPermissions||{})}
+    : (roleDefault.kanban||builtInKanbanPermissionsForRole(f.role));
+  const calendarConfig=calendarInheritance==='custom'
+    ? {...(roleDefault.calendar||builtInCalendarPermissionsForRole(f.role)),...(f.calendarPermissions||{})}
+    : (roleDefault.calendar||builtInCalendarPermissionsForRole(f.role));
+  const portfolioConfig=portfolioInheritance==='custom'
+    ? {...(roleDefault.portfolio||builtInPortfolioPermissionsForRole(f.role)),...(f.portfolioPermissions||{})}
+    : (roleDefault.portfolio||builtInPortfolioPermissionsForRole(f.role));
+  const planningConfig=planningInheritance==='custom'
+    ? {...(roleDefault.planning||builtInPlanningPermissionsForRole(f.role)),...(f.planningPermissions||{})}
+    : (roleDefault.planning||builtInPlanningPermissionsForRole(f.role));
+  const documentsConfig=documentsInheritance==='custom'
+    ? {...(roleDefault.documents||builtInDocumentPermissionsForRole(f.role)),...(f.documentPermissions||{})}
+    : (roleDefault.documents||builtInDocumentPermissionsForRole(f.role));
+  const tasksListConfig=tasksListInheritance==='custom'
+    ? {...(roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role)),...(f.tasksListPermissions||{})}
+    : (roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role));
+  function toggleKanbanPermission(id,checked){
+    const current=kanbanInheritance==='custom'?{...(f.kanbanPermissions||{})}:{...(roleDefault.kanban||builtInKanbanPermissionsForRole(f.role))};
+    set('kanbanPermissions',{...current,[id]:checked});
+  }
+  function toggleCalendarPermission(id,checked){
+    const current=calendarInheritance==='custom'?{...(f.calendarPermissions||{})}:{...(roleDefault.calendar||builtInCalendarPermissionsForRole(f.role))};
+    set('calendarPermissions',{...current,[id]:checked});
+  }
+  function togglePortfolioPermission(id,checked){
+    const current=portfolioInheritance==='custom'?{...(f.portfolioPermissions||{})}:{...(roleDefault.portfolio||builtInPortfolioPermissionsForRole(f.role))};
+    set('portfolioPermissions',{...current,[id]:checked});
+  }
+  function togglePlanningPermission(id,checked){
+    const current=planningInheritance==='custom'?{...(f.planningPermissions||{})}:{...(roleDefault.planning||builtInPlanningPermissionsForRole(f.role))};
+    set('planningPermissions',{...current,[id]:checked});
+  }
+  function toggleDocumentPermission(id,checked){
+    const current=documentsInheritance==='custom'?{...(f.documentPermissions||{})}:{...(roleDefault.documents||builtInDocumentPermissionsForRole(f.role))};
+    set('documentPermissions',{...current,[id]:checked});
+  }
+  function toggleTasksListPermission(id,checked){
+    const current=tasksListInheritance==='custom'?{...(f.tasksListPermissions||{})}:{...(roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role))};
+    set('tasksListPermissions',{...current,[id]:checked});
+  }
+
+  function panelDetails(panel){
+    if(panel.id==='notifications') return <div>
+      <label>Configuração de notificações<select value={notificationInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('notifications',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div style={notificationInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        <h3>Painel e ações</h3>
+        <div className="checks one-col compact-checks-v3">{NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={notificationPanelConfig?.[item.id]===true} onChange={e=>toggleNotificationPanelPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+        <div className="notification-prefs-grid" style={{marginTop:18}}>
+          <div><h3>Eventos que geram notificação</h3><div className="checks one-col compact-checks-v3">{events.map(ev=><label key={ev}><input type="checkbox" checked={(f.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}</div></div>
+          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" checked={f.notificationStatusPrefs?.[st.id]??true} onChange={e=>set('notificationStatusPrefs',{...(f.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
+        </div>
+      </div>
+    </div>;
+    if(panel.id==='dashboard') return <div>
+      <label>Configuração do Dashboard<select value={dashboardInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('dashboard',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div className="checks one-col compact-checks-v3" style={dashboardInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        {DASHBOARD_WIDGETS.filter(item=>!(item.adminOnly&&f.role!=='admin')&&!(item.teamOnly&&f.role!=='team')).map(item=><label key={item.id}><input type="checkbox" checked={dashboardInheritance==='custom'?(f.dashboardPermissions?.visible?.[item.id]??true):(roleDefault.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}
+      </div>
+    </div>;
+    if(panel.id==='calendar') return <div>
+      <label>Configuração do Calendário<select value={calendarInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('calendar',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div className="checks one-col compact-checks-v3" style={calendarInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        {CALENDAR_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={calendarConfig?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      </div>
+    </div>;
+    if(panel.id==='tasks') return <div>
+      <label>Configuração da lista de tarefas<select value={tasksListInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('tasksList',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div className="checks one-col compact-checks-v3" style={tasksListInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        {TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={tasksListConfig?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      </div>
+    </div>;
+    if(panel.id==='kanban') return <div>
+      <label>Configuração do Kanban<select value={kanbanInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('kanban',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        {KANBAN_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      </div>
+    </div>;
+    if(panel.id==='teamhub') return <div>
+      <label>Configuração dos Portfólios<select value={portfolioInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('portfolio',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div className="checks one-col compact-checks-v3" style={portfolioInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        {PORTFOLIO_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={portfolioConfig?.[item.id]===true} onChange={e=>togglePortfolioPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      </div>
+    </div>;
+    if(panel.id==='planning') return <div>
+      <label>Configuração do Planejamento<select value={planningInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('planning',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div className="checks one-col compact-checks-v3" style={planningInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        {PLANNING_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={planningConfig?.[item.id]===true} onChange={e=>togglePlanningPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      </div>
+    </div>;
+    if(panel.id==='documents') return <div>
+      <label>Configuração dos Documentos<select value={documentsInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('documents',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <div className="checks one-col compact-checks-v3" style={documentsInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        {DOCUMENT_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={documentsConfig?.[item.id]===true} onChange={e=>toggleDocumentPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      </div>
+    </div>;
+    if(panel.id==='settings') return <p className="muted">Configurações é uma área exclusiva de Admin e não pode ser liberada para outros perfis.</p>;
+    return null;
+  }
+  const toggleSection=id=>setOpenSection(current=>current===id?null:id);
+  return <div className="modal-bg"><div className="modal"><h2>Configurações de {f.name||'usuário'}</h2>
+    <p className="muted">Defina as regras funcionais e, separadamente, os painéis exibidos no menu lateral.</p>
+
+    {f.role==='client'&&<><h3>Empresas vinculadas</h3><div className="arg-linked-company-list-v2">{companies.map(c=><label className="arg-linked-company-row-v2" key={c.id}><input type="checkbox" checked={(f.companyIds||[]).includes(c.id)} onChange={e=>set('companyIds',e.target.checked?[...(f.companyIds||[]),c.id]:(f.companyIds||[]).filter(x=>x!==c.id))}/><AvatarMini value={c.logo} label={c.name}/><span>{c.name}</span></label>)}</div></>}
+
+    <h3 style={{marginTop:18}}>Regras de acesso</h3>
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {f.role!=='admin'&&<AccessConfigCard title="Status disponíveis" open={openSection==='rule:statuses'} onToggleOpen={()=>toggleSection('rule:statuses')} accent>
+        <label>Configuração dos status<select value={statusInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('statuses',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+        <div style={statusInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+          <StatusVisibilityChecks statuses={statuses} selected={statusInheritance==='custom'?(f.visibleStatuses||[]):(roleDefault.visibleStatuses||[])} onToggle={toggleStatus}/>
+        </div>
+      </AccessConfigCard>}
+
+      <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent>
+        <label>Configuração da tarefa aberta<select value={taskDetailInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('taskDetail',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+        <div style={taskDetailInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+          <TaskOpenPermissionList
+            config={taskDetailConfig}
+            disabled={editingOtherAdmin||taskDetailInheritance!=='custom'}
+            onToggleApproval={checked=>setTaskDetailAction('canApprovePosts',checked)}
+            onTogglePermission={toggleTaskDetailPermission}
+          />
+        </div>
+      </AccessConfigCard>
+
+      <AccessConfigCard
+        title="Botão de tarefa"
+        active={actionConfig?.canCreate===true}
+        disabled={editingOtherAdmin||actionsInheritance!=='custom'}
+        open={openSection==='rule:taskButton'}
+        onToggleOpen={()=>toggleSection('rule:taskButton')}
+        onToggleActive={checked=>setTaskPermission('canCreate',checked)}
+      >
+        <label>Configuração do botão<select value={actionsInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('actions',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+        <div style={actionsInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+          <label>Texto do botão<select value={actionConfig?.creationMode||'task'} onChange={e=>setTaskPermission('creationMode',e.target.value)}><option value="task">Nova tarefa</option><option value="request">Nova solicitação</option></select></label>
+          <h4 style={{margin:'14px 0 8px'}}>Campos disponíveis</h4>
+          <div className="checks one-col compact-checks-v3">{CREATE_TASK_FIELDS.map(field=><label key={field.id}><input type="checkbox" checked={actionConfig?.createFields?.[field.id]===true} onChange={e=>toggleCreateField(field.id,e.target.checked)}/>{field.label}</label>)}</div>
+        </div>
+      </AccessConfigCard>
+    </div>
+
+    <h3 style={{marginTop:22}}>Painéis do menu lateral</h3>
+    <label>Modelo de acesso<select value={panelPermissionMode} disabled={editingOtherAdmin} onChange={e=>setMode(e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select><small>{panelPermissionMode==='default'?'Os painéis acompanham automaticamente o padrão da função.':'Ative ou desative os painéis e abra cada item para configurar.'}</small></label>
+    <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:14}}>
+      {PANEL_CATALOG.filter(panel=>f.role==='admin'||panel.id!=='settings').map(panel=>{
+        const enabled=resolvedVisible[panel.id]===true;
+        const sectionId=`panel:${panel.id}`;
+        return <AccessConfigCard
+          key={panel.id}
+          title={panel.label}
+          active={enabled}
+          disabled={editingOtherAdmin||panelPermissionMode==='default'||(f.role==='admin'&&panel.id==='settings')}
+          open={openSection===sectionId}
+          onToggleOpen={()=>toggleSection(sectionId)}
+          onToggleActive={checked=>togglePanel(panel.id,checked)}
+        >
+          {enabled?panelDetails(panel):<p className="muted">Ative este painel para configurar suas opções.</p>}
+        </AccessConfigCard>;
+      })}
+    </div>
+
+    <div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={()=>save({...f,notificationPrefsFromProfile:true})}>Salvar configurações</button></div>
+  </div></div>;
 }
 function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,currentUser=null,onArchive=null,onDelete=null,onResetPassword=null}){
   const [f,setF]=useState(u);
@@ -3455,10 +4877,6 @@ function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,curren
   const isExisting=!!f.id;
   const canArchive = isExisting && (!currentUser?.id || f.id!==currentUser.id);
   const canDelete = isExisting && (!currentUser?.id || f.id!==currentUser.id);
-  function toggleVisibleStatus(id,checked){
-    const current=f.visibleStatuses||[];
-    set('visibleStatuses', checked ? [...new Set([...current,id])] : current.filter(x=>x!==id));
-  }
   async function uploadUserAvatar(e){
     const file=e.target.files?.[0];
     if(!file) return;
@@ -3485,20 +4903,269 @@ function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,curren
     <label>Login<input disabled={isExisting} value={f.email||''} onChange={e=>set('email',e.target.value)}/><small className="profile-save-note">Depois de criado, o login fica travado para não desalinhar com o Supabase Auth.</small></label>
     <label>Senha<input disabled={isExisting} value={isExisting?'••••••••':(f.password||'')} onChange={e=>set('password',e.target.value)}/><small className="profile-save-note">Para usuário já criado, use o botão Redefinir senha.</small></label>{isExisting&&onResetPassword&&<button type="button" className="auth-secondary-action" onClick={()=>onResetPassword(f)}>Redefinir senha</button>}
     <label>Foto/avatar<input value={f.avatar||''} onChange={e=>set('avatar',e.target.value)} placeholder="Inicial, URL ou upload"/><input type="file" accept="image/*" onChange={uploadUserAvatar}/>{uploading&&<small>Enviando imagem...</small>}</label>
-    {clientMode&&<><h3>Empresas vinculadas</h3><div className="arg-linked-company-list-v2">{companies.map(c=><label className="arg-linked-company-row-v2" key={c.id}><input type="checkbox" checked={(f.companyIds||[]).includes(c.id)} onChange={e=>set('companyIds',e.target.checked?[...(f.companyIds||[]),c.id]:(f.companyIds||[]).filter(x=>x!==c.id))}/><AvatarMini value={c.logo} label={c.name}/><span>{c.name}</span></label>)}</div></>}
-    {!isAdminRole&&<><h3>Status visíveis</h3><StatusVisibilityChecks statuses={statuses} selected={f.visibleStatuses||[]} onToggle={toggleVisibleStatus}/></>}
+    <p className="muted">Painéis, status, empresas vinculadas e notificações ficam no botão Configurações.</p>
+
     {isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Arquivar esconde o cadastro sem apagar histórico. Excluir remove do painel.</p><div className="danger-zone-actions">{canArchive?<button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar usuário':'Arquivar usuário'}</button>:<button disabled>Arquivar usuário</button>}{canDelete?<button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir usuário</button>:<button className="danger-button" disabled>Excluir usuário</button>}</div>{!canArchive&&<small>Você não pode arquivar seu próprio usuário.</small>}{isAdminRole&&<small>Admins não podem ser excluídos.</small>}</div>}
     <div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div>
   </div></div>
 }
+
+function AccessDefaultsEditor({system,setSystem,statuses=[]}){
+  const [role,setRole]=useState('team');
+  const [draft,setDraft]=useState(()=>clonePayload(accessDefaultForRole(system,'team')));
+  const [openSection,setOpenSection]=useState(null);
+  useEffect(()=>{setDraft(clonePayload(accessDefaultForRole(system,role)));setOpenSection(null);},[role,system?.accessDefaults]);
+
+  function setDraftValue(key,value){setDraft(prev=>({...prev,[key]:value}));}
+  function togglePanel(id,checked){
+    if(role==='admin'&&id==='settings'&&!checked) return alert('Configurações precisa permanecer ativa no padrão de Admin.');
+    const next={...(draft.panels?.visible||{}),[id]:checked};
+    if(!Object.values(next).some(Boolean)) return alert('O padrão precisa ter pelo menos um painel ativo.');
+    setDraft(prev=>({...prev,panels:{...(prev.panels||{}),visible:next}}));
+    if(!checked&&openSection===`panel:${id}`)setOpenSection(null);
+  }
+  function toggleStatus(id,checked){
+    const current=draft.visibleStatuses||[];
+    setDraftValue('visibleStatuses',checked?[...new Set([...current,id])]:current.filter(x=>x!==id));
+  }
+  function toggleEvent(ev,checked){
+    const current=draft.notificationPrefs||[];
+    setDraftValue('notificationPrefs',checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev));
+  }
+  function toggleNotificationPanelPermission(id,checked){
+    setDraft(prev=>({...prev,notificationPanel:{...(prev.notificationPanel||builtInNotificationPanelPermissionsForRole(role)),[id]:checked}}));
+  }
+  function toggleDashboardWidget(id,checked){
+    setDraft(prev=>({...prev,dashboard:{visible:{...(prev.dashboard?.visible||fullDashboardVisibility()),[id]:checked}}}));
+  }
+  function toggleKanbanPermission(id,checked){
+    setDraft(prev=>({...prev,kanban:{...(prev.kanban||builtInKanbanPermissionsForRole(role)),[id]:checked}}));
+  }
+  function toggleCalendarPermission(id,checked){
+    setDraft(prev=>({...prev,calendar:{...(prev.calendar||builtInCalendarPermissionsForRole(role)),[id]:checked}}));
+  }
+  function togglePortfolioPermission(id,checked){
+    setDraft(prev=>({...prev,portfolio:{...(prev.portfolio||builtInPortfolioPermissionsForRole(role)),[id]:checked}}));
+  }
+  function togglePlanningPermission(id,checked){
+    setDraft(prev=>({...prev,planning:{...(prev.planning||builtInPlanningPermissionsForRole(role)),[id]:checked}}));
+  }
+  function toggleDocumentPermission(id,checked){
+    setDraft(prev=>({...prev,documents:{...(prev.documents||builtInDocumentPermissionsForRole(role)),[id]:checked}}));
+  }
+  function toggleTasksListPermission(id,checked){
+    setDraft(prev=>({...prev,tasksList:{...(prev.tasksList||builtInTasksListPermissionsForRole(role)),[id]:checked}}));
+  }
+  function setTaskPermission(key,value){
+    setDraft(prev=>({...prev,tasks:{...(prev.tasks||{}),[key]:value,createFields:{...(prev.tasks?.createFields||{})}}}));
+  }
+  function toggleCreateField(id,checked){
+    setDraft(prev=>({...prev,tasks:{...(prev.tasks||{}),createFields:{...(prev.tasks?.createFields||{}),[id]:checked}}}));
+  }
+  function toggleTaskDetailPermission(section,id,checked){
+    setDraft(prev=>{
+      const detail=prev.tasks?.detailFields||builtInTaskDetailPermissionsForRole(role);
+      const nextDetail={
+        visible:{...(detail.visible||{})},
+        editable:{...(detail.editable||{})},
+      };
+      nextDetail[section][id]=checked;
+      if(section==='visible'&&!checked) nextDetail.editable[id]=false;
+      if(section==='editable'&&checked) nextDetail.visible[id]=true;
+      return {...prev,tasks:{...(prev.tasks||{}),createFields:{...(prev.tasks?.createFields||{})},detailFields:nextDetail}};
+    });
+  }
+  function setTaskDetailAction(key,value){
+    setDraft(prev=>({...prev,tasks:{...(prev.tasks||{}),[key]:value,createFields:{...(prev.tasks?.createFields||{})},detailFields:{
+      visible:{...(prev.tasks?.detailFields?.visible||{})},
+      editable:{...(prev.tasks?.detailFields?.editable||{})},
+    }}}));
+  }
+  function saveDefaults(){
+    setSystem({...system,accessDefaults:{...(system?.accessDefaults||{}),[role]:clonePayload(draft)}});
+    alert('Padrão salvo.');
+  }
+  function restoreBuiltIn(){
+    if(!confirm('Restaurar o padrão original desta função?'))return;
+    const restored=builtInAccessDefaultForRole(role);
+    setDraft(clonePayload(restored));
+    setSystem({...system,accessDefaults:{...(system?.accessDefaults||{}),[role]:restored}});
+  }
+  const roleLabel=role==='admin'?'Admin':role==='team'?'Equipe':'Responsável';
+  const toggleSection=id=>setOpenSection(current=>current===id?null:id);
+  function panelDefaultDetails(panel){
+    if(panel.id==='notifications') return <div>
+      <h4>Painel e ações</h4><div className="checks one-col compact-checks-v3">{NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.notificationPanel?.[item.id]===true} onChange={e=>toggleNotificationPanelPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      <div className="notification-prefs-grid" style={{marginTop:18}}><div><h4>Eventos</h4><div className="checks one-col compact-checks-v3">{NOTIFICATION_VISIBLE_EVENTS.map(ev=><label key={ev}><input type="checkbox" checked={(draft.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}</div></div><div><h4>Status que geram notificação</h4><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" checked={(draft.notificationStatusPrefs?.[st.id]??true)} onChange={e=>setDraftValue('notificationStatusPrefs',{...(draft.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div></div>
+    </div>;
+    if(panel.id==='dashboard') return <div><h4>Cards e gráficos visíveis</h4><div className="checks one-col compact-checks-v3">{DASHBOARD_WIDGETS.filter(item=>!(item.adminOnly&&role!=='admin')&&!(item.teamOnly&&role!=='team')).map(item=><label key={item.id}><input type="checkbox" checked={(draft.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='tasks') return <div><h4>Filtros, grupos e dados visíveis</h4><div className="checks one-col compact-checks-v3">{TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.tasksList?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='calendar') return <div><h4>Filtros, navegação e tarefas</h4><div className="checks one-col compact-checks-v3">{CALENDAR_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.calendar?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='kanban') return <div><h4>Filtros, cards e navegação</h4><div className="checks one-col compact-checks-v3">{KANBAN_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.kanban?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='teamhub') return <div><h4>Perfis e trabalhos visíveis</h4><div className="checks one-col compact-checks-v3">{PORTFOLIO_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.portfolio?.[item.id]===true} onChange={e=>togglePortfolioPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='planning') return <div><h4>Semanas, templates e geração</h4><div className="checks one-col compact-checks-v3">{PLANNING_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.planning?.[item.id]===true} onChange={e=>togglePlanningPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='documents') return <div><h4>Pastas, conteúdo e ações</h4><div className="checks one-col compact-checks-v3">{DOCUMENT_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.documents?.[item.id]===true} onChange={e=>toggleDocumentPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    return <p className="muted">As configurações internas deste painel serão adicionadas no módulo correspondente. A visibilidade já está funcional.</p>;
+  }
+  return <div className="settings-section">
+    <div className="section-header"><div><h2>Padrões de acesso</h2><p className="muted">Usuários que usam o padrão acompanham automaticamente qualquer mudança salva aqui.</p></div></div>
+    <div className="view-tabs" style={{justifyContent:'flex-start',margin:'0 0 18px'}}>{[['team','Equipe'],['client','Responsável']].map(([id,label])=><button key={id} className={role===id?'active primary':''} aria-pressed={role===id} onClick={()=>setRole(id)}>{role===id?'✓ ':''}{label}</button>)}</div>
+    <div className="panel"><h2>Padrão de {roleLabel}</h2>
+
+      <h3>Regras de acesso</h3>
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {role!=='admin'&&<AccessConfigCard title="Status disponíveis" open={openSection==='rule:statuses'} onToggleOpen={()=>toggleSection('rule:statuses')} accent>
+          <StatusVisibilityChecks statuses={statuses} selected={draft.visibleStatuses||[]} onToggle={toggleStatus}/>
+        </AccessConfigCard>}
+
+        <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent>
+          <TaskOpenPermissionList
+            config={{canApprovePosts:draft.tasks?.canApprovePosts===true,visible:draft.tasks?.detailFields?.visible||{},editable:draft.tasks?.detailFields?.editable||{}}}
+            onToggleApproval={checked=>setTaskDetailAction('canApprovePosts',checked)}
+            onTogglePermission={toggleTaskDetailPermission}
+          />
+        </AccessConfigCard>
+
+        <AccessConfigCard
+          title="Botão de tarefa"
+          active={draft.tasks?.canCreate===true}
+          open={openSection==='rule:taskButton'}
+          onToggleOpen={()=>toggleSection('rule:taskButton')}
+          onToggleActive={checked=>setTaskPermission('canCreate',checked)}
+        >
+          <label>Texto do botão<select value={draft.tasks?.creationMode||'task'} onChange={e=>setTaskPermission('creationMode',e.target.value)}><option value="task">Nova tarefa</option><option value="request">Nova solicitação</option></select></label>
+          <h4 style={{margin:'14px 0 8px'}}>Campos disponíveis</h4>
+          <div className="checks one-col compact-checks-v3">{CREATE_TASK_FIELDS.map(field=><label key={field.id}><input type="checkbox" checked={draft.tasks?.createFields?.[field.id]===true} onChange={e=>toggleCreateField(field.id,e.target.checked)}/>{field.label}</label>)}</div>
+        </AccessConfigCard>
+      </div>
+
+      <h3 style={{marginTop:22}}>Painéis do menu lateral</h3>
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {PANEL_CATALOG.filter(panel=>panel.id!=='settings').map(panel=>{
+          const active=draft.panels?.visible?.[panel.id]===true;
+          const sectionId=`panel:${panel.id}`;
+          return <AccessConfigCard
+            key={panel.id}
+            title={panel.label}
+            active={active}
+            disabled={role==='admin'&&panel.id==='settings'}
+            open={openSection===sectionId}
+            onToggleOpen={()=>toggleSection(sectionId)}
+            onToggleActive={checked=>togglePanel(panel.id,checked)}
+          >
+            {active?panelDefaultDetails(panel):<p className="muted">Ative este painel para configurar suas opções.</p>}
+          </AccessConfigCard>;
+        })}
+      </div>
+
+      <div className="modal-actions"><button onClick={restoreBuiltIn}>Restaurar padrão original</button><button className="primary" onClick={saveDefaults}>Salvar padrão</button></div>
+    </div>
+  </div>;
+}
+
+const ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS = `
+/* Round155S: confirmação visual da aba ativa em Configurações */
+.settings-tabs{
+  display:flex!important;
+  align-items:flex-end!important;
+  flex-wrap:wrap!important;
+  gap:6px!important;
+  margin:0 0 20px!important;
+  padding:0 0 1px!important;
+  border-bottom:1px solid rgba(225,177,44,.18)!important;
+}
+
+.settings-tabs > button{
+  position:relative!important;
+  min-height:38px!important;
+  margin:0!important;
+  padding:9px 13px!important;
+  border:1px solid rgba(225,177,44,.13)!important;
+  border-bottom-color:rgba(225,177,44,.22)!important;
+  border-radius:8px 8px 0 0!important;
+  background:rgba(255,255,255,.025)!important;
+  color:rgba(255,255,255,.62)!important;
+  font-size:13px!important;
+  font-weight:650!important;
+  line-height:1.15!important;
+  box-shadow:none!important;
+  opacity:.82!important;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,opacity .16s ease!important;
+}
+
+.settings-tabs > button:hover{
+  color:rgba(255,255,255,.9)!important;
+  border-color:rgba(225,177,44,.32)!important;
+  background:rgba(225,177,44,.055)!important;
+  opacity:1!important;
+}
+
+.settings-tabs > button.active,
+.settings-tabs > button[aria-current="page"]{
+  color:#f4dda0!important;
+  border-color:rgba(225,177,44,.58)!important;
+  border-bottom-color:rgba(12,12,12,1)!important;
+  background:linear-gradient(180deg,rgba(225,177,44,.17) 0%,rgba(225,177,44,.075) 100%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,224,139,.08),0 -1px 10px rgba(225,177,44,.055)!important;
+  opacity:1!important;
+  z-index:2!important;
+}
+
+.settings-tabs > button.active::after,
+.settings-tabs > button[aria-current="page"]::after{
+  content:""!important;
+  position:absolute!important;
+  left:11px!important;
+  right:11px!important;
+  bottom:-2px!important;
+  height:2px!important;
+  border-radius:999px!important;
+  background:#d9ad38!important;
+  box-shadow:0 0 8px rgba(225,177,44,.42)!important;
+}
+
+@media (max-width:760px){
+  .settings-tabs{
+    align-items:stretch!important;
+    gap:6px!important;
+    overflow-x:auto!important;
+    flex-wrap:nowrap!important;
+    padding-bottom:5px!important;
+    scrollbar-width:thin!important;
+  }
+
+  .settings-tabs > button{
+    flex:0 0 auto!important;
+    white-space:nowrap!important;
+    border-radius:8px!important;
+  }
+
+  .settings-tabs > button.active,
+  .settings-tabs > button[aria-current="page"]{
+    border-bottom-color:rgba(225,177,44,.58)!important;
+  }
+}
+`;
+
+if(typeof document!=='undefined'){
+  let style155S=document.getElementById('argos-round155s-settings-active-tab');
+  if(!style155S){
+    style155S=document.createElement('style');
+    style155S.id='argos-round155s-settings-active-tab';
+    document.head.appendChild(style155S);
+  }
+  style155S.textContent=ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS;
+}
+
 function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanies,users,setUsers,system,setSystem,reset,currentUser=null}){ 
   const [tab,setTab]=useState('status'); 
   const [editing,setEditing]=useState(null); 
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
   function save(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
-  const tabs=[['status','Status'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Geral']];
-  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
+  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Geral']];
+  if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
+  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} type="button" className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -3766,40 +5433,49 @@ function blankDocument(currentUser){
   };
 }
 function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,currentUser}){
-  const visibleDocs=(documents||[]).filter(d=>!d.archived && !isFolderMarker(d));
+  const permissions={...builtInDocumentPermissionsForRole(currentUser?.role),...(currentUser?.documentPermissions||{})};
+  const visibleDocs=(documents||[]).filter(d=>!d.archived&&!isFolderMarker(d));
   const folders=documentFolders(documents);
-  const [selected,setSelected]=useState(visibleDocs[0]?.id || documents.find(d=>!isFolderMarker(d))?.id || null);
+  const [selected,setSelected]=useState(visibleDocs[0]?.id||documents.find(d=>!isFolderMarker(d))?.id||null);
   const [q,setQ]=useState('');
   const [openFolders,setOpenFolders]=useState(()=>Object.fromEntries(folders.map(f=>[f,true])));
   const [creatingFolder,setCreatingFolder]=useState(false);
   const [folderDraft,setFolderDraft]=useState('');
-  const doc=documents.find(d=>!isFolderMarker(d) && d.id===selected) || visibleDocs[0] || null;
+  const doc=documents.find(d=>!isFolderMarker(d)&&d.id===selected)||visibleDocs[0]||null;
+
   useEffect(()=>{
-    if(!doc && visibleDocs[0]) setSelected(visibleDocs[0].id);
+    if(!doc&&visibleDocs[0]) setSelected(visibleDocs[0].id);
   },[documents.length]);
+
   function createDoc(folder='Clientes'){
+    if(!permissions.canCreateDocuments) return;
     const safeFolder=normalizeFolderName(folder)||folders[0]||'Clientes';
     const folderDocs=visibleDocs.filter(d=>(d.folder||'Clientes')===safeFolder);
-    const next={...blankDocument(currentUser), folder:safeFolder, order:folderDocs.length};
+    const next={...blankDocument(currentUser),folder:safeFolder,order:folderDocs.length};
     setDocuments(prev=>[next,...(prev||[])]);
     setSelected(next.id);
     setOpenFolders(prev=>({...prev,[safeFolder]:true}));
   }
+
   function createFolder(nameValue){
+    if(!permissions.canCreateFolders) return false;
     const name=normalizeFolderName(nameValue);
     if(!name) return false;
-    if(folders.some(f=>f.toLowerCase()===name.toLowerCase())){ alert('Essa pasta já existe.'); return false; }
+    if(folders.some(f=>f.toLowerCase()===name.toLowerCase())){alert('Essa pasta já existe.');return false;}
     setDocuments(prev=>[folderMarker(name,currentUser,{order:folders.length}),...(prev||[])]);
     setOpenFolders(prev=>({...prev,[name]:true}));
     return true;
   }
+
   function commitFolderDraft(){
     if(createFolder(folderDraft)){
       setFolderDraft('');
       setCreatingFolder(false);
     }
   }
+
   function deleteFolder(folder){
+    if(!permissions.canDeleteFolders) return;
     const safeFolder=normalizeFolderName(folder);
     const docsInFolder=visibleDocs.filter(d=>(d.folder||'Clientes')===safeFolder);
     const msg=docsInFolder.length?`Excluir a pasta "${safeFolder}" e arquivar ${docsInFolder.length} documento(s) dentro dela?`:`Excluir a pasta "${safeFolder}"?`;
@@ -3814,15 +5490,17 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
       });
       return hasMarker?next:[deletedMarker,...next];
     });
-    if(doc && (doc.folder||'Clientes')===safeFolder){
+    if(doc&&(doc.folder||'Clientes')===safeFolder){
       const next=visibleDocs.find(d=>(d.folder||'Clientes')!==safeFolder);
       setSelected(next?.id||null);
     }
   }
+
   function moveFolder(folder,dir){
+    if(!permissions.canReorder) return;
     const idx=folders.indexOf(folder);
     const nextIdx=idx+dir;
-    if(idx<0 || nextIdx<0 || nextIdx>=folders.length) return;
+    if(idx<0||nextIdx<0||nextIdx>=folders.length) return;
     const ordered=[...folders];
     [ordered[idx],ordered[nextIdx]]=[ordered[nextIdx],ordered[idx]];
     setDocuments(prev=>{
@@ -3836,56 +5514,124 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
       return [...markers,...without];
     });
   }
+
   function patchDoc(id,patch){
     setDocuments(prev=>(prev||[]).map(d=>d.id===id?{...d,...patch,updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy}:d));
   }
+
   function deleteDoc(id){
+    if(!permissions.canDeleteDocuments) return;
     if(!confirm('Excluir este documento? Esta ação remove o documento da lista.')) return;
     setDocuments(prev=>(prev||[]).filter(d=>d.id!==id));
     const next=visibleDocs.find(d=>d.id!==id);
-    setSelected(next?.id || null);
+    setSelected(next?.id||null);
   }
+
   function moveDoc(id,folder,dir){
+    if(!permissions.canReorder) return;
     const orderedDocs=visibleDocs.filter(d=>(d.folder||'Clientes')===folder).sort((a,b)=>(a.order??9999)-(b.order??9999));
     const idx=orderedDocs.findIndex(d=>d.id===id);
     const nextIdx=idx+dir;
-    if(idx<0 || nextIdx<0 || nextIdx>=orderedDocs.length) return;
+    if(idx<0||nextIdx<0||nextIdx>=orderedDocs.length) return;
     const next=[...orderedDocs];
     [next[idx],next[nextIdx]]=[next[nextIdx],next[idx]];
     const orderMap=new Map(next.map((d,i)=>[d.id,i]));
     setDocuments(prev=>(prev||[]).map(d=>orderMap.has(d.id)?{...d,order:orderMap.get(d.id),updatedAt:now(),updatedBy:currentUser?.id||d.updatedBy}:d));
   }
-  const query=(q||'').trim().toLowerCase();
-  const baseOrder = new Map((documents||[]).map((d,i)=>[d.id,i]));
+
+  const query=permissions.showSearch?(q||'').trim().toLowerCase():'';
+  const baseOrder=new Map((documents||[]).map((d,i)=>[d.id,i]));
   const filteredDocs=visibleDocs.filter(d=>{
     if(!query) return true;
-    const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name: d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'Geral';
-    const hay=`${d.title||''} ${d.folder||''} ${target||''} ${d.content||''}`.toLowerCase();
-    return hay.includes(query);
+    const target=d.linkType==='company'?companies.find(c=>c.id===d.targetId)?.name:d.linkType==='user'?users.find(u=>u.id===d.targetId)?.name:'Geral';
+    return `${d.title||''} ${d.folder||''} ${target||''} ${d.content||''}`.toLowerCase().includes(query);
   });
-  const grouped=folders.map(folder=>({folder, docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder).sort((a,b)=>((a.order??9999)-(b.order??9999)) || ((baseOrder.get(a.id)||0)-(baseOrder.get(b.id)||0)))}));
-  return <section className="documents-page docs-clickup-shell"><div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div></div><div className="docs-workspace">{doc?<DocumentEditor doc={doc} patchDoc={patchDoc} deleteDoc={deleteDoc} folders={folders} companies={companies} users={users}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>Crie uma pasta e depois um documento para começar.</p></div>}<aside className="docs-sidebar"><div className="docs-sidebar-head"><b>Arquivos</b><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar..."/></div><div className="docs-folder-list">{grouped.map((group,folderIndex)=>{const isOpen=openFolders[group.folder]!==false; return <div className="docs-folder" key={group.folder}><div className="docs-folder-row"><button className="docs-folder-toggle" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{isOpen?'▾':'▸'}</button><button className="docs-folder-name" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{group.folder}</button><button className="docs-folder-move" disabled={folderIndex===0} title="Subir pasta" onClick={()=>moveFolder(group.folder,-1)}>↑</button><button className="docs-folder-move" disabled={folderIndex===folders.length-1} title="Descer pasta" onClick={()=>moveFolder(group.folder,1)}>↓</button><button className="docs-folder-add" title="Novo documento nesta pasta" onClick={()=>createDoc(group.folder)}>+</button><button className="docs-folder-delete" title="Excluir pasta" onClick={()=>deleteFolder(group.folder)}>×</button></div>{isOpen&&<div className="docs-page-list">{group.docs.length?group.docs.map((d,docIndex)=><div key={d.id} className={'docs-page-row '+(doc?.id===d.id?'active':'')}><button className="docs-page-item" onClick={()=>setSelected(d.id)}><span>{d.title||'Sem título'}</span></button><button className="docs-doc-move" disabled={docIndex===0} title="Subir documento" onClick={()=>moveDoc(d.id,group.folder,-1)}>↑</button><button className="docs-doc-move" disabled={docIndex===group.docs.length-1} title="Descer documento" onClick={()=>moveDoc(d.id,group.folder,1)}>↓</button></div>):<small className="docs-folder-empty">Sem documentos</small>}</div>}</div>})}</div>{creatingFolder?<div className="docs-new-folder-inline"><input autoFocus value={folderDraft} onChange={e=>setFolderDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') commitFolderDraft(); if(e.key==='Escape'){setCreatingFolder(false); setFolderDraft('');}}} placeholder="Nome da pasta"/><button onClick={commitFolderDraft}>Criar</button><button onClick={()=>{setCreatingFolder(false);setFolderDraft('')}}>×</button></div>:<button className="docs-new-folder" onClick={()=>setCreatingFolder(true)}>+ Nova pasta</button>}</aside></div></section>
+  const grouped=folders.map(folder=>({folder,docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder).sort((a,b)=>((a.order??9999)-(b.order??9999))||((baseOrder.get(a.id)||0)-(baseOrder.get(b.id)||0)))}));
+
+  return <section className="documents-page docs-clickup-shell">
+    <div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div></div>
+    <div className="docs-workspace">
+      {doc?<DocumentEditor doc={doc} patchDoc={patchDoc} deleteDoc={deleteDoc} folders={folders} companies={companies} users={users} permissions={permissions}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>{permissions.canCreateDocuments?'Crie uma pasta e depois um documento para começar.':'Nenhum documento disponível.'}</p></div>}
+
+      {permissions.showFolders&&<aside className="docs-sidebar">
+        <div className="docs-sidebar-head"><b>Arquivos</b>{permissions.showSearch&&<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Pesquisar..."/>}</div>
+        <div className="docs-folder-list">{grouped.map((group,folderIndex)=>{
+          const isOpen=openFolders[group.folder]!==false;
+          return <div className="docs-folder" key={group.folder}>
+            <div className="docs-folder-row">
+              <button className="docs-folder-toggle" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{isOpen?'▾':'▸'}</button>
+              <button className="docs-folder-name" onClick={()=>setOpenFolders(prev=>({...prev,[group.folder]:!isOpen}))}>{group.folder}</button>
+              {permissions.canReorder&&<><button className="docs-folder-move" disabled={folderIndex===0} title="Subir pasta" onClick={()=>moveFolder(group.folder,-1)}>↑</button><button className="docs-folder-move" disabled={folderIndex===folders.length-1} title="Descer pasta" onClick={()=>moveFolder(group.folder,1)}>↓</button></>}
+              {permissions.canCreateDocuments&&<button className="docs-folder-add" title="Novo documento nesta pasta" onClick={()=>createDoc(group.folder)}>+</button>}
+              {permissions.canDeleteFolders&&<button className="docs-folder-delete" title="Excluir pasta" onClick={()=>deleteFolder(group.folder)}>×</button>}
+            </div>
+            {isOpen&&<div className="docs-page-list">{group.docs.length?group.docs.map((d,docIndex)=><div key={d.id} className={'docs-page-row '+(doc?.id===d.id?'active':'')}>
+              <button className="docs-page-item" disabled={!permissions.canOpenDocuments} onClick={()=>permissions.canOpenDocuments&&setSelected(d.id)}><span>{d.title||'Sem título'}</span></button>
+              {permissions.canReorder&&<><button className="docs-doc-move" disabled={docIndex===0} title="Subir documento" onClick={()=>moveDoc(d.id,group.folder,-1)}>↑</button><button className="docs-doc-move" disabled={docIndex===group.docs.length-1} title="Descer documento" onClick={()=>moveDoc(d.id,group.folder,1)}>↓</button></>}
+            </div>):<small className="docs-folder-empty">Sem documentos</small>}</div>}
+          </div>;
+        })}</div>
+
+        {permissions.canCreateFolders&&(creatingFolder?<div className="docs-new-folder-inline"><input autoFocus value={folderDraft} onChange={e=>setFolderDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')commitFolderDraft();if(e.key==='Escape'){setCreatingFolder(false);setFolderDraft('');}}} placeholder="Nome da pasta"/><button onClick={commitFolderDraft}>Criar</button><button onClick={()=>{setCreatingFolder(false);setFolderDraft('')}}>×</button></div>:<button className="docs-new-folder" onClick={()=>setCreatingFolder(true)}>+ Nova pasta</button>)}
+      </aside>}
+    </div>
+  </section>;
 }
 
-function DocumentEditor({doc,patchDoc,deleteDoc,folders,companies,users}){
+function DocumentEditor({doc,patchDoc,deleteDoc,folders,companies,users,permissions}){
   const [metaOpen,setMetaOpen]=useState(false);
-  const linkedOptions=doc.linkType==='company'?companies.filter(c=>c.active!==false):doc.linkType==='user'?users.filter(u=>u.active!==false && u.role!=='client'):[ ];
+  const linkedOptions=doc.linkType==='company'?companies.filter(c=>c.active!==false):doc.linkType==='user'?users.filter(u=>u.active!==false&&u.role!=='client'):[];
   const linkedTarget=doc.linkType==='company'?companies.find(c=>c.id===doc.targetId):doc.linkType==='user'?users.find(u=>u.id===doc.targetId):null;
   const linkedAvatar=doc.linkType==='company'?linkedTarget?.logo:linkedTarget?.avatar;
   const linkedLabel=doc.linkType==='company'?'Empresa/cliente':doc.linkType==='user'?'Funcionário':'Sem vínculo';
-  return <main className="docs-editor"><div className="docs-editor-head"><div className="docs-title-block"><input className="docs-title-input" value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})} placeholder="Título do documento"/><div className="docs-breadcrumb"><span>{doc.folder||'Clientes'}</span><span>•</span><span>Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</span></div>{linkedTarget&&<div className="docs-linked-card"><AvatarMini value={linkedAvatar} label={linkedTarget.name}/><div><small>{linkedLabel}</small><b>{linkedTarget.name}</b></div></div>}</div><div className="docs-actions"><button onClick={()=>setMetaOpen(v=>!v)}>{metaOpen?'Ocultar configurações':'Configurações'}</button></div></div>{metaOpen&&<div className="docs-meta-panel"><div className="form-two"><label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{folders.map(f=><option key={f}>{f}</option>)}</select></label><label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label></div>{doc.linkType!=='general'&&<label>{doc.linkType==='user'?'Funcionário':'Empresa/cliente'}<select value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}<div className="danger-zone"><h3>Documento</h3><p>Use apenas se tiver certeza. Esta ação remove o documento da biblioteca.</p><button onClick={()=>deleteDoc(doc.id)}>Excluir documento</button></div></div>}<textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/></main>
+
+  return <main className="docs-editor">
+    <div className="docs-editor-head">
+      <div className="docs-title-block">
+        {permissions.canEditTitle
+          ? <input className="docs-title-input" value={doc.title||''} onChange={e=>patchDoc(doc.id,{title:e.target.value})} placeholder="Título do documento"/>
+          : <h2>{doc.title||'Sem título'}</h2>
+        }
+        <div className="docs-breadcrumb"><span>{doc.folder||'Clientes'}</span><span>•</span><span>Atualizado em {doc.updatedAt?new Date(doc.updatedAt).toLocaleString('pt-BR'):'agora'}</span></div>
+        {permissions.showLinkedEntity&&linkedTarget&&<div className="docs-linked-card"><AvatarMini value={linkedAvatar} label={linkedTarget.name}/><div><small>{linkedLabel}</small><b>{linkedTarget.name}</b></div></div>}
+      </div>
+      {permissions.canEditMetadata&&<div className="docs-actions"><button onClick={()=>setMetaOpen(v=>!v)}>{metaOpen?'Ocultar configurações':'Configurações'}</button></div>}
+    </div>
+
+    {metaOpen&&permissions.canEditMetadata&&<div className="docs-meta-panel">
+      <div className="form-two">
+        <label>Pasta<select value={doc.folder||'Clientes'} onChange={e=>patchDoc(doc.id,{folder:e.target.value})}>{folders.map(f=><option key={f}>{f}</option>)}</select></label>
+        <label>Vincular a<select value={doc.linkType||'general'} onChange={e=>patchDoc(doc.id,{linkType:e.target.value,targetId:''})}><option value="general">Geral / sem vínculo</option><option value="company">Empresa/cliente</option><option value="user">Funcionário</option></select></label>
+      </div>
+      {doc.linkType!=='general'&&<label>{doc.linkType==='user'?'Funcionário':'Empresa/cliente'}<select value={doc.targetId||''} onChange={e=>patchDoc(doc.id,{targetId:e.target.value})}><option value="">Selecione</option>{linkedOptions.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}
+      {permissions.canDeleteDocuments&&<div className="danger-zone"><h3>Documento</h3><p>Use apenas se tiver certeza. Esta ação remove o documento da biblioteca.</p><button onClick={()=>deleteDoc(doc.id)}>Excluir documento</button></div>}
+    </div>}
+
+    {permissions.canEditContent
+      ? <textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/>
+      : <div className="docs-content-editor" style={{whiteSpace:'pre-wrap',overflow:'auto'}}>{doc.content||'Sem conteúdo.'}</div>
+    }
+  </main>;
 }
 
 
 
 function NotificationsPage({notifications,setNotifications,open,tasks,companies,users,statuses,user}){ 
+  const permissions={...builtInNotificationPanelPermissionsForRole(user?.role),...(user?.notificationPanelPermissions||{})};
   const [tab,setTab]=useState('open'); 
   const scoped=notifications.filter(n=>(!n.userId||n.userId===user.id));
-  const list=scoped.filter(n=>tab==='done'?n.done:!n.done); 
+  const effectiveTab=permissions.showTabs?tab:'open';
+  const list=scoped.filter(n=>effectiveTab==='done'?n.done:!n.done); 
   const doneCount=scoped.filter(n=>n.done).length;
-  function done(id){ setNotifications(prev=>prev.map(n=>n.id===id?{...n,done:true}:n)); }
+  const openCount=scoped.filter(n=>!n.done).length;
+  function done(id){ if(!permissions.canComplete)return; setNotifications(prev=>prev.map(n=>n.id===id?{...n,done:true}:n)); }
+  function doneAll(){
+    if(!permissions.canCompleteAll||!openCount)return;
+    if(!confirm(`Concluir ${openCount} notificação${openCount===1?'':'ões'} pendente${openCount===1?'':'s'}?`))return;
+    setNotifications(prev=>prev.map(n=>(!n.userId||n.userId===user.id)&&!n.done?{...n,done:true}:n));
+  }
   function clearDone(){
-    if(!doneCount) return;
+    if(!permissions.canDeleteCompleted||!doneCount) return;
     if(!confirm(`Limpar ${doneCount} notificação${doneCount===1?' concluída':' concluídas'}?`)) return;
     setNotifications(prev=>prev.filter(n=>!(n.done && (!n.userId || n.userId===user.id))));
   }
@@ -3944,11 +5690,36 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     const value=String(color||'');
     return /^#[0-9a-f]{6}$/i.test(value)?`${value}${alpha}`:'rgba(255,255,255,.05)';
   }
-  return <section><h1>Notificações</h1><div className="filters"><button className={tab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={tab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button>{tab==='done'&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}</div><div className="notifications-list">{list.length?list.map(n=>{const info=notificationInfo(n);const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';return <div className="panel notification-item" key={n.id}><div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:18}}><div style={{minWidth:0,flex:1}}><small>{new Date(n.at).toLocaleString('pt-BR')}</small>{info.task&&<div style={{fontWeight:750,fontSize:'14px',marginTop:12,marginBottom:6}}>{info.task.title}</div>}{info.actorName&&<div style={{fontWeight:700,fontSize:'13px',marginBottom:4,color:'var(--text)'}}>{info.actorName}:</div>}<div style={{lineHeight:1.5,color:'var(--text)',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{info.content}</div></div><div style={{display:'flex',alignItems:'center',gap:14,flex:'0 0 auto',padding:'6px 8px 0 0'}}>{info.company&&<span title={`Empresa: ${info.company.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.company.logo} label={info.company.name}/></span>}{info.responsible&&<span title={`Responsável: ${info.responsible.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.responsible.avatar} label={info.responsible.name}/></span>}</div></div>{(info.postDate||info.deadline||info.status)&&<div style={{display:'flex',flexWrap:'wrap',gap:'7px 12px',margin:'12px 0',fontSize:'12px'}}>
-  <span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:'#aeb4bd',background:'rgba(156,163,175,.08)',border:'1px solid rgba(156,163,175,.38)'}}>{info.postDate?fmtDate(info.postDate):'Sem data'}</span>
-  {info.deadline&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:deadlineTone,background:softColor(deadlineTone,'18'),border:`1px solid ${softColor(deadlineTone,'66')}`}}>{fmtDate(info.deadline)}</span>}
-  {info.status&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:statusTone,background:softColor(statusTone,'18'),border:`1px solid ${softColor(statusTone,'66')}`}}>{info.status.name}</span>}
-</div>}<div className="row-actions"><button onClick={()=>open(n.taskId)}>Abrir tarefa</button>{!n.done&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}</div></div>}):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div></section> 
+  return <section><h1>Notificações</h1>
+    {(permissions.showTabs||permissions.canCompleteAll||permissions.canDeleteCompleted)&&<div className="filters">
+      {permissions.showTabs&&<><button className={effectiveTab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={effectiveTab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></>}
+      {effectiveTab==='open'&&permissions.canCompleteAll&&<button onClick={doneAll} disabled={!openCount}>Concluir todas</button>}
+      {effectiveTab==='done'&&permissions.canDeleteCompleted&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}
+    </div>}
+    <div className="notifications-list">{list.length?list.map(n=>{const info=notificationInfo(n);const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';return <div className="panel notification-item" key={n.id}>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:18}}>
+        <div style={{minWidth:0,flex:1}}>
+          {permissions.showDateTime&&<small>{new Date(n.at).toLocaleString('pt-BR')}</small>}
+          {info.task&&<div style={{fontWeight:750,fontSize:'14px',marginTop:12,marginBottom:6}}>{info.task.title}</div>}
+          {info.actorName&&<div style={{fontWeight:700,fontSize:'13px',marginBottom:4,color:'var(--text)'}}>{info.actorName}:</div>}
+          <div style={{lineHeight:1.5,color:'var(--text)',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{info.content}</div>
+        </div>
+        {(permissions.showCompany||permissions.showResponsible)&&<div style={{display:'flex',alignItems:'center',gap:14,flex:'0 0 auto',padding:'6px 8px 0 0'}}>
+          {permissions.showCompany&&info.company&&<span title={`Empresa: ${info.company.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.company.logo} label={info.company.name}/></span>}
+          {permissions.showResponsible&&info.responsible&&<span title={`Responsável: ${info.responsible.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.responsible.avatar} label={info.responsible.name}/></span>}
+        </div>}
+      </div>
+      {(permissions.showPostDate||permissions.showDeadline||permissions.showStatus)&&(info.postDate||info.deadline||info.status)&&<div style={{display:'flex',flexWrap:'wrap',gap:'7px 12px',margin:'12px 0',fontSize:'12px'}}>
+        {permissions.showPostDate&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:'#aeb4bd',background:'rgba(156,163,175,.08)',border:'1px solid rgba(156,163,175,.38)'}}>{info.postDate?fmtDate(info.postDate):'Sem data'}</span>}
+        {permissions.showDeadline&&info.deadline&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:deadlineTone,background:softColor(deadlineTone,'18'),border:`1px solid ${softColor(deadlineTone,'66')}`}}>{fmtDate(info.deadline)}</span>}
+        {permissions.showStatus&&info.status&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:statusTone,background:softColor(statusTone,'18'),border:`1px solid ${softColor(statusTone,'66')}`}}>{info.status.name}</span>}
+      </div>}
+      {(permissions.canOpenTasks||(!n.done&&permissions.canComplete))&&<div className="row-actions">
+        {permissions.canOpenTasks&&info.task&&<button onClick={()=>open(n.taskId)}>Abrir tarefa</button>}
+        {!n.done&&permissions.canComplete&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}
+      </div>}
+    </div>}):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div>
+  </section> 
 }
 
 
