@@ -4599,3 +4599,39 @@ body.public-portfolio-scroll-root{
 .public-portfolio-activate-video{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;z-index:9!important;width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;padding:0!important;display:grid!important;place-items:center!important;border-radius:999px!important;border:1px solid rgba(255,255,255,.28)!important;background:rgba(0,0,0,.70)!important;color:#fff!important;font-size:17px!important;box-shadow:0 12px 30px rgba(0,0,0,.38)!important;backdrop-filter:blur(8px)}
 .public-portfolio-paged-media{display:none!important}
 @media(max-width:760px){.public-portfolio-optimized-media{aspect-ratio:4/5!important;height:auto!important}.public-portfolio-optimized-thumb,.public-portfolio-optimized-placeholder,.public-portfolio-real-layer{position:absolute!important;inset:0!important}.public-portfolio-activate-video{width:46px!important;height:46px!important;min-width:46px!important;min-height:46px!important;font-size:15px!important}.public-portfolio-real-layer{touch-action:pan-y!important}.public-portfolio-real-layer iframe{touch-action:manipulation!important}}
+
+/* Round158A — fechamento de pop-ups e organização do Template semanal */
+.template-line-title{margin:0 0 12px;color:var(--text);font-size:15px}
+.template-modal-actions{justify-content:space-between;align-items:center}
+.template-save-actions{display:flex;gap:10px;margin-left:auto}
+@media(max-width:760px){
+  .template-modal-actions{align-items:stretch}
+  .template-save-actions{display:flex;gap:10px;margin-left:0}
+  .template-save-actions button{flex:1}
+}
+
+/* Round161C — editor rico integrado e barra contextual flutuante */
+.rich-text-field{position:relative!important;display:block!important;margin:0!important;padding:0!important;overflow:visible!important}
+.rich-text-field>label{display:block!important;margin:0 0 6px!important}
+.rich-text-editor-shell{position:relative!important;display:block!important;width:100%!important}
+.rich-text-toolbar{position:fixed!important;z-index:80!important;display:flex!important;align-items:center!important;gap:4px!important;width:max-content!important;max-width:calc(100vw - 16px)!important;padding:5px!important;border:1px solid rgba(225,177,44,.28)!important;border-radius:9px!important;background:rgba(10,10,12,.94)!important;box-shadow:0 10px 28px rgba(0,0,0,.42)!important;backdrop-filter:blur(9px)!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;transform:translateY(4px)!important;transition:opacity .12s ease,transform .12s ease,visibility .12s ease!important}
+.rich-text-toolbar.is-visible{opacity:1!important;visibility:visible!important;pointer-events:auto!important;transform:translateY(0)!important}
+.rich-text-toolbar button{width:auto!important;min-width:30px!important;min-height:28px!important;height:28px!important;margin:0!important;padding:3px 8px!important;border-radius:6px!important;background:rgba(255,255,255,.035)!important;color:rgba(255,255,255,.78)!important;box-shadow:none!important;font-size:12px!important;line-height:1!important}
+.rich-text-toolbar button:hover{border-color:rgba(225,177,44,.42)!important;color:#e1b12c!important;background:rgba(225,177,44,.08)!important}
+.rich-text-editor{box-sizing:border-box!important;display:block!important;width:100%!important;height:auto!important;min-height:110px!important;padding:12px 46px 12px 12px!important;overflow-y:auto!important;border:1px solid var(--line-gold)!important;border-radius:10px!important;background:#080809!important;color:var(--text)!important;font:inherit!important;font-size:13px!important;line-height:1.5!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;outline:none!important;cursor:text!important}
+.rich-text-editor:focus{border-color:rgba(225,177,44,.55)!important;box-shadow:0 0 0 3px rgba(225,177,44,.06)!important}
+.rich-text-editor:empty:before{content:attr(data-placeholder);color:rgba(255,255,255,.34);pointer-events:none}
+.rich-text-editor h3,.rich-text-display h3{margin:.45em 0 .25em;color:#e1b12c;font-size:1.08em;line-height:1.35}
+.rich-text-editor ul,.rich-text-editor ol,.rich-text-display ul,.rich-text-display ol{margin:.35em 0;padding-left:1.4em}
+.rich-text-editor a,.rich-text-display a{color:#e1b12c;text-decoration:underline;overflow-wrap:anywhere}
+.rich-text-editor a{cursor:pointer}
+.rich-text-display{white-space:normal;overflow-wrap:anywhere}
+.rich-text-display p,.rich-text-display div{margin:.25em 0}
+.insta-caption>.rich-text-display{display:inline}
+@media(max-width:760px){.rich-text-toolbar{max-width:calc(100vw - 16px)!important;flex-wrap:wrap!important}.rich-text-toolbar button{min-width:34px!important}.rich-text-editor{min-height:120px!important}}
+
+/* Round162A — editor rico compartilhado nos campos editoriais */
+.docs-rich-text-field{flex:1 1 auto!important;min-height:45vh!important}
+.docs-rich-text-field .rich-text-editor-shell{height:100%!important;min-height:45vh!important}
+.docs-rich-text-field .rich-text-editor{height:100%!important;min-height:45vh!important;border:0!important;border-radius:0!important;background:transparent!important;padding:18px 8px!important;font-size:15px!important;line-height:1.7!important}
+.docs-rich-text-field .rich-text-editor:focus{box-shadow:none!important}

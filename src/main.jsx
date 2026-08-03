@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
@@ -1871,6 +1871,57 @@ function linkify(text){
     return part.split(/(\n)/g).map((chunk,j)=>chunk==='\n'?<br key={'b'+i+'-'+j}/>:chunk);
   });
 }
+const RICH_TEXT_PREFIX='__ARGOS_RICH_TEXT_V1__';
+function isRichTextValue(value){ return String(value||'').startsWith(RICH_TEXT_PREFIX); }
+function richTextHtml(value){
+  const text=String(value||'');
+  if(isRichTextValue(text)) return text.slice(RICH_TEXT_PREFIX.length);
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+function sanitizeRichText(html){
+  if(typeof document==='undefined') return '';
+  const source=document.createElement('div');
+  source.innerHTML=String(html||'');
+  const allowed=new Set(['BR','B','STRONG','I','EM','U','H3','UL','OL','LI','P','DIV','A']);
+  const cleanNode=node=>{
+    Array.from(node.childNodes).forEach(child=>{
+      if(child.nodeType===Node.COMMENT_NODE){ child.remove(); return; }
+      if(child.nodeType!==Node.ELEMENT_NODE) return;
+      if(!allowed.has(child.tagName)){
+        cleanNode(child);
+        child.replaceWith(...Array.from(child.childNodes));
+        return;
+      }
+      const originalHref=child.tagName==='A'?String(child.getAttribute('href')||'').trim():'';
+      Array.from(child.attributes).forEach(attribute=>child.removeAttribute(attribute.name));
+      if(child.tagName==='A'){
+        const href=originalHref||String(child.textContent||'').trim();
+        if(/^https?:\/\/[^\s]+$/i.test(href)){
+          child.setAttribute('href',href);
+          child.setAttribute('target','_blank');
+          child.setAttribute('rel','noreferrer');
+        }else child.replaceWith(...Array.from(child.childNodes));
+      }
+      cleanNode(child);
+    });
+  };
+  cleanNode(source);
+  Array.from(source.querySelectorAll('h3 h3')).reverse().forEach(nestedTitle=>{
+    nestedTitle.replaceWith(...Array.from(nestedTitle.childNodes));
+  });
+  return source.innerHTML;
+}
+function richTextPlainText(value){
+  if(!isRichTextValue(value)) return String(value||'');
+  if(typeof document==='undefined') return String(value||'').slice(RICH_TEXT_PREFIX.length).replace(/<[^>]+>/g,' ');
+  const box=document.createElement('div');
+  box.innerHTML=richTextHtml(value).replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|h3|li)>/gi,'\n');
+  return String(box.textContent||'').replace(/\n{3,}/g,'\n\n').trim();
+}
+function RichTextDisplay({value,className=''}){
+  if(!isRichTextValue(value)) return <span className={className}>{linkify(value)}</span>;
+  return <div className={'rich-text-display '+className} dangerouslySetInnerHTML={{__html:sanitizeRichText(richTextHtml(value))}}/>;
+}
 function extractLinks(text){ return Array.from(String(text||'').matchAll(/https?:\/\/[^\s]+/g)).map(m=>m[0]); }
 function periodMatch(date, period, from, to){
   if(!date) return false; const d=dObj(date); const today=dObj(todayStr());
@@ -2323,6 +2374,10 @@ function App(){
   const taskSyncBusyRef=useRef(0);
   const taskSyncQueueRef=useRef(Promise.resolve());
   const notificationSyncQueueRef=useRef(Promise.resolve());
+  const notificationAlertBaselineRef=useRef(null);
+  const notificationAudioContextRef=useRef(null);
+  const [notificationAlertsEnabled,setNotificationAlertsEnabled]=useState(false);
+  const [notificationPermission,setNotificationPermission]=useState(()=>typeof Notification==='undefined'?'unsupported':Notification.permission);
   const taskOpenSessionRef=useRef({});
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
@@ -2425,12 +2480,12 @@ function App(){
   },[cloudReady,auth?.organizationId]);
 
   useEffect(()=>{
-    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !notificationTablesReady || DISABLE_POLLING) return;
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !notificationTablesReady) return;
     let alive=true;
     let refreshInFlight=false;
 
     async function refreshNotifications(){
-      if(!alive || document.visibilityState==='hidden' || refreshInFlight) return;
+      if(!alive || refreshInFlight) return;
       refreshInFlight=true;
       try{
         const latest=await loadNotificationRecords(auth.organizationId);
@@ -2446,7 +2501,7 @@ function App(){
       if(document.visibilityState==='visible') refreshNotifications();
     }
 
-    const interval=setInterval(refreshNotifications,60000);
+    const interval=setInterval(refreshNotifications,15000);
     window.addEventListener('focus',refreshNotifications);
     document.addEventListener('visibilitychange',refreshWhenVisible);
     return()=>{
@@ -2456,6 +2511,102 @@ function App(){
       document.removeEventListener('visibilitychange',refreshWhenVisible);
     };
   },[cloudReady,auth?.organizationId,notificationTablesReady]);
+
+  useEffect(()=>{
+    notificationAlertBaselineRef.current=null;
+    const enabled=!!auth?.id && localStorage.getItem(`argos_notification_alerts_${auth.id}`)==='enabled';
+    setNotificationAlertsEnabled(enabled);
+    setNotificationPermission(typeof Notification==='undefined'?'unsupported':Notification.permission);
+  },[auth?.id]);
+
+  useEffect(()=>{
+    if(!notificationAlertsEnabled) return;
+    const unlockAudio=async()=>{
+      try{
+        const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+        if(!AudioContextClass) return;
+        const audioContext=notificationAudioContextRef.current||new AudioContextClass();
+        notificationAudioContextRef.current=audioContext;
+        if(audioContext.state==='suspended') await audioContext.resume();
+      }catch(err){ console.warn('notification audio unlock failed',err); }
+    };
+    window.addEventListener('pointerdown',unlockAudio,{once:true});
+    window.addEventListener('keydown',unlockAudio,{once:true});
+    return()=>{
+      window.removeEventListener('pointerdown',unlockAudio);
+      window.removeEventListener('keydown',unlockAudio);
+    };
+  },[notificationAlertsEnabled]);
+
+  useEffect(()=>{
+    if(!notificationTablesReady || !auth?.id) return;
+    const scoped=(notifications||[]).filter(n=>n?.userId===auth.id);
+    const currentIds=new Set(scoped.map(n=>String(n.id)));
+    const previousIds=notificationAlertBaselineRef.current;
+    notificationAlertBaselineRef.current=currentIds;
+    if(previousIds===null || !notificationAlertsEnabled) return;
+    const fresh=scoped.filter(n=>!n.done && !previousIds.has(String(n.id)));
+    if(!fresh.length) return;
+
+    try{
+      const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+      const audioContext=notificationAudioContextRef.current;
+      if(AudioContextClass&&audioContext?.state==='running'){
+        const oscillator=audioContext.createOscillator();
+        const gain=audioContext.createGain();
+        oscillator.type='sine';
+        oscillator.frequency.setValueAtTime(880,audioContext.currentTime);
+        gain.gain.setValueAtTime(0.0001,audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12,audioContext.currentTime+0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001,audioContext.currentTime+0.32);
+        oscillator.connect(gain); gain.connect(audioContext.destination);
+        oscillator.start(); oscillator.stop(audioContext.currentTime+0.34);
+      }
+    }catch(err){ console.warn('notification sound failed',err); }
+
+    if(typeof Notification!=='undefined'&&Notification.permission==='granted'&&document.visibilityState!=='visible'){
+      const first=fresh[0];
+      const task=tasks.find(t=>t.id===first.taskId);
+      const extra=fresh.length>1?` (+${fresh.length-1})`:'';
+      const taskTitle=task?.title||'Tarefa não identificada';
+      const actorName=first.actorName||first.payload?.actorName||'Sistema Argos';
+      const notificationContent=String(first.text||'Você recebeu uma nova notificação.')
+        .replace(`${taskTitle}:`,'')
+        .trim();
+      const browserNotification=new Notification('Argos',{
+        body:`${taskTitle}${extra}\n${actorName}\n${notificationContent}`,
+        tag:`argos-${first.id}`
+      });
+      browserNotification.onclick=()=>{ window.focus(); if(first.taskId) openTaskRoute(first.taskId); browserNotification.close(); };
+    }
+  },[notifications,notificationTablesReady,auth?.id,notificationAlertsEnabled,tasks]);
+
+  async function enableNotificationAlerts(){
+    if(!auth?.id) return;
+    if(typeof Notification==='undefined'){
+      setNotificationPermission('unsupported');
+      alert('Este navegador não oferece notificações do sistema.');
+      return;
+    }
+    let permission=Notification.permission;
+    if(permission==='default') permission=await Notification.requestPermission();
+    setNotificationPermission(permission);
+    if(permission==='denied'){
+      alert('As notificações estão bloqueadas no navegador. Libere a permissão nas configurações do site.');
+      return;
+    }
+    try{
+      const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+      if(AudioContextClass){
+        const audioContext=notificationAudioContextRef.current||new AudioContextClass();
+        notificationAudioContextRef.current=audioContext;
+        if(audioContext.state==='suspended') await audioContext.resume();
+      }
+    }catch(err){ console.warn('notification audio activation failed',err); }
+    localStorage.setItem(`argos_notification_alerts_${auth.id}`,'enabled');
+    notificationAlertBaselineRef.current=new Set((notifications||[]).filter(n=>n?.userId===auth.id).map(n=>String(n.id)));
+    setNotificationAlertsEnabled(true);
+  }
 
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady || DISABLE_POLLING) return;
@@ -3000,7 +3151,7 @@ function App(){
         {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
         {activeScreen==='documents' && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
         {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
-        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} companies={companies} users={users} statuses={statuses} user={effectiveUser} auth={auth}/>} 
+        {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} companies={companies} users={users} statuses={statuses} user={effectiveUser} auth={auth} alertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableAlerts={enableNotificationAlerts}/>} 
       </div>
     </main>
     {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)} user={effectiveUser} permissions={effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role)}/>} 
@@ -3147,8 +3298,25 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
     </div>
   </aside> 
 }
+function ModalDismiss({onClose}){
+  const onCloseRef=useRef(onClose);
+  useEffect(()=>{ onCloseRef.current=onClose; },[onClose]);
+  useEffect(()=>{
+    const handleEscape=event=>{
+      if(event.key!=='Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      onCloseRef.current?.();
+    };
+    window.addEventListener('keydown',handleEscape,true);
+    return ()=>window.removeEventListener('keydown',handleEscape,true);
+  },[]);
+  return <button type="button" className="x modal-close-button" aria-label="Fechar" title="Fechar" onClick={()=>onCloseRef.current?.()}>×</button>;
+}
 function CreateModal({form,setForm,companies,users,statuses,types,createTask,close,user,permissions}){
-  const F=(k,v)=>setForm({...form,[k]:v});
+  const F=(k,v)=>setForm(k==='postDate'&&permissions?.creationMode==='request'
+    ? {...form,postDate:v,internalDate:v}
+    : {...form,[k]:v});
   const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
   const fields=permissions?.createFields||{};
   const allowedCompanies=user?.role==='client'
@@ -3157,7 +3325,7 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
   const isRequest=permissions?.creationMode==='request';
 
   return <div className="modal-bg"><div className="modal create">
-    <button className="x" onClick={close}>×</button>
+    <ModalDismiss onClose={close}/>
     <h2>{isRequest?'Nova solicitação':'Nova tarefa'}</h2>
     <p>{isRequest?'Envie as informações necessárias para a produção.':'Organize briefing, prazos e materiais da produção.'}</p>
 
@@ -3207,6 +3375,7 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
     {(fields.postDate||fields.internalDate)&&<div className="form-two">
       {fields.postDate&&<label>Data desejada
         <input type="date" value={form.postDate} onChange={e=>F('postDate',e.target.value)}/>
+        {isRequest&&<small style={{display:'block',marginTop:8,fontSize:15,fontWeight:700,color:'#f4c542',lineHeight:1.4}}>Prazo sujeito à fila de produção de até 7 dias.</small>}
       </label>}
       {fields.internalDate&&<label className={'date-field '+priorityClass(form.internalDate)}>Prazo
         <input type="date" value={form.internalDate} onChange={e=>F('internalDate',e.target.value)}/>
@@ -3214,45 +3383,15 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
       </label>}
     </div>}
 
-    {fields.copyInstructions&&<label>Instruções ao copy
-      <AutoTextarea
-        value={form.copyInstructions||''}
-        onChange={e=>F('copyInstructions',e.target.value)}
-        placeholder="Explique o objetivo, a abordagem, o tom, o CTA e outras orientações para o texto."
-      />
-    </label>}
+    {fields.copyInstructions&&<RichTextField label="Instruções ao copy" value={form.copyInstructions||''} onChange={e=>F('copyInstructions',e.target.value)} placeholder="Explique o objetivo, a abordagem, o tom, o CTA e outras orientações para o texto."/>}
 
-    {fields.editorInstructions&&<label>Instruções ao editor
-      <AutoTextarea
-        value={form.editorInstructions||''}
-        onChange={e=>F('editorInstructions',e.target.value)}
-        placeholder="Explique o formato, a identidade visual, as imagens e outras orientações para a edição."
-      />
-    </label>}
+    {fields.editorInstructions&&<RichTextField label="Instruções ao editor" value={form.editorInstructions||''} onChange={e=>F('editorInstructions',e.target.value)} placeholder="Explique o formato, a identidade visual, as imagens e outras orientações para a edição."/>}
 
-    {fields.usefulLinks&&<label>Links úteis
-      <AutoTextarea
-        value={form.usefulLinks||''}
-        onChange={e=>F('usefulLinks',e.target.value)}
-        placeholder="Cole links e descreva para que serve cada um."
-      />
-    </label>}
+    {fields.usefulLinks&&<RichTextField label="Links úteis" value={form.usefulLinks||''} onChange={e=>F('usefulLinks',e.target.value)} placeholder="Cole links e descreva para que serve cada um."/>}
 
-    {fields.copy&&<label>Copy
-      <AutoTextarea
-        value={form.copy||''}
-        onChange={e=>F('copy',e.target.value)}
-        placeholder="Insira o texto do post."
-      />
-    </label>}
+    {fields.copy&&<RichTextField label="Copy" value={form.copy||''} onChange={e=>F('copy',e.target.value)} placeholder="Insira o texto do post."/>}
 
-    {fields.caption&&<label>Legenda
-      <AutoTextarea
-        value={form.caption||''}
-        onChange={e=>F('caption',e.target.value)}
-        placeholder="Insira a legenda do post."
-      />
-    </label>}
+    {fields.caption&&<RichTextField label="Legenda" value={form.caption||''} onChange={e=>F('caption',e.target.value)} placeholder="Insira a legenda do post."/>}
 
     {fields.materialLinks&&<label>Links de material pronto
       <AutoTextarea
@@ -3643,7 +3782,8 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     </div>}
   </div>}
 
-  {bulkEdit&&permissions.canBulkEdit&&<div className="modal-bg"><div className="modal bulk-edit-modal"><h2>Alterar {bulkLabel(bulkEdit)}</h2><p>{selectedFiltered.length} tarefa(s) selecionada(s).</p>{bulkEdit==='responsibleId'&&<label>Novo responsável<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}{bulkEdit==='status'&&<label>Novo status<div className="status-select">{statusDot(activeStatuses.find(s=>s.id===bulkValue))}<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{activeStatuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>}{bulkEdit==='internalDate'&&<label>Novo prazo<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}{bulkEdit==='postDate'&&<label>Nova data do post<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}<div className="modal-actions"><button onClick={()=>{setBulkEdit(null);setBulkValue('')}}>Cancelar</button><button className="primary" onClick={applyBulkEdit}>Aplicar</button></div></div></div>}
+  {bulkEdit&&permissions.canBulkEdit&&<div className="modal-bg"><div className="modal bulk-edit-modal"><ModalDismiss onClose={()=>{setBulkEdit(null);setBulkValue('')}}/><h2>Alterar {bulkLabel(bulkEdit)}</h2><p>{selectedFiltered.length} tarefa(s) selecionada(s).</p>{bulkEdit==='responsibleId'&&<label>Novo responsável<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}{bulkEdit==='status'&&<label>Novo status<div className="status-select">{statusDot(activeStatuses.find(s=>s.id===bulkValue))}<select value={bulkValue} onChange={e=>setBulkValue(e.target.value)}>{activeStatuses.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>}{bulkEdit==='internalDate'&&<label>Novo prazo<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}{bulkEdit==='postDate'&&<label>Nova data do post<input type="date" value={bulkValue} onChange={e=>setBulkValue(e.target.value)}/></label>}
+<div className="modal-actions"><button onClick={()=>{setBulkEdit(null);setBulkValue('')}}>Cancelar</button><button className="primary" onClick={applyBulkEdit}>Aplicar</button></div></div></div>}
 
   <div className="tasks-board" style={{display:'flex',flexDirection:'column',gap:16}}>
     {groupEntries.length?groupEntries.map(([group,items])=>{
@@ -3933,7 +4073,7 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''})
 function CopyTextButton({text}){
   const [copied,setCopied]=useState(false);
   async function copy(){
-    const value=String(text||'');
+    const value=richTextPlainText(text);
     if(!value.trim()) return;
     try{
       await navigator.clipboard.writeText(value);
@@ -4032,7 +4172,7 @@ function ReadOnlyReadyLinks({title='Links de material pronto',text}){
 }
 
 function ReadOnlyInstruction({title,text}){
-  return <div className="readonly-instruction"><label>{title}</label><div style={{position:'relative'}}><div className="instruction-box textarea-like" style={{paddingRight:48}}>{text?linkify(text):<span className="muted-note">Sem informações.</span>}</div><CopyTextButton text={text}/></div></div>
+  return <div className="readonly-instruction"><label>{title}</label><div style={{position:'relative'}}><div className="instruction-box textarea-like" style={{paddingRight:48}}>{text?<RichTextDisplay value={text}/>:<span className="muted-note">Sem informações.</span>}</div><CopyTextButton text={text}/></div></div>
 }
 
 function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open,user}){
@@ -4123,7 +4263,11 @@ function WeeklyTemplateEditor({company,users,save,cancel}){
   function updateTemplate(id,patch){ setWeeklyTemplate(weeklyTemplate.map(item=>item.id===id?{...item,...patch}:item)); }
   function addTemplateItem(){ setWeeklyTemplate([...weeklyTemplate,{ id:safeUUID(), type:TASK_TYPES[0], quantity:1, responsibleId:teams[0]?.id||'', postDay:0, internalOffset:1, copyInstructions:'', editorInstructions:'', usefulLinks:'' }]); }
   function removeTemplateItem(id){ setWeeklyTemplate(weeklyTemplate.filter(item=>item.id!==id)); }
-  return <div className="modal-bg"><div className="modal company-modal"><div className="section-header"><div><h2>Template semanal</h2><p>{company.name}</p></div><button type="button" onClick={addTemplateItem}>+ Linha</button></div>{weeklyTemplate.length?weeklyTemplate.map(item=><div className="panel template-item" key={item.id}><div className="form-two"><label>Tipo<select value={item.type||TASK_TYPES[0]} onChange={e=>updateTemplate(item.id,{type:e.target.value})}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Quantidade<input type="number" min="0" value={item.quantity??1} onChange={e=>updateTemplate(item.id,{quantity:Number(e.target.value)})}/></label></div><div className="form-two"><label>Responsável<select value={item.responsibleId||''} onChange={e=>updateTemplate(item.id,{responsibleId:e.target.value})}><option value="">Padrão do sistema</option>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Dia de postagem<select value={item.postDay??0} onChange={e=>updateTemplate(item.id,{postDay:Number(e.target.value)})}>{WEEK_DAYS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select></label></div><label>Prazo interno<input type="number" min="0" value={item.internalOffset??1} onChange={e=>updateTemplate(item.id,{internalOffset:Number(e.target.value)})}/><small>Quantos dias antes da postagem. Ex: 1 = um dia antes.</small></label><label>Instruções ao copy<textarea value={item.copyInstructions||''} onChange={e=>updateTemplate(item.id,{copyInstructions:e.target.value})} placeholder="Orientações padrão para o copy desta linha."/></label><label>Instruções ao editor<textarea value={item.editorInstructions||''} onChange={e=>updateTemplate(item.id,{editorInstructions:e.target.value})} placeholder="Orientações padrão para edição/design desta linha."/></label><label>Links úteis<textarea value={item.usefulLinks||''} onChange={e=>updateTemplate(item.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/></label><div className="row-actions"><button type="button" onClick={()=>removeTemplateItem(item.id)}>Remover linha</button></div></div>):<p className="muted-note">Nenhuma linha de template. Clique em + Linha para criar a remessa semanal deste cliente.</p>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={()=>save(company.id,weeklyTemplate)}>Salvar template</button></div></div></div>
+  return <div className="modal-bg"><div className="modal company-modal"><ModalDismiss onClose={cancel}/>
+<div className="section-header"><div><h2>Template semanal</h2><p>{company.name}</p></div></div>
+{weeklyTemplate.length?weeklyTemplate.map((item,index)=><div className="panel template-item" key={item.id}><h3 className="template-line-title">Linha {index+1}</h3>
+<div className="form-two"><label>Tipo<select value={item.type||TASK_TYPES[0]} onChange={e=>updateTemplate(item.id,{type:e.target.value})}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Quantidade<input type="number" min="0" value={item.quantity??1} onChange={e=>updateTemplate(item.id,{quantity:Number(e.target.value)})}/></label></div><div className="form-two"><label>Responsável<select value={item.responsibleId||''} onChange={e=>updateTemplate(item.id,{responsibleId:e.target.value})}><option value="">Padrão do sistema</option>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Dia de postagem<select value={item.postDay??0} onChange={e=>updateTemplate(item.id,{postDay:Number(e.target.value)})}>{WEEK_DAYS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select></label></div><label>Prazo interno<input type="number" min="0" value={item.internalOffset??1} onChange={e=>updateTemplate(item.id,{internalOffset:Number(e.target.value)})}/><small>Quantos dias antes da postagem. Ex: 1 = um dia antes.</small></label><RichTextField label="Instruções ao copy" value={item.copyInstructions||''} onChange={e=>updateTemplate(item.id,{copyInstructions:e.target.value})} placeholder="Orientações padrão para o copy desta linha."/><RichTextField label="Instruções ao editor" value={item.editorInstructions||''} onChange={e=>updateTemplate(item.id,{editorInstructions:e.target.value})} placeholder="Orientações padrão para edição/design desta linha."/><RichTextField label="Links úteis" value={item.usefulLinks||''} onChange={e=>updateTemplate(item.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/><div className="row-actions"><button type="button" onClick={()=>removeTemplateItem(item.id)}>Remover linha</button></div></div>
+):<p className="muted-note">Nenhuma linha de template. Clique em + Linha para criar a remessa semanal deste cliente.</p>}<div className="modal-actions template-modal-actions"><button type="button" className="template-add-line" onClick={addTemplateItem}>+ Linha</button><div className="template-save-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={()=>save(company.id,weeklyTemplate)}>Salvar template</button></div></div></div></div>
 }
 
 function TaskAccessDenied({back}){
@@ -4156,6 +4300,138 @@ function AutoTextarea({value,onChange,minHeight=92,style,...props}){
       resize:'vertical'
     }}
   />;
+}
+
+function RichTextField({label,value,onChange,placeholder='Escreva aqui...',className='',minHeight}){
+  const editorRef=useRef(null);
+  const lastValueRef=useRef(null);
+  const [toolbar,setToolbar]=useState({visible:false,left:0,top:0});
+
+  useEffect(()=>{
+    const editor=editorRef.current;
+    const incoming=String(value||'');
+    if(!editor || incoming===lastValueRef.current) return;
+    editor.innerHTML=sanitizeRichText(richTextHtml(incoming));
+    lastValueRef.current=incoming;
+  },[value]);
+
+  function emit(){
+    const editor=editorRef.current;
+    if(!editor) return;
+    const html=sanitizeRichText(editor.innerHTML);
+    const plain=String(editor.innerText||'').replace(/\u00a0/g,' ').trim();
+    const next=plain ? RICH_TEXT_PREFIX+html : '';
+    lastValueRef.current=next;
+    onChange({target:{value:next}});
+  }
+
+  function command(name,arg=null){
+    editorRef.current?.focus();
+    document.execCommand(name,false,arg);
+    emit();
+    positionToolbar();
+  }
+
+  function toggleTitle(){
+    const editor=editorRef.current;
+    const selection=window.getSelection();
+    if(!editor || !selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
+    const anchor=selection.anchorNode?.nodeType===Node.ELEMENT_NODE
+      ? selection.anchorNode
+      : selection.anchorNode?.parentElement;
+    const currentTitle=anchor?.closest?.('h3');
+    const titleIsActive=Boolean(currentTitle&&editor.contains(currentTitle));
+    editor.focus();
+    document.execCommand('formatBlock',false,titleIsActive?'div':'h3');
+    emit();
+    positionToolbar();
+  }
+
+  function positionToolbar(){
+    const editor=editorRef.current;
+    if(!editor || document.activeElement!==editor){
+      setToolbar(current=>current.visible?{...current,visible:false}:current);
+      return;
+    }
+    requestAnimationFrame(()=>{
+      const selection=window.getSelection();
+      let rect=null;
+      if(selection?.rangeCount && editor.contains(selection.anchorNode)){
+        const range=selection.getRangeAt(0).cloneRange();
+        rect=range.getBoundingClientRect();
+        if(!rect.width&&!rect.height) rect=Array.from(range.getClientRects())[0]||null;
+      }
+      const editorRect=editor.getBoundingClientRect();
+      const anchor=rect&&Number.isFinite(rect.left)?rect:editorRect;
+      const toolbarWidth=Math.min(274,window.innerWidth-16);
+      const left=Math.max(8,Math.min(anchor.left,window.innerWidth-toolbarWidth-8));
+      const preferredTop=anchor.top-42;
+      const top=preferredTop>=8?preferredTop:Math.min(window.innerHeight-42,anchor.bottom+8);
+      setToolbar({visible:true,left,top});
+    });
+  }
+
+  function autoLinkAtCaret(){
+    const selection=window.getSelection();
+    if(!selection?.rangeCount || !editorRef.current?.contains(selection.anchorNode)) return;
+    const node=selection.anchorNode;
+    if(node?.nodeType!==Node.TEXT_NODE) return;
+    const offset=selection.anchorOffset;
+    const match=String(node.textContent||'').slice(0,offset).match(/(https?:\/\/[^\s]+)$/i);
+    if(!match) return;
+    const range=document.createRange();
+    range.setStart(node,offset-match[1].length);
+    range.setEnd(node,offset);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand('createLink',false,match[1]);
+    selection.collapseToEnd();
+    emit();
+  }
+
+  function pastePlainText(event){
+    event.preventDefault();
+    const plain=event.clipboardData.getData('text/plain');
+    const escaped=plain
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/(https?:\/\/[^\s<]+)/gi,'<a href="$1" target="_blank" rel="noreferrer">$1</a>')
+      .replace(/\r?\n/g,'<br>');
+    document.execCommand('insertHTML',false,escaped);
+    emit();
+    positionToolbar();
+  }
+
+  const tool=(title,content,onPress)=><button type="button" title={title} aria-label={title} onMouseDown={event=>{event.preventDefault();onPress();}}>{content}</button>;
+  return <div className={'rich-text-field '+className}>
+    {label&&<label>{label}</label>}
+    <div className={'rich-text-toolbar'+(toolbar.visible?' is-visible':'')} style={{left:toolbar.left,top:toolbar.top}} role="toolbar" aria-label={`Formatação de ${label}`}>
+      {tool('Negrito',<b>B</b>,()=>command('bold'))}
+      {tool('Itálico',<i>I</i>,()=>command('italic'))}
+      {tool('Sublinhado',<u>U</u>,()=>command('underline'))}
+      {tool('Título','T',toggleTitle)}
+      {tool('Lista','• Lista',()=>command('insertUnorderedList'))}
+    </div>
+    <div className="rich-text-editor-shell">
+      <div
+        ref={editorRef}
+        className="rich-text-editor"
+        style={minHeight?{minHeight}:undefined}
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder={placeholder}
+        onFocus={positionToolbar}
+        onInput={()=>{emit();positionToolbar();}}
+        onBlur={event=>{emit();if(!event.currentTarget.parentElement?.parentElement?.contains(event.relatedTarget))setToolbar(current=>({...current,visible:false}));}}
+        onPaste={pastePlainText}
+        onKeyUp={positionToolbar}
+        onMouseUp={positionToolbar}
+        onScroll={positionToolbar}
+        onClick={event=>{const anchor=event.target.closest?.('a');if(anchor&&(event.ctrlKey||event.metaKey)){event.preventDefault();window.open(anchor.href,'_blank','noopener,noreferrer');}}}
+        onKeyDown={event=>{ if(event.key==='Enter'||event.key===' ') autoLinkAtCaret(); }}
+      />
+      <CopyTextButton text={value}/>
+    </div>
+  </div>;
 }
 
 function TaskLinksEditor({task,updateTask,field,title,placeholder='Cole um link'}) {
@@ -4376,13 +4652,13 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
   return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left">
   {canViewDetail('title')&&<div className="task-title">{canEditDetail('title')?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{canViewDetail('status')&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div>}
-  {canViewDetail('preview')&&<div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <span>{task.caption}</span></div></div>}
+  {canViewDetail('preview')&&<div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <RichTextDisplay value={task.caption||''}/></div></div>}
   <div className="content-fields">
-    {!hiddenTeam&&canViewDetail('copyInstructions')&&(canEditDetail('copyInstructions')?<TextFieldWithCopy label="Instruções ao copy" value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/>) }
-    {!hiddenTeam&&canViewDetail('editorInstructions')&&(canEditDetail('editorInstructions')?<TextFieldWithCopy label="Instruções ao editor" value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/>) }
-    {!hiddenTeam&&canViewDetail('usefulLinks')&&(canEditDetail('usefulLinks')?<TextFieldWithCopy label="Links úteis" value={task.usefulLinks||''} onChange={e=>updateTask(task.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/>:<ReadOnlyInstruction title="Links úteis" text={task.usefulLinks||''}/>) }
-    {canViewDetail('copy')&&(canEditDetail('copy')?<TextFieldWithCopy label="Copy" value={task.copy||''} onChange={e=>updateTask(task.id,{copy:e.target.value})}/>:<ReadOnlyInstruction title="Copy" text={task.copy||''}/>) }
-    {canViewDetail('caption')&&(canEditDetail('caption')?<TextFieldWithCopy label="Legenda" value={task.caption||''} onChange={e=>updateTask(task.id,{caption:e.target.value})}/>:<ReadOnlyInstruction title="Legenda" text={task.caption||''}/>) }
+    {!hiddenTeam&&canViewDetail('copyInstructions')&&(canEditDetail('copyInstructions')?<RichTextField label="Instruções ao copy" value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/>) }
+    {!hiddenTeam&&canViewDetail('editorInstructions')&&(canEditDetail('editorInstructions')?<RichTextField label="Instruções ao editor" value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/>) }
+    {!hiddenTeam&&canViewDetail('usefulLinks')&&(canEditDetail('usefulLinks')?<RichTextField label="Links úteis" value={task.usefulLinks||''} onChange={e=>updateTask(task.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/>:<ReadOnlyInstruction title="Links úteis" text={task.usefulLinks||''}/>) }
+    {canViewDetail('copy')&&(canEditDetail('copy')?<RichTextField label="Copy" value={task.copy||''} onChange={e=>updateTask(task.id,{copy:e.target.value})}/>:<ReadOnlyInstruction title="Copy" text={task.copy||''}/>) }
+    {canViewDetail('caption')&&(canEditDetail('caption')?<RichTextField label="Legenda" value={task.caption||''} onChange={e=>updateTask(task.id,{caption:e.target.value})}/>:<ReadOnlyInstruction title="Legenda" text={task.caption||''}/>) }
     {canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material pronto" placeholder="Adicionar material pronto"/>:<ReadOnlyReadyLinks title="Links de material pronto" text={task.materialLinks||''}/>) }
   </div>
 </div><aside className="task-side">{['companyId','responsibleId','type','status','internalDate','postDate'].some(canViewDetail)&&<div className="panel panel-config"><h2>Configurações</h2>
@@ -4628,7 +4904,7 @@ function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
   const [f,setF]=useState(c);
   const set=(k,v)=>setF(prev=>({...prev,[k]:v}));
   const isExisting=!!f.id;
-  return <div className="modal-bg"><div className="modal"><h2>Empresa</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Instagram<input value={f.instagram} onChange={e=>set('instagram',e.target.value)}/></label><label>Logo ou link de imagem<input value={f.logo} onChange={e=>set('logo',e.target.value)} placeholder="Inicial, URL pública ou link do Drive"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),`companies/${f.id||slug(f.name)||'pending'}`)}/></label><label>Entrada<input type="date" value={f.entryDate||''} onChange={e=>set('entryDate',e.target.value)}/></label>{isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Use arquivar para esconder sem perder histórico. Excluir remove o cadastro do painel.</p><div className="danger-zone-actions"><button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar empresa':'Arquivar empresa'}</button><button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir empresa</button></div></div>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div>
+  return <div className="modal-bg"><div className="modal"><ModalDismiss onClose={cancel}/><h2>Empresa</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Instagram<input value={f.instagram} onChange={e=>set('instagram',e.target.value)}/></label><label>Logo ou link de imagem<input value={f.logo} onChange={e=>set('logo',e.target.value)} placeholder="Inicial, URL pública ou link do Drive"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),`companies/${f.id||slug(f.name)||'pending'}`)}/></label><label>Entrada<input type="date" value={f.entryDate||''} onChange={e=>set('entryDate',e.target.value)}/></label>{isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Use arquivar para esconder sem perder histórico. Excluir remove o cadastro do painel.</p><div className="danger-zone-actions"><button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar empresa':'Arquivar empresa'}</button><button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir empresa</button></div></div>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div>
 }
 
 function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleActive=null,onToggleOpen=null,children,accent=false}){
@@ -4977,7 +5253,7 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
     return null;
   }
   const toggleSection=id=>setOpenSection(current=>current===id?null:id);
-  return <div className="modal-bg"><div className="modal"><h2>Configurações de {f.name||'usuário'}</h2>
+  return <div className="modal-bg"><div className="modal"><ModalDismiss onClose={cancel}/><h2>Configurações de {f.name||'usuário'}</h2>
     <p className="muted">Defina as regras funcionais e, separadamente, os painéis exibidos no menu lateral.</p>
 
     {f.role==='client'&&<><h3>Empresas vinculadas</h3><div className="arg-linked-company-list-v2">{companies.map(c=><label className="arg-linked-company-row-v2" key={c.id}><input type="checkbox" checked={(f.companyIds||[]).includes(c.id)} onChange={e=>set('companyIds',e.target.checked?[...(f.companyIds||[]),c.id]:(f.companyIds||[]).filter(x=>x!==c.id))}/><AvatarMini value={c.logo} label={c.name}/><span>{c.name}</span></label>)}</div></>}
@@ -5071,7 +5347,7 @@ function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,curren
       setUploading(false);
     }
   }
-  return <div className="modal-bg"><div className="modal"><h2>{clientMode?'Responsável':'Usuário'}</h2>
+  return <div className="modal-bg"><div className="modal"><ModalDismiss onClose={cancel}/><h2>{clientMode?'Responsável':'Usuário'}</h2>
     {!clientMode&&<label>Tipo de usuário<select value={f.role||'team'} disabled={editingOtherAdmin} onChange={e=>set('role',e.target.value)}><option value="team">Equipe</option><option value="admin">Admin</option></select>{editingOtherAdmin&&<small>Permissões de outro admin não podem ser alteradas.</small>}</label>}
     <label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label>
     <label>Cargo<input value={f.title||''} onChange={e=>set('title',e.target.value)} placeholder={clientMode?'Responsável':'Designer, Editor, Admin...'}/></label>
@@ -5367,7 +5643,7 @@ function NotificationSettings({users,setUsers,statuses,currentUser=null}){
     </div>
   })}</div></div>
 }
-function StatusEditor({s,save,cancel}){ const [f,setF]=useState(s); const set=(k,v)=>setF({...f,[k]:v}); return <div className="modal-bg"><div className="modal"><h2>Status</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Cor<input type="color" value={f.color} onChange={e=>set('color',e.target.value)}/></label><label><input type="checkbox" checked={f.active} onChange={e=>set('active',e.target.checked)}/> Ativo</label><label><input type="checkbox" checked={f.final} onChange={e=>set('final',e.target.checked)}/> Conta como finalizado</label><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div> }
+function StatusEditor({s,save,cancel}){ const [f,setF]=useState(s); const set=(k,v)=>setF({...f,[k]:v}); return <div className="modal-bg"><div className="modal status-editor-modal"><ModalDismiss onClose={cancel}/><h2>Status</h2><div className="status-editor-fields"><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Cor<input type="color" value={f.color} onChange={e=>set('color',e.target.value)}/></label></div><div className="status-editor-checks"><label><input type="checkbox" checked={f.active} onChange={e=>set('active',e.target.checked)}/><span>Ativo</span></label><label><input type="checkbox" checked={f.final} onChange={e=>set('final',e.target.checked)}/><span>Conta como finalizado</span></label></div><div className="modal-actions status-editor-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div> }
 
 
 function PublicPortfolioSettings({currentUser}){
@@ -5783,15 +6059,15 @@ function DocumentEditor({doc,patchDoc,deleteDoc,folders,companies,users,permissi
     </div>}
 
     {permissions.canEditContent
-      ? <textarea className="docs-content-editor" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..."/>
-      : <div className="docs-content-editor" style={{whiteSpace:'pre-wrap',overflow:'auto'}}>{doc.content||'Sem conteúdo.'}</div>
+      ? <RichTextField className="docs-rich-text-field" value={doc.content||''} onChange={e=>patchDoc(doc.id,{content:e.target.value})} placeholder="Escreva aqui briefing, acessos, preferências, combinados, observações internas..." minHeight="45vh"/>
+      : <div className="docs-content-editor" style={{whiteSpace:'pre-wrap',overflow:'auto'}}>{doc.content?<RichTextDisplay value={doc.content}/>:<>Sem conteúdo.</>}</div>
     }
   </main>;
 }
 
 
 
-function NotificationsPage({notifications,setNotifications,open,tasks,companies,users,statuses,user}){ 
+function NotificationsPage({notifications,setNotifications,open,tasks,companies,users,statuses,user,alertsEnabled,notificationPermission,enableAlerts}){ 
   const permissions={...builtInNotificationPanelPermissionsForRole(user?.role),...(user?.notificationPanelPermissions||{})};
   const [tab,setTab]=useState('open'); 
   const scoped=notifications.filter(n=>(!n.userId||n.userId===user.id));
@@ -5868,7 +6144,7 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     const value=String(color||'');
     return /^#[0-9a-f]{6}$/i.test(value)?`${value}${alpha}`:'rgba(255,255,255,.05)';
   }
-  return <section><h1>Notificações</h1>
+  return <section><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><h1>Notificações</h1><button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button></div>
     {(permissions.showTabs||permissions.canCompleteAll||permissions.canDeleteCompleted)&&<div className="filters">
       {permissions.showTabs&&<><button className={effectiveTab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={effectiveTab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></>}
       {effectiveTab==='open'&&permissions.canCompleteAll&&<button onClick={doneAll} disabled={!openCount}>Concluir todas</button>}
