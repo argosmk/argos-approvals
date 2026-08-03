@@ -1340,6 +1340,37 @@ html, body, #root {
   min-width:180px!important;
 }
 
+/* Round164A: exportação mensal do calendário */
+.calendar-main .month-head.month-head-export{
+  display:grid!important;
+  grid-template-columns:auto auto minmax(24px,1fr) auto auto!important;
+  align-items:center!important;
+  gap:10px!important;
+}
+.month-head-export h2{white-space:nowrap!important;}
+.month-head-export .month-export-btn{
+  width:auto!important;
+  min-height:36px!important;
+  padding:7px 12px!important;
+  white-space:nowrap!important;
+  color:#111!important;
+  background:linear-gradient(135deg,#e1b12c,#b88714)!important;
+  border-color:#e1b12c!important;
+  font-weight:800!important;
+}
+.month-head-export>small{grid-column:4!important;white-space:nowrap!important;}
+.month-head-export .nav-actions{grid-column:5!important;}
+
+@media(max-width:760px){
+  .calendar-main .month-head.month-head-export{
+    grid-template-columns:1fr auto!important;
+  }
+  .month-head-export h2{grid-column:1!important;}
+  .month-head-export .month-export-btn{grid-column:2!important;}
+  .month-head-export>small{grid-column:1!important;}
+  .month-head-export .nav-actions{grid-column:2!important;justify-content:flex-end!important;}
+}
+
 @media (max-width:860px){
   .calendar-main .week-grid{
     grid-template-columns:repeat(7, minmax(220px, 220px))!important;

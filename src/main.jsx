@@ -1918,6 +1918,53 @@ function richTextPlainText(value){
   box.innerHTML=richTextHtml(value).replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|h3|li)>/gi,'\n');
   return String(box.textContent||'').replace(/\n{3,}/g,'\n\n').trim();
 }
+function cleanExportUrl(value){
+  return String(value||'').trim().replace(/[),.;:!?]+$/,'');
+}
+function readyFolderLink(task){
+  const instructionFields=[task?.copyInstructions,task?.editorInstructions,task?.usefulLinks];
+  for(const field of instructionFields){
+    const text=richTextPlainText(field);
+    const readyMatch=/\bpronto\b/i.exec(text);
+    if(!readyMatch) continue;
+    const link=String(text.slice(readyMatch.index+readyMatch[0].length)).match(/https?:\/\/[^\s<>"']+/i)?.[0];
+    if(link) return cleanExportUrl(link);
+  }
+  return cleanExportUrl(taskMaterialLinks(task)[0]||'');
+}
+function excelXmlEscape(value){
+  return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+function exportMonthTasksToExcel(tasks,selectedDay){
+  const current=dObj(selectedDay)||dObj(todayStr());
+  const year=current.getFullYear(), month=current.getMonth();
+  const rows=(tasks||[])
+    .filter(task=>{const date=dObj(task?.postDate); return date&&date.getFullYear()===year&&date.getMonth()===month;})
+    .sort((a,b)=>String(a.postDate||'').localeCompare(String(b.postDate||''))||String(a.title||'').localeCompare(String(b.title||''),'pt-BR'));
+  if(!rows.length){ alert('Não há tarefas neste mês para exportar.'); return; }
+  const cell=(value,style='Text',href='')=>`<Cell ss:StyleID="${style}"${href?` ss:HRef="${excelXmlEscape(href)}"`:''}><Data ss:Type="String">${excelXmlEscape(value)}</Data></Cell>`;
+  const tableRows=rows.map(task=>{
+    const link=readyFolderLink(task);
+    return `<Row ss:AutoFitHeight="1">${cell(fmtDate(task.postDate),'Date')}${cell(task.title||'')}${cell(richTextPlainText(task.copy||''),'LongText')}${cell(richTextPlainText(task.caption||''),'LongText')}${cell(link,link?'Link':'Text',link)}</Row>`;
+  }).join('');
+  const xml=`<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Top"/><Font ss:FontName="Aptos" ss:Size="10"/><Interior/><NumberFormat/><Protection/></Style>
+<Style ss:ID="Header"><Alignment ss:Vertical="Center"/><Font ss:FontName="Aptos Display" ss:Size="11" ss:Bold="1" ss:Color="#111111"/><Interior ss:Color="#E1B12C" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#A47B10"/></Borders></Style>
+<Style ss:ID="Text"><Alignment ss:Vertical="Top" ss:WrapText="1"/><Font ss:FontName="Aptos" ss:Size="10"/></Style>
+<Style ss:ID="LongText"><Alignment ss:Vertical="Top" ss:WrapText="1"/><Font ss:FontName="Aptos" ss:Size="10"/></Style>
+<Style ss:ID="Date"><Alignment ss:Vertical="Top"/><Font ss:FontName="Aptos" ss:Size="10"/></Style>
+<Style ss:ID="Link"><Alignment ss:Vertical="Top" ss:WrapText="1"/><Font ss:FontName="Aptos" ss:Size="10" ss:Color="#0563C1" ss:Underline="Single"/></Style>
+</Styles>
+<Worksheet ss:Name="Posts"><Table ss:ExpandedColumnCount="5" ss:ExpandedRowCount="${rows.length+1}" x:FullColumns="1" x:FullRows="1"><Column ss:Width="82"/><Column ss:Width="190"/><Column ss:Width="330"/><Column ss:Width="330"/><Column ss:Width="260"/><Row ss:Height="24">${cell('Data do post','Header')}${cell('Título','Header')}${cell('Copy','Header')}${cell('Legenda','Header')}${cell('Pasta Pronto','Header')}</Row>${tableRows}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><Selected/><FreezePanes/><FrozenNoSplit/><SplitHorizontal>1</SplitHorizontal><TopRowBottomPane>1</TopRowBottomPane><ActivePane>2</ActivePane><ProtectObjects>False</ProtectObjects><ProtectScenarios>False</ProtectScenarios></WorksheetOptions><AutoFilter x:Range="R1C1:R${rows.length+1}C5" xmlns="urn:schemas-microsoft-com:office:excel"/></Worksheet>
+</Workbook>`;
+  const blob=new Blob(['\ufeff',xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob), anchor=document.createElement('a');
+  const safeMonth=monthLabel(selectedDay).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'_').replace(/^_|_$/g,'').toLowerCase();
+  anchor.href=url; anchor.download=`posts_${safeMonth}.xls`; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 function RichTextDisplay({value,className=''}){
   if(!isRichTextValue(value)) return <span className={className}>{linkify(value)}</span>;
   return <div className={'rich-text-display '+className} dangerouslySetInnerHTML={{__html:sanitizeRichText(richTextHtml(value))}}/>;
@@ -3981,7 +4028,7 @@ function SpecialDatePanel({items=[]}){
   return <div className="special-date-panel"><h3>Datas especiais</h3>{items.map((item,idx)=><div className={'special-date-line'+(item.market==='us'?' market-us':'')} key={item.name+idx}><b>{item.icon||'✦'}</b><span>{item.name}</span><small>{item.market==='us'?`EUA • ${item.type}`:item.type}</small></div>)}</div>
 }
 
-function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); return <div className="month"><div className="month-head"><h2>{monthLabel(selectedDay)}</h2>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div>}<small>{tasks.length} tarefa(s)</small></div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
+function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); const monthTaskCount=tasks.filter(t=>{const d=dObj(t.postDate); return d&&d.getFullYear()===cur.getFullYear()&&d.getMonth()===cur.getMonth();}).length; return <div className="month"><div className="month-head month-head-export"><h2>{monthLabel(selectedDay)}</h2><button type="button" className="month-export-btn" onClick={()=>exportMonthTasksToExcel(tasks,selectedDay)}>Exportar Excel</button><small>{monthTaskCount} tarefa(s)</small>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div>}</div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
 function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div><div className="month-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div>}</div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
 function DayView({day,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ 
   const list=tasks.filter(t=>t.postDate===day); 
