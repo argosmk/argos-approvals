@@ -4666,3 +4666,32 @@ body.public-portfolio-scroll-root{
 .docs-rich-text-field .rich-text-editor-shell{height:100%!important;min-height:45vh!important}
 .docs-rich-text-field .rich-text-editor{height:100%!important;min-height:45vh!important;border:0!important;border-radius:0!important;background:transparent!important;padding:18px 8px!important;font-size:15px!important;line-height:1.7!important}
 .docs-rich-text-field .rich-text-editor:focus{box-shadow:none!important}
+
+/* Round165A — estado vazio das notificações */
+.notification-empty-state{
+  min-height:52vh!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  text-align:center!important;
+}
+.notification-empty-icon{
+  width:46px;
+  height:46px;
+  margin-bottom:8px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(225,177,44,.42);
+  border-radius:50%;
+  background:rgba(225,177,44,.08);
+  color:#e1b12c;
+  font-size:23px;
+  font-weight:800;
+  box-shadow:0 0 24px rgba(225,177,44,.08);
+}
+.notification-empty-state p{margin:0!important;color:var(--text);font-size:15px;line-height:1.5}
+.notification-empty-state p strong{color:#e1b12c}
+.notification-empty-congrats{color:var(--text);font-size:16px}
+@media(max-width:760px){.notification-empty-state{min-height:44vh!important;padding:28px 18px!important}}

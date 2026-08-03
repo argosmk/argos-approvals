@@ -6219,7 +6219,11 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
         {permissions.canOpenTasks&&info.task&&<button onClick={()=>open(n.taskId)}>Abrir tarefa</button>}
         {!n.done&&permissions.canComplete&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}
       </div>}
-    </div>}):<div className="panel"><p>Nenhuma notificação aqui.</p></div>}</div>
+    </div>}):<div className="panel notification-empty-state">
+      <div className="notification-empty-icon" aria-hidden="true">✓</div>
+      <p>Nenhuma notificação pendente para você, <strong>{String(user?.name||'Argonauta').trim().split(/\s+/)[0]}</strong>.</p>
+      <strong className="notification-empty-congrats">Excelente trabalho, Argonauta!</strong>
+    </div>}</div>
   </section> 
 }
 
