@@ -2715,8 +2715,55 @@ function App(){
       alert('Preencha os campos principais disponíveis.');
       return;
     }
-    const t={ id:safeUUID(), ...form, archived:false, alterationCount:0, totalEditSeconds:0, totalAlterSeconds:0, startedAt:null, version:1, logs:[{id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'log',visibility:'internal',at:now(),text:'Tarefa criada.'}] };
-    setTasks(prev=>[...prev,t]); setCreateOpen(false); setForm(null);
+
+    const eventAt=now();
+    const creationLog={
+      id:safeUUID(),
+      user:effectiveUser.name,
+      userId:effectiveUser.id,
+      type:'log',
+      visibility:'internal',
+      at:eventAt,
+      text:'Tarefa criada.',
+      resolved:false
+    };
+
+    const t={
+      id:safeUUID(),
+      ...form,
+      archived:false,
+      alterationCount:0,
+      totalEditSeconds:0,
+      totalAlterSeconds:0,
+      startedAt:null,
+      version:1,
+      createdAt:eventAt,
+      logs:[creationLog]
+    };
+
+    setTasks(prev=>[...prev,t]);
+
+    const initialStatusId=t.status||null;
+    if(initialStatusId){
+      const initialStatusName=statusById[initialStatusId]?.name||initialStatusId;
+      notifyTask(
+        t,
+        `Tarefa criada diretamente no status ${initialStatusName}.`,
+        'Status da tarefa',
+        initialStatusId,
+        effectiveUser.id,
+        {
+          actorName:effectiveUser.name,
+          logId:creationLog.id,
+          fromStatus:null,
+          toStatus:initialStatusId,
+          at:eventAt
+        }
+      );
+    }
+
+    setCreateOpen(false);
+    setForm(null);
   }
   function notifyTask(task,text,event,statusId=null,actorId=effectiveUser?.id,meta={}){
     if(!task || isSystemNoise(text)) return;

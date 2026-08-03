@@ -91,34 +91,60 @@ function logFromRow(row){
   };
 }
 
+async function loadAllTaskRows(organizationId){
+  const pageSize=500;
+  const rows=[];
+  for(let from=0;;from+=pageSize){
+    const {data,error}=await supabase
+      .from(TASK_TABLE)
+      .select('*')
+      .eq('organization_id',organizationId)
+      .is('deleted_at',null)
+      .order('created_at',{ascending:true})
+      .range(from,from+pageSize-1);
+    if(error) throw error;
+    const page=data||[];
+    rows.push(...page);
+    if(page.length<pageSize) break;
+  }
+  return rows;
+}
+
+async function loadAllLogRows(organizationId,taskIds=[]){
+  if(!taskIds.length) return [];
+  const pageSize=500;
+  const taskChunkSize=100;
+  const rows=[];
+  for(let chunkStart=0;chunkStart<taskIds.length;chunkStart+=taskChunkSize){
+    const taskChunk=taskIds.slice(chunkStart,chunkStart+taskChunkSize);
+    for(let from=0;;from+=pageSize){
+      const {data,error}=await supabase
+        .from(LOG_TABLE)
+        .select('*')
+        .eq('organization_id',organizationId)
+        .in('task_id',taskChunk)
+        .order('at',{ascending:true})
+        .range(from,from+pageSize-1);
+      if(error) throw error;
+      const page=data||[];
+      rows.push(...page);
+      if(page.length<pageSize) break;
+    }
+  }
+  return rows;
+}
+
 export async function loadTaskRecords(organizationId){
   if(!isSupabaseConfigured) return [];
-  const { data: taskRows, error: taskError } = await supabase
-    .from(TASK_TABLE)
-    .select('*')
-    .eq('organization_id', organizationId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: true });
-  if(taskError) throw taskError;
-
-  const ids = (taskRows || []).map(t=>t.id);
-  let logRows = [];
-  if(ids.length){
-    const { data, error } = await supabase
-      .from(LOG_TABLE)
-      .select('*')
-      .eq('organization_id', organizationId)
-      .in('task_id', ids)
-      .order('at', { ascending: true });
-    if(error) throw error;
-    logRows = data || [];
-  }
-  const logsByTask = new Map();
+  const taskRows=await loadAllTaskRows(organizationId);
+  const ids=taskRows.map(task=>task.id);
+  const logRows=await loadAllLogRows(organizationId,ids);
+  const logsByTask=new Map();
   logRows.forEach(row=>{
-    if(!logsByTask.has(row.task_id)) logsByTask.set(row.task_id, []);
+    if(!logsByTask.has(row.task_id)) logsByTask.set(row.task_id,[]);
     logsByTask.get(row.task_id).push(logFromRow(row));
   });
-  return (taskRows || []).map(row=>taskFromRow(row, logsByTask.get(row.id) || []));
+  return taskRows.map(row=>taskFromRow(row,logsByTask.get(row.id)||[]));
 }
 
 export async function upsertTaskRecord(organizationId, task){
