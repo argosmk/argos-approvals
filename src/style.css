@@ -4695,3 +4695,1253 @@ body.public-portfolio-scroll-root{
 .notification-empty-state p strong{color:#e1b12c}
 .notification-empty-congrats{color:var(--text);font-size:16px}
 @media(max-width:760px){.notification-empty-state{min-height:44vh!important;padding:28px 18px!important}}
+
+/* Round166A — caixas de texto sempre acompanham todo o conteúdo */
+.rich-text-editor:not(.docs-rich-text-field .rich-text-editor){
+  height:auto!important;
+  min-height:44px!important;
+  max-height:none!important;
+  overflow-x:hidden!important;
+  overflow-y:visible!important;
+}
+.instruction-box.textarea-like{
+  min-height:44px!important;
+  height:auto!important;
+  max-height:none!important;
+  overflow-x:hidden!important;
+  overflow-y:visible!important;
+  overflow-wrap:anywhere!important;
+}
+@media(max-width:760px){
+  .rich-text-editor:not(.docs-rich-text-field .rich-text-editor){min-height:44px!important}
+}
+
+/* Round168A — material pronto igual aos demais campos na criação */
+.plain-text-field-with-copy{
+  position:relative!important;
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+}
+.plain-text-editor-shell{
+  position:relative!important;
+  display:block!important;
+  width:100%!important;
+}
+.plain-text-editor{
+  box-sizing:border-box!important;
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:44px!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:12px 46px 12px 12px!important;
+  overflow-x:hidden!important;
+  overflow-y:hidden!important;
+  resize:none!important;
+  border:1px solid var(--line-gold)!important;
+  border-radius:10px!important;
+  background:#080809!important;
+  color:var(--text)!important;
+  font:inherit!important;
+  font-size:13px!important;
+  line-height:1.5!important;
+  overflow-wrap:anywhere!important;
+  outline:none!important;
+}
+.plain-text-editor:focus{
+  border-color:rgba(225,177,44,.55)!important;
+  box-shadow:0 0 0 3px rgba(225,177,44,.06)!important;
+}
+/* Round169A — restaura o alinhamento dos checkboxes no editor de Status */
+.status-editor-modal .status-editor-checks{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  gap:10px!important;
+  margin-top:14px!important;
+}
+
+.status-editor-modal .status-editor-checks > label{
+  display:inline-flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  width:auto!important;
+  min-height:22px!important;
+  margin:0!important;
+  padding:0!important;
+  gap:9px!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  cursor:pointer!important;
+}
+
+.status-editor-modal .status-editor-checks input[type="checkbox"]{
+  appearance:auto!important;
+  -webkit-appearance:auto!important;
+  display:inline-block!important;
+  position:static!important;
+  width:16px!important;
+  height:16px!important;
+  min-width:16px!important;
+  min-height:16px!important;
+  max-width:16px!important;
+  max-height:16px!important;
+  flex:0 0 16px!important;
+  margin:0!important;
+  padding:0!important;
+  transform:none!important;
+  accent-color:var(--gold)!important;
+}
+
+.status-editor-modal .status-editor-checks > label > span{
+  display:inline!important;
+  width:auto!important;
+  margin:0!important;
+  padding:0!important;
+  color:var(--text)!important;
+  font-size:13px!important;
+  line-height:1.25!important;
+  white-space:nowrap!important;
+}
+
+/* Round170B — linhas realmente únicas e navegação somente com fade dourado */
+.side nav .nav-btn.active{
+  color:#f4d66a!important;
+  border-color:transparent!important;
+  outline:0!important;
+  background:linear-gradient(90deg,rgba(225,177,44,.30) 0%,rgba(151,112,22,.15) 32%,rgba(38,30,10,.055) 66%,rgba(7,7,8,0) 100%)!important;
+  box-shadow:none!important;
+}
+.side nav .nav-btn.active::after{display:none!important}
+
+/* Round188A — seletor do menu com dourado fosco e gradiente suave */
+.side nav .nav-btn.active{
+  color:#d7b96f!important;
+  background:linear-gradient(
+    90deg,
+    rgba(193,158,83,.14) 0%,
+    rgba(193,158,83,.07) 38%,
+    rgba(193,158,83,.025) 68%,
+    rgba(7,7,8,0) 100%
+  )!important;
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+}
+.side nav .nav-btn.active::before,
+.side nav .nav-btn.active::after{
+  content:none!important;
+  display:none!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+.tasks-board .task-group{padding:14px 16px!important}
+.task-row-wrap{margin:0!important;border-top:1px solid rgba(255,255,255,.065)}
+.task-row-wrap:first-child{border-top:0}
+.task-row-wrap .task-list-row{
+  display:grid!important;
+  grid-template-columns:minmax(180px,1fr) 30px 30px max-content max-content max-content!important;
+  align-items:center!important;
+  gap:clamp(10px,1.45vw,22px)!important;
+  min-height:44px!important;
+  margin:0!important;
+  padding:7px 12px!important;
+  border:0!important;
+  border-radius:8px!important;
+  background:transparent!important;
+}
+.task-row-wrap .task-list-row:hover{background:rgba(255,255,255,.025)!important}
+.task-list-main,.task-list-responsible{display:flex!important;align-items:center!important;min-width:0}
+.task-list-main{grid-column:1}.task-list-company-avatar{grid-column:2}.task-list-responsible{grid-column:3}.task-list-status{grid-column:4}.task-list-deadline{grid-column:5}.task-list-postdate{grid-column:6}
+.task-list-main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-list-company-avatar,.task-list-responsible{display:flex!important;align-items:center;justify-content:center;justify-self:center}
+.task-list-company-avatar .avatar-mini,
+.task-list-responsible .avatar-mini{
+  display:grid!important;place-items:center!important;
+  width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;
+  flex:0 0 28px!important;aspect-ratio:1/1!important;border-radius:50%!important;
+  object-fit:cover!important;font-size:9px;border-color:rgba(225,177,44,.34)
+}
+.task-list-company-avatar .avatar-mini img,
+.task-list-responsible .avatar-mini img{width:100%!important;height:100%!important;aspect-ratio:1/1!important;border-radius:50%!important;object-fit:cover!important}
+.task-list-status,.task-list-deadline,.task-list-postdate,.notification-status,.notification-deadline,.notification-postdate{
+  display:inline-flex!important;align-items:center;justify-content:center;justify-self:start;
+  min-height:26px;padding:3px 8px;border:1px solid;border-radius:7px;
+  font-size:11px!important;font-weight:500!important;line-height:1.15;white-space:nowrap
+}
+.task-list-postdate,.notification-postdate{border-color:transparent!important;background:transparent!important;color:#8f949c!important}
+
+.notifications-list{gap:8px!important}
+.notifications-list .notification-list-row{
+  display:grid!important;
+  grid-template-columns:minmax(180px,1fr) 30px 30px max-content max-content max-content max-content!important;
+  align-items:center!important;gap:clamp(8px,1vw,16px)!important;
+  min-height:46px!important;padding:6px 12px!important;border-color:rgba(255,255,255,.075)!important
+}
+.notification-list-main{display:flex;align-items:center;gap:12px;min-width:0}
+.notification-list-main{grid-column:1}.notification-company-avatar{grid-column:2}.notification-responsible{grid-column:3}.notification-status{grid-column:4}.notification-deadline{grid-column:5}.notification-postdate{grid-column:6}.notification-row-actions{grid-column:7}
+.notification-company-avatar,.notification-responsible{display:flex!important;align-items:center;justify-content:center;justify-self:center}
+.notification-company-avatar .avatar-mini,
+.notification-responsible .avatar-mini{
+  display:grid!important;place-items:center!important;
+  width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;
+  flex:0 0 28px!important;aspect-ratio:1/1!important;border-radius:50%!important;
+  object-fit:cover!important;font-size:9px;border-color:rgba(225,177,44,.34)
+}
+.notification-company-avatar .avatar-mini img,
+.notification-responsible .avatar-mini img{width:100%!important;height:100%!important;aspect-ratio:1/1!important;border-radius:50%!important;object-fit:cover!important}
+.notification-copy{display:flex;align-items:center;min-width:0;gap:7px;white-space:nowrap;overflow:hidden}
+.notification-copy>b{flex:0 1 42%;min-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notification-copy>span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);font-size:12px}
+.notification-copy>span strong{color:var(--text);font-weight:700}
+.notification-copy>small{flex:0 0 auto;font-size:10px;color:var(--muted)}
+.notification-responsible{min-width:0}
+.notification-row-actions{margin:0!important;padding:0!important;border:0!important;flex-wrap:nowrap!important;justify-content:flex-end}
+.notification-row-actions button{width:auto!important;min-width:0!important;white-space:nowrap;height:32px!important;min-height:32px!important;padding:5px 9px!important;font-size:11px}
+
+@media(max-width:1180px){
+  .task-row-wrap .task-list-row{grid-template-columns:minmax(130px,1fr) 28px 28px max-content max-content max-content!important;gap:10px!important}
+  .notifications-list .notification-list-row{grid-template-columns:minmax(130px,1fr) 28px 28px max-content max-content max-content max-content!important;gap:8px!important}
+  .notification-row-actions{grid-column:7}
+  .notification-row-actions button{padding-inline:7px!important}
+}
+@media(max-width:760px){
+  .task-row-wrap{align-items:center!important;margin:7px 0!important;border-top:0}
+  .task-row-check{margin-top:0!important}
+  .task-row-wrap .task-list-row{grid-template-columns:minmax(0,1fr) auto!important;gap:8px 12px!important;padding:11px!important;border:1px solid rgba(255,255,255,.08)!important}
+  .task-list-main{grid-column:1/-1}
+  .task-list-responsible{grid-column:1}
+  .task-list-status,.task-list-deadline{grid-column:auto}
+  .task-list-postdate{display:none!important}
+  .notifications-list .notification-list-row{grid-template-columns:minmax(0,1fr) auto!important;gap:9px 12px!important;padding:13px!important}
+  .notification-list-main{grid-column:1/-1}
+  .notification-responsible{grid-column:1}
+  .notification-status,.notification-deadline{grid-column:auto}
+  .notification-postdate{display:none!important}
+  .notification-row-actions{grid-column:1/-1!important;justify-content:flex-start!important;padding-top:8px!important}
+}
+
+/* Round171A — texto das notificações em duas linhas, lateral direita preservada */
+.notifications-list .notification-list-row{
+  min-height:58px!important;
+  padding-block:7px!important;
+}
+.notification-list-main,
+.notification-copy{
+  width:100%!important;
+  min-width:0!important;
+}
+.notification-copy{
+  display:grid!important;
+  grid-template-rows:auto auto!important;
+  align-content:center!important;
+  gap:3px!important;
+  overflow:hidden!important;
+  white-space:normal!important;
+}
+.notification-copy-line{
+  display:flex!important;
+  align-items:baseline!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  white-space:nowrap!important;
+}
+.notification-copy-head{gap:8px!important}
+.notification-copy-head>b{
+  flex:0 1 auto!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:13px!important;
+  line-height:1.2!important;
+}
+.notification-copy-head>small{
+  flex:0 0 auto!important;
+  color:var(--muted)!important;
+  font-size:10px!important;
+  line-height:1.2!important;
+}
+.notification-copy-message{
+  color:var(--text-2)!important;
+  font-size:11px!important;
+  line-height:1.25!important;
+}
+.notification-copy-message>strong{
+  flex:0 0 auto!important;
+  color:var(--text)!important;
+  font-weight:700!important;
+}
+.notification-copy-message>span{
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+@media(max-width:760px){
+  .notifications-list .notification-list-row{min-height:0!important}
+  .notification-copy-head>b{font-size:12px!important}
+}
+
+/* Round172A — densidade compacta nativa para uso em 100% de zoom */
+@media(min-width:761px){
+  :root{--side:174px}
+
+  body{font-size:13px}
+
+  .side{
+    padding:10px 8px!important;
+    gap:6px!important;
+  }
+  .side .brand{padding-bottom:2px!important}
+  .side .brand-logo{width:34px!important;height:34px!important}
+  .side .user-card,
+  .side .impersonate{
+    padding:8px 9px!important;
+    border-radius:10px!important;
+  }
+  .side .user-card{gap:8px!important}
+  .side .user-card .avatar-mini{width:28px!important;height:28px!important;flex:0 0 28px!important}
+  .side .user-card b{font-size:12px!important;line-height:1.2!important}
+  .side .user-card small{font-size:10px!important;line-height:1.2!important}
+  .side .impersonate select{
+    height:32px!important;
+    min-height:32px!important;
+    margin:4px 0 0!important;
+    padding-block:5px!important;
+    font-size:11px!important;
+  }
+  .side nav{gap:2px!important;margin-top:2px!important}
+  .side nav .nav-btn{
+    height:32px!important;
+    min-height:32px!important;
+    padding:5px 9px!important;
+    font-size:12px!important;
+    border-radius:8px!important;
+  }
+  .side nav .nav-btn svg{width:15px!important;height:15px!important;flex:0 0 15px!important}
+  .side .spacer{min-height:5px!important}
+  .side>.spacer+button,
+  .side>.spacer+button+button{
+    height:32px!important;
+    min-height:32px!important;
+    padding-block:5px!important;
+    font-size:12px!important;
+  }
+
+  .main{padding:14px 20px 44px!important}
+  .main>section{padding-bottom:22px!important}
+  .search-wrap{margin-bottom:16px!important}
+  .search-wrap input{height:38px!important;min-height:38px!important}
+  .new-btn{top:14px!important;right:20px!important;height:38px!important;min-height:38px!important;padding-inline:15px!important}
+
+  h1{font-size:25px;line-height:1.08;margin-bottom:6px}
+  h2{font-size:17px;margin-bottom:11px}
+  h3{font-size:14px;margin-bottom:8px}
+
+  .filters{
+    gap:9px!important;
+    margin:13px 0 17px!important;
+  }
+  .filters label{gap:4px!important;font-size:11px!important}
+  .filters input,
+  .filters select,
+  .filters button{
+    min-height:35px!important;
+    height:35px!important;
+    padding:6px 10px!important;
+    font-size:12px!important;
+  }
+  .view-tabs button,
+  .settings-tabs button{
+    min-height:33px!important;
+    height:33px!important;
+    padding:5px 10px!important;
+    font-size:12px!important;
+  }
+  .calendar-titlebar{margin-bottom:11px!important}
+
+  .panel{padding:15px}
+  .card{padding:15px;min-height:84px}
+  .dash-zone{margin:17px 0 19px;padding:13px}
+  .grid2{gap:13px}
+
+  /* A tipografia já aprovada das notificações não acompanha a redução global. */
+  .notification-copy-head>b{font-size:13px!important}
+  .notification-copy-message{font-size:11px!important}
+  .notification-copy-head>small{font-size:10px!important}
+}
+
+/* Round175A — ação mínima e linha inteira clicável nas Notificações */
+.notifications-list .notification-list-row{
+  position:relative;
+  grid-template-columns:28px minmax(180px,1fr) auto!important;
+  cursor:default;
+  transition:background-color .16s ease,border-color .16s ease;
+}
+.notifications-list .notification-list-row.is-clickable{cursor:pointer}
+.notifications-list .notification-list-row.is-clickable:hover{
+  background:rgba(255,255,255,.025)!important;
+  border-color:rgba(225,177,44,.22)!important;
+}
+.notifications-list .notification-list-row.is-clickable:focus-visible{
+  outline:1px solid rgba(225,177,44,.56);
+  outline-offset:2px;
+}
+.notification-leading-action{
+  grid-column:1!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:28px!important;
+  min-width:28px!important;
+  height:28px!important;
+}
+.notification-complete-x{
+  display:grid!important;
+  place-items:center!important;
+  width:22px!important;
+  min-width:22px!important;
+  height:22px!important;
+  min-height:22px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:5px!important;
+  background:transparent!important;
+  color:#9a9a9a!important;
+  box-shadow:none!important;
+  font-size:20px!important;
+  font-weight:400!important;
+  line-height:1!important;
+  cursor:pointer!important;
+}
+.notification-complete-x:hover,
+.notification-complete-x:focus-visible{
+  color:#ef4444!important;
+  background:rgba(239,68,68,.10)!important;
+  outline:none!important;
+}
+.notifications-list .notification-list-main{grid-column:2!important}
+.notifications-list .notification-list-meta{grid-column:3!important}
+.notifications-list .notification-row-actions{display:none!important}
+
+@media(max-width:760px){
+  .notifications-list .notification-list-row{
+    grid-template-columns:28px minmax(0,1fr)!important;
+  }
+  .notifications-list .notification-list-main{grid-column:2!important}
+  .notifications-list .notification-list-meta{grid-column:2!important}
+}
+
+/* Round173A — painel Tarefas alinhado pela mesma lógica das Notificações */
+@media(min-width:761px){
+  .task-row-wrap{
+    display:flex!important;
+    align-items:center!important;
+    gap:10px!important;
+  }
+  .task-row-wrap .task-list-row{
+    display:flex!important;
+    align-items:center!important;
+    width:100%!important;
+    min-width:0!important;
+    min-height:44px!important;
+    padding:7px 12px!important;
+    gap:18px!important;
+  }
+  .task-list-main{
+    display:block!important;
+    flex:1 1 auto!important;
+    width:auto!important;
+    min-width:0!important;
+    text-align:left!important;
+  }
+  .task-list-main b{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+    font-size:12px!important;
+    line-height:1.25!important;
+  }
+  .task-list-meta{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:flex-end!important;
+    flex:0 0 auto!important;
+    min-width:0!important;
+    gap:clamp(10px,1.15vw,18px)!important;
+  }
+  .task-list-meta > *{
+    flex:0 0 auto!important;
+    margin:0!important;
+  }
+  .task-list-company-avatar,
+  .task-list-responsible{
+    width:28px!important;
+    min-width:28px!important;
+    height:28px!important;
+    justify-self:auto!important;
+  }
+  .task-list-status,
+  .task-list-deadline,
+  .task-list-postdate{
+    justify-self:auto!important;
+  }
+}
+
+@media(max-width:760px){
+  .task-row-wrap .task-list-row{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:9px!important;
+  }
+  .task-list-main{width:100%!important}
+  .task-list-meta{
+    display:flex!important;
+    align-items:center!important;
+    flex-wrap:wrap!important;
+    gap:8px!important;
+  }
+  .task-list-postdate{display:none!important}
+}
+
+/* Round174A — colunas estáveis e leitura refinada em Tarefas e Notificações */
+@media(min-width:761px){
+  .task-list-meta,
+  .notification-list-meta{
+    display:grid!important;
+    grid-template-columns:28px 28px 112px 82px 82px!important;
+    align-items:center!important;
+    column-gap:clamp(10px,1.15vw,18px)!important;
+    flex:0 0 auto!important;
+    min-width:0!important;
+  }
+  .task-list-meta > *,
+  .notification-list-meta > *{
+    width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    justify-self:stretch!important;
+  }
+  .task-list-company-avatar,
+  .task-list-responsible,
+  .notification-company-avatar,
+  .notification-responsible{
+    width:28px!important;
+    min-width:28px!important;
+    justify-self:center!important;
+  }
+  .task-list-status,
+  .notification-status{
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  .task-list-deadline,
+  .task-list-postdate,
+  .notification-deadline,
+  .notification-postdate{
+    text-align:center!important;
+  }
+  .notifications-list .notification-list-row{
+    grid-template-columns:minmax(180px,1fr) auto max-content!important;
+  }
+  .notification-list-main{grid-column:1!important}
+  .notification-list-meta{grid-column:2!important}
+  .notification-row-actions{grid-column:3!important}
+  .notification-copy-head,
+  .notification-copy-message{
+    letter-spacing:.018em!important;
+  }
+  .meta-empty{
+    visibility:hidden!important;
+    pointer-events:none!important;
+  }
+}
+
+@media(max-width:1180px) and (min-width:761px){
+  .task-list-meta,
+  .notification-list-meta{
+    grid-template-columns:28px 28px 100px 76px 76px!important;
+    column-gap:10px!important;
+  }
+}
+
+@media(max-width:760px){
+  .notification-list-meta{
+    display:flex!important;
+    align-items:center!important;
+    flex-wrap:wrap!important;
+    gap:8px!important;
+    grid-column:1/-1!important;
+  }
+  .notification-list-meta .meta-empty{display:none!important}
+  .notification-copy-head,
+  .notification-copy-message{letter-spacing:.012em!important}
+}
+
+/* Round174B — blindagem das colunas internas da linha de Tarefas */
+@media(min-width:761px){
+  .task-row-wrap .task-list-row > .task-list-meta{
+    grid-column:auto!important;
+    grid-row:auto!important;
+    overflow:visible!important;
+    white-space:normal!important;
+  }
+  .task-row-wrap .task-list-meta > *{
+    grid-column:auto!important;
+    grid-row:auto!important;
+  }
+  .task-row-wrap .task-list-company-avatar{grid-column:1!important}
+  .task-row-wrap .task-list-responsible{grid-column:2!important}
+  .task-row-wrap .task-list-status{grid-column:3!important}
+  .task-row-wrap .task-list-deadline{grid-column:4!important}
+  .task-row-wrap .task-list-postdate{grid-column:5!important}
+}
+
+/* Round175A — precedência final do novo fluxo das Notificações */
+@media(min-width:761px){
+  .notifications-list .notification-list-row{
+    grid-template-columns:28px minmax(180px,1fr) auto!important;
+  }
+  .notifications-list .notification-leading-action{grid-column:1!important}
+  .notifications-list .notification-list-main{grid-column:2!important}
+  .notifications-list .notification-list-meta{grid-column:3!important}
+}
+@media(max-width:760px){
+  .notifications-list .notification-list-row{
+    grid-template-columns:28px minmax(0,1fr)!important;
+  }
+  .notifications-list .notification-leading-action{grid-column:1!important;grid-row:1!important}
+  .notifications-list .notification-list-main{grid-column:2!important;grid-row:1!important}
+  .notifications-list .notification-list-meta{grid-column:2!important}
+}
+
+/* Round176A — listas compactas de Configurações em uma única linha */
+.settings-section .compact-admin-grid > .panel{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  grid-template-rows:auto auto!important;
+  align-items:center!important;
+  column-gap:18px!important;
+  row-gap:2px!important;
+  min-height:0!important;
+  padding:12px 16px!important;
+}
+
+/* Round187A — notificações consecutivas agrupadas por empresa */
+.notifications-list{
+  gap:8px!important;
+}
+.notifications-list .notification-company-group{
+  padding:0!important;
+  overflow:hidden;
+  border-radius:12px!important;
+}
+.notifications-list .notification-company-group .notification-list-row{
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.notifications-list .notification-company-group .notification-list-row + .notification-list-row{
+  border-top:1px solid rgba(255,255,255,.075)!important;
+}
+@media(min-width:761px){
+  .notifications-list .notification-list-meta{
+    column-gap:clamp(10px,1.15vw,18px)!important;
+  }
+  .notifications-list .notification-list-meta > *{
+    grid-row:auto!important;
+  }
+  .notifications-list .notification-company-avatar{grid-column:1!important}
+  .notifications-list .notification-responsible{grid-column:2!important}
+  .notifications-list .notification-status{grid-column:3!important}
+  .notifications-list .notification-deadline{grid-column:4!important}
+  .notifications-list .notification-postdate{grid-column:5!important}
+}
+
+/* Round190A — mesma densidade e espaçamento interno de Tarefas */
+@media(min-width:761px){
+  .notifications-list .notification-company-group .notification-list-row{
+    min-height:44px!important;
+    padding:7px 12px!important;
+  }
+}
+
+.settings-section .compact-admin-grid > .panel > .mini-title{
+  grid-column:1!important;
+  grid-row:1 / 3!important;
+  min-width:0!important;
+}
+
+.settings-section .compact-admin-grid > .panel > h2{
+  grid-column:1!important;
+  grid-row:1!important;
+  min-width:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+.settings-section .compact-admin-grid > .panel > small{
+  grid-column:1!important;
+  grid-row:2!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+.settings-section .compact-admin-grid > .panel > .row-actions{
+  grid-column:2!important;
+  grid-row:1 / 3!important;
+  align-self:center!important;
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  gap:8px!important;
+  width:auto!important;
+  min-width:max-content!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+}
+
+.settings-section .compact-admin-grid > .panel > .row-actions button{
+  flex:0 0 auto!important;
+  width:auto!important;
+  min-width:74px!important;
+  margin:0!important;
+}
+
+@media(max-width:700px){
+  .settings-section .compact-admin-grid > .panel{
+    column-gap:10px!important;
+    padding:10px 12px!important;
+  }
+  .settings-section .compact-admin-grid > .panel > .row-actions{
+    gap:5px!important;
+    min-width:0!important;
+  }
+  .settings-section .compact-admin-grid > .panel > .row-actions button{
+    min-width:0!important;
+    padding:7px 8px!important;
+    font-size:11px!important;
+  }
+}
+
+/* ========================================================================== 
+   Round193A — Argos Monocromático / Biblioteca de Toth
+   Primeira camada global + Dashboard. Preserva estrutura, dimensões,
+   responsividade e todas as cores funcionais de status, prazo e prioridade.
+   ========================================================================== */
+:root{
+  --bg:#060607;--surface:#0c0d0f;--surface-2:#101114;--surface-3:#141519;
+  --line:rgba(255,255,255,.075);--line-gold:rgba(203,174,108,.16);
+  --text:#f0ece4;--text-2:#c7c1b7;--muted:#87837c;
+  --gold:#cbae6c;--gold-2:#d7bc7a;--danger:#f20d4f;
+}
+body,.side{background:#060607!important}
+.side{border-right-color:rgba(255,255,255,.055)!important}
+.user-card,.impersonate,.card,.panel,.month,.legend,.col,.modal,.content-fields,.week-col,.search-results{
+  background:#0c0d0f!important;border-color:rgba(255,255,255,.075)!important;box-shadow:none!important
+}
+input,select,textarea,.status-select{
+  background:#08090a!important;border-color:rgba(255,255,255,.105)!important;box-shadow:none!important
+}
+input:hover,select:hover,textarea:hover,.status-select:hover{border-color:rgba(203,174,108,.28)!important}
+input:focus,select:focus,textarea:focus{
+  border-color:rgba(203,174,108,.52)!important;box-shadow:0 0 0 2px rgba(203,174,108,.055)!important
+}
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story){
+  background:#0d0e10!important;border-color:rgba(255,255,255,.10)!important;box-shadow:none!important
+}
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):hover{
+  background:#131416!important;border-color:rgba(203,174,108,.32)!important;box-shadow:none!important
+}
+button.primary,.primary{background:#cbae6c!important;border-color:#cbae6c!important;color:#090909!important;box-shadow:none!important}
+button.primary:hover,.primary:hover{background:#d7bc7a!important;border-color:#d7bc7a!important;box-shadow:0 5px 16px rgba(0,0,0,.18)!important}
+.side nav .nav-btn:hover{background:rgba(203,174,108,.045)!important}
+.side nav .nav-btn.active{
+  background:linear-gradient(90deg,rgba(203,174,108,.13),rgba(203,174,108,.035) 64%,transparent)!important;
+  color:#d7bc7a!important;border-color:transparent!important;box-shadow:none!important
+}
+.side nav .nav-btn.active .nav-icon,.side nav .nav-btn.active span{color:#d7bc7a!important;stroke:#d7bc7a!important}
+.dash-zone,.main > section:has(> .dash-zone) .dash-zone,.main > div > section > .dash-zone{
+  background:#090a0b!important;border-color:rgba(255,255,255,.07)!important;box-shadow:none!important
+}
+.main > div > section > .dash-zone .quick-cards .card,
+.main > div > section > .dash-zone .time-cards .card,
+.main > section:has(> .dash-zone) .dash-zone .card{
+  background:#0d0e10!important;border-color:rgba(255,255,255,.075)!important;box-shadow:none!important
+}
+.main > div > section > .dash-zone .quick-cards .card:hover,
+.main > div > section > .dash-zone .time-cards .card:hover,
+.main > section:has(> .dash-zone) .dash-zone .card:hover{
+  background:#111214!important;border-color:rgba(203,174,108,.22)!important;box-shadow:none!important
+}
+.main > div > section > .grid2 > .panel,.main > section:has(> .dash-zone) > .grid2 > .panel{
+  background:#0b0c0e!important;border-color:rgba(255,255,255,.075)!important;box-shadow:none!important
+}
+.main > div > section > .grid2 > .panel:hover,.main > section:has(> .dash-zone) > .grid2 > .panel:hover{
+  background:#0d0e10!important;border-color:rgba(203,174,108,.20)!important
+}
+.main > div > section > .filters select,.main > div > section > .filters input,
+.main > section:has(> .dash-zone) > .filters select,.main > section:has(> .dash-zone) > .filters input{
+  background:#08090a!important;border-color:rgba(255,255,255,.105)!important;box-shadow:none!important
+}
+.main > div > section > .grid2 .bar i{background:#17181a!important;border-color:rgba(255,255,255,.05)!important;box-shadow:none!important}
+.main > div > section > .grid2 > .panel:nth-child(2) .bar em,
+.main > div > section > .grid2 > .panel:nth-child(3) .bar em,
+.main > div > section > .grid2 > .panel:nth-child(4) .bar em{
+  background:#cbae6c!important;color:#cbae6c!important;box-shadow:0 0 6px rgba(203,174,108,.20)!important;filter:none!important
+}
+.main > div > section > .grid2 > .panel:first-child .bar em{box-shadow:0 0 5px currentColor!important;filter:brightness(1.03)!important}
+.status-pill,.priority-pill,.date-field input,.status-dot,.task-row[class*="priority-"],.kcard[class*="priority-"]{filter:none!important}
+
+/* ========================================================================== 
+   Round194A — preservação das cores funcionais
+   O reskin permanece monocromático, mas status volta a orientar a navegação.
+   ========================================================================== */
+.col[style*="--status-color"]{
+  border-top-color:var(--status-color)!important;
+}
+.tasks-board .task-group[style*="--status-color"]{
+  border-color:var(--status-color)!important;
+}
+.status-grid > .panel[style*="--status-color"]{
+  border-left-color:var(--status-color)!important;
+}
+.task-detail .status-select[style*="--status-color"],
+.task-config .status-select[style*="--status-color"],
+.status-select[style*="--status-color"]{
+  border-color:var(--status-color)!important;
+}
+
+/* ========================================================================== 
+   Round195A — abas de Configurações padronizadas
+   Mesmo acabamento monocromático no desktop e no mobile. O scroll horizontal
+   e as dimensões responsivas permanecem intactos.
+   ========================================================================== */
+.main .settings-tabs{
+  align-items:center!important;
+  gap:6px!important;
+  padding:0 0 8px!important;
+  border-bottom:1px solid rgba(255,255,255,.055)!important;
+}
+.main .settings-tabs > button{
+  position:relative!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:8px!important;
+  background:#0d0e10!important;
+  color:#c7c1b7!important;
+  box-shadow:none!important;
+  opacity:1!important;
+}
+.main .settings-tabs > button:hover{
+  border-color:rgba(203,174,108,.30)!important;
+  background:#131416!important;
+  color:#f0ece4!important;
+  box-shadow:none!important;
+}
+.main .settings-tabs > button.active,
+.main .settings-tabs > button[aria-current="page"]{
+  border-color:rgba(203,174,108,.48)!important;
+  background:rgba(203,174,108,.085)!important;
+  color:#d7bc7a!important;
+  box-shadow:none!important;
+}
+.main .settings-tabs > button.active::after,
+.main .settings-tabs > button[aria-current="page"]::after{
+  content:none!important;
+  display:none!important;
+}
+
+@media (max-width:760px){
+  .main .settings-tabs{
+    align-items:center!important;
+    padding-bottom:8px!important;
+  }
+  .main .settings-tabs > button,
+  .main .settings-tabs > button.active,
+  .main .settings-tabs > button[aria-current="page"]{
+    border-radius:8px!important;
+  }
+}
+
+/* ========================================================================== 
+   Round196A — estados selecionados no padrão Biblioteca de Toth
+   Seleção é grafite com contorno e texto dourado suave. Ações primárias
+   continuam preenchidas fora dos seletores/filtros.
+   ========================================================================== */
+.side nav .nav-btn.active,
+.main .settings-tabs > button.active,
+.main .settings-tabs > button[aria-current="page"],
+.main .filters > button.primary{
+  background:#11110f!important;
+  border:1px solid rgba(203,174,108,.46)!important;
+  color:#d7bc7a!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
+
+.side nav .nav-btn.active:hover,
+.main .settings-tabs > button.active:hover,
+.main .settings-tabs > button[aria-current="page"]:hover,
+.main .filters > button.primary:hover{
+  background:#15140f!important;
+  border-color:rgba(215,188,122,.62)!important;
+  color:#e0c98e!important;
+  box-shadow:none!important;
+}
+
+.side nav .nav-btn.active::before,
+.side nav .nav-btn.active::after,
+.main .settings-tabs > button.active::before,
+.main .settings-tabs > button.active::after,
+.main .settings-tabs > button[aria-current="page"]::before,
+.main .settings-tabs > button[aria-current="page"]::after{
+  content:none!important;
+  display:none!important;
+}
+
+.side nav .nav-btn.active .nav-icon,
+.side nav .nav-btn.active span{
+  color:#d7bc7a!important;
+  stroke:#d7bc7a!important;
+}
+
+/* ========================================================================== 
+   Round197A — confirmação visual em Configurações
+   Reforça a aba superior ativa e remove o check redundante do seletor de perfil.
+   ========================================================================== */
+.main .settings-tabs > button.active,
+.main .settings-tabs > button[aria-current="page"]{
+  background:#191711!important;
+  border-color:rgba(215,188,122,.78)!important;
+  color:#ead49b!important;
+  box-shadow:inset 0 0 0 1px rgba(203,174,108,.10)!important;
+  font-weight:700!important;
+}
+
+.main .access-role-tabs > button.active,
+.main .access-role-tabs > button[aria-pressed="true"]{
+  background:#15140f!important;
+  border-color:rgba(203,174,108,.58)!important;
+  color:#d7bc7a!important;
+  box-shadow:none!important;
+}
+
+/* =========================================================
+   Round198A — sistema único de botões / Biblioteca de Toth
+   Mantém a hierarquia funcional: ação, seleção e apoio.
+   ========================================================= */
+
+/* Botões de apoio: grafite limpo, sem gradientes legados. */
+button:not([style]):not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.danger):not(.danger-button){
+  background:#0d0e10!important;
+  border-color:rgba(255,255,255,.12)!important;
+  color:rgba(255,255,255,.86)!important;
+  box-shadow:none!important;
+}
+
+button:not([style]):not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.danger):not(.danger-button):hover{
+  background:#131417!important;
+  border-color:rgba(203,174,108,.34)!important;
+  color:#f4f0e7!important;
+  box-shadow:none!important;
+}
+
+/* Ações principais: dourado fosco preenchido como no exemplo aprovado. */
+button.primary,
+.modal-actions button.primary,
+.top-actions button.primary,
+.panel-actions button.primary,
+.row-actions button.primary,
+.section-header button.primary,
+.settings-toolbar button.primary{
+  background:linear-gradient(180deg,#d8bd79 0%,#c5a45d 52%,#aa833c 100%)!important;
+  border-color:#d2b46e!important;
+  color:#090909!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 4px 12px rgba(0,0,0,.18)!important;
+}
+
+button.primary:hover,
+.modal-actions button.primary:hover,
+.top-actions button.primary:hover,
+.panel-actions button.primary:hover,
+.row-actions button.primary:hover,
+.section-header button.primary:hover,
+.settings-toolbar button.primary:hover{
+  background:linear-gradient(180deg,#e0c886 0%,#ccac65 54%,#b18a42 100%)!important;
+  border-color:#dec47e!important;
+  color:#080808!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 5px 15px rgba(0,0,0,.22)!important;
+}
+
+/* Seletores: também possuem dourado por dentro, mas sem competir com ações. */
+.side button.active,
+.main .settings-tabs > button.active,
+.main .settings-tabs > button[aria-current="page"],
+.main .access-role-tabs > button.active,
+.main .access-role-tabs > button[aria-pressed="true"],
+.main .view-tabs > button.primary,
+.main .filters > button.primary{
+  background:linear-gradient(180deg,rgba(203,174,108,.16),rgba(203,174,108,.075))!important;
+  border-color:rgba(203,174,108,.62)!important;
+  color:#d8bd79!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+
+.side button.active:hover,
+.main .settings-tabs > button.active:hover,
+.main .settings-tabs > button[aria-current="page"]:hover,
+.main .access-role-tabs > button.active:hover,
+.main .access-role-tabs > button[aria-pressed="true"]:hover,
+.main .view-tabs > button.primary:hover,
+.main .filters > button.primary:hover{
+  background:linear-gradient(180deg,rgba(203,174,108,.21),rgba(203,174,108,.10))!important;
+  border-color:rgba(215,188,122,.76)!important;
+  color:#e0c886!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important;
+}
+
+/* Perigo continua semanticamente vermelho. */
+button.danger,
+button.danger-button,
+.danger-zone button.danger,
+.danger-zone button.danger-button{
+  background:rgba(242,13,79,.10)!important;
+  border-color:rgba(242,13,79,.48)!important;
+  color:#ff4d7f!important;
+  box-shadow:none!important;
+}
+
+button:disabled{
+  opacity:.42!important;
+  box-shadow:none!important;
+}
+
+/* =========================================================
+   Round199A — confirmação inequívoca da aba ativa
+   O estado ativo das Configurações precisa ser reconhecido de imediato.
+   ========================================================= */
+.main .settings-tabs > button.active,
+.main .settings-tabs > button[aria-current="page"]{
+  background:linear-gradient(
+    180deg,
+    rgba(216,189,121,.34) 0%,
+    rgba(197,164,93,.25) 52%,
+    rgba(170,131,60,.18) 100%
+  )!important;
+  border-color:rgba(216,189,121,.88)!important;
+  color:#f1dca5!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.09),
+    inset 0 0 12px rgba(203,174,108,.06)!important;
+  font-weight:700!important;
+}
+
+.main .settings-tabs > button.active:hover,
+.main .settings-tabs > button[aria-current="page"]:hover{
+  background:linear-gradient(
+    180deg,
+    rgba(224,200,134,.39) 0%,
+    rgba(204,172,101,.29) 54%,
+    rgba(177,138,66,.21) 100%
+  )!important;
+  border-color:rgba(224,200,134,.94)!important;
+  color:#f6e4b5!important;
+}
+
+/* =========================================================
+   Round200A — ações neutras e checkboxes vermelho-cereja
+   Dourado fica restrito a estados selecionados. Botões de ação
+   usam o mesmo acabamento grafite do restante do sistema.
+   ========================================================= */
+button.primary,
+.modal-actions button.primary,
+.top-actions button.primary,
+.panel-actions button.primary,
+.row-actions button.primary,
+.section-header button.primary,
+.settings-toolbar button.primary,
+.main .filters > button.primary{
+  background:#111216!important;
+  border-color:rgba(255,255,255,.14)!important;
+  color:#f0ece4!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
+
+button.primary:hover,
+.modal-actions button.primary:hover,
+.top-actions button.primary:hover,
+.panel-actions button.primary:hover,
+.row-actions button.primary:hover,
+.section-header button.primary:hover,
+.settings-toolbar button.primary:hover,
+.main .filters > button.primary:hover{
+  background:#17181c!important;
+  border-color:rgba(203,174,108,.36)!important;
+  color:#fffaf0!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
+
+/* Estados selecionados continuam com confirmação dourada interna. */
+.side button.active,
+.main .settings-tabs > button.active,
+.main .settings-tabs > button[aria-current="page"],
+.main .access-role-tabs > button.active,
+.main .access-role-tabs > button[aria-pressed="true"],
+.main .view-tabs > button.primary{
+  background:linear-gradient(180deg,rgba(216,189,121,.34),rgba(197,164,93,.20) 54%,rgba(170,131,60,.14))!important;
+  border-color:rgba(216,189,121,.82)!important;
+  color:#f1dca5!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07)!important;
+}
+
+input[type="checkbox"],
+.status-editor-modal .status-editor-checks input[type="checkbox"],
+.public-portfolio-active input[type="checkbox"]{
+  accent-color:#ff174f!important;
+}
+
+/* =========================================================
+   Round201A — confirmação real da aba ativa em Configurações
+   Seletor direto: funciona independentemente do contêiner da tela.
+   ========================================================= */
+.settings-tabs > button.active,
+.settings-tabs > button[aria-current="page"]{
+  background:linear-gradient(
+    180deg,
+    rgba(216,189,121,.38) 0%,
+    rgba(197,164,93,.27) 54%,
+    rgba(170,131,60,.18) 100%
+  )!important;
+  border:1px solid rgba(216,189,121,.90)!important;
+  color:#f3dda5!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08)!important;
+  font-weight:700!important;
+  filter:none!important;
+}
+
+.settings-tabs > button.active:hover,
+.settings-tabs > button[aria-current="page"]:hover{
+  background:linear-gradient(
+    180deg,
+    rgba(224,200,134,.43) 0%,
+    rgba(204,172,101,.31) 54%,
+    rgba(177,138,66,.21) 100%
+  )!important;
+  border-color:rgba(224,200,134,.96)!important;
+  color:#f7e6b8!important;
+}
+
+.settings-tabs > button.active::before,
+.settings-tabs > button.active::after,
+.settings-tabs > button[aria-current="page"]::before,
+.settings-tabs > button[aria-current="page"]::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* =========================================================
+   Round202A — padrão único e chapado para ações e seleções
+   Referência: botão Captura rápida. Sem gradiente ou negrito.
+   ========================================================= */
+
+/* Ações principais e estados selecionados compartilham o acabamento premium. */
+button.primary,
+.modal-actions button.primary,
+.top-actions button.primary,
+.panel-actions button.primary,
+.row-actions button.primary,
+.section-header button.primary,
+.settings-toolbar button.primary,
+.main .filters > button.primary,
+.main .view-tabs > button.primary,
+.main .access-role-tabs > button.active,
+.main .access-role-tabs > button[aria-pressed="true"],
+.settings-tabs > button.active,
+.settings-tabs > button[aria-current="page"],
+.side nav .nav-btn.active{
+  background:#17150f!important;
+  border-color:#806821!important;
+  color:#d7b96f!important;
+  box-shadow:inset 0 0 0 1px rgba(215,185,111,.035)!important;
+  filter:none!important;
+  font-weight:500!important;
+}
+
+button.primary:hover,
+.modal-actions button.primary:hover,
+.top-actions button.primary:hover,
+.panel-actions button.primary:hover,
+.row-actions button.primary:hover,
+.section-header button.primary:hover,
+.settings-toolbar button.primary:hover,
+.main .filters > button.primary:hover,
+.main .view-tabs > button.primary:hover,
+.main .access-role-tabs > button.active:hover,
+.main .access-role-tabs > button[aria-pressed="true"]:hover,
+.settings-tabs > button.active:hover,
+.settings-tabs > button[aria-current="page"]:hover,
+.side nav .nav-btn.active:hover{
+  background:#1d1a11!important;
+  border-color:#a48732!important;
+  color:#e0c57f!important;
+  box-shadow:inset 0 0 0 1px rgba(224,197,127,.05)!important;
+  filter:none!important;
+}
+
+/* Confirmação inequívoca nas abas superiores de Configurações. */
+.settings-tabs > button.active,
+.settings-tabs > button[aria-current="page"]{
+  border:1px solid #a98a35!important;
+  background:#332b18!important;
+  color:#f0d58a!important;
+  opacity:1!important;
+  font-weight:500!important;
+  box-shadow:inset 0 0 0 1px rgba(240,213,138,.06)!important;
+}
+
+.settings-tabs > button.active:hover,
+.settings-tabs > button[aria-current="page"]:hover{
+  background:#3b311a!important;
+  border-color:#c09d42!important;
+  color:#f5dea0!important;
+  box-shadow:inset 0 0 0 1px rgba(245,222,160,.075)!important;
+}
+
+.settings-tabs > button.active::before,
+.settings-tabs > button.active::after,
+.settings-tabs > button[aria-current="page"]::before,
+.settings-tabs > button[aria-current="page"]::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* A regra específica antiga não pode recolorir os checkboxes. */
+input[type="checkbox"],
+.status-editor-modal .status-editor-checks input[type="checkbox"],
+.public-portfolio-active input[type="checkbox"]{
+  accent-color:#ff174f!important;
+}

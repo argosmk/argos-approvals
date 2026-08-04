@@ -3386,16 +3386,16 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
 
     {(fields.companyId||fields.responsibleId)&&<div className="form-two">
       {fields.companyId&&<label>Cliente / Empresa
-        <div className="select-entity">
-          <EntityLabel value={allowedCompanies.find(c=>c.id===form.companyId)?.logo} label={allowedCompanies.find(c=>c.id===form.companyId)?.name||'Empresa'}/>
+        <div className="select-entity create-select-entity">
+          <AvatarMini value={allowedCompanies.find(c=>c.id===form.companyId)?.logo} label={allowedCompanies.find(c=>c.id===form.companyId)?.name||'Empresa'}/>
           <select value={form.companyId} onChange={e=>F('companyId',e.target.value)}>
             {allowedCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}
           </select>
         </div>
       </label>}
       {fields.responsibleId&&<label>Responsável
-        <div className="select-entity">
-          <EntityLabel value={teams.find(u=>u.id===form.responsibleId)?.avatar} label={teams.find(u=>u.id===form.responsibleId)?.name||'Responsável'}/>
+        <div className="select-entity create-select-entity">
+          <AvatarMini value={teams.find(u=>u.id===form.responsibleId)?.avatar} label={teams.find(u=>u.id===form.responsibleId)?.name||'Responsável'}/>
           <select value={form.responsibleId} onChange={e=>F('responsibleId',e.target.value)}>
             {teams.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}
           </select>
@@ -3440,13 +3440,13 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
 
     {fields.caption&&<RichTextField label="Legenda" value={form.caption||''} onChange={e=>F('caption',e.target.value)} placeholder="Insira a legenda do post."/>}
 
-    {fields.materialLinks&&<label>Links de material pronto
-      <AutoTextarea
-        value={form.materialLinks||''}
-        onChange={e=>F('materialLinks',e.target.value)}
-        placeholder="Cole um link por linha para artes, vídeos ou arquivos finalizados."
-      />
-    </label>}
+    {fields.materialLinks&&<TextFieldWithCopy
+      label="Links de material pronto"
+      value={form.materialLinks||''}
+      onChange={e=>F('materialLinks',e.target.value)}
+      placeholder="Cole um link por linha para artes, vídeos ou arquivos finalizados."
+      minHeight={44}
+    />}
 
     <div className="modal-actions">
       <button onClick={close}>Cancelar</button>
@@ -3836,7 +3836,7 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     {groupEntries.length?groupEntries.map(([group,items])=>{
       const collapsed=permissions.canCollapseGroups?isGroupCollapsed(group):false;
       const groupStatus=mode==='status'?activeStatuses.find(s=>s.name===group):null;
-      return <div className="panel task-group" style={{width:'100%',borderColor:groupStatus?.color||undefined}} key={group}>
+      return <div className="panel task-group" style={{width:'100%',borderColor:groupStatus?.color||undefined,'--status-color':groupStatus?.color||'var(--line)'}} key={group}>
         <button type="button" disabled={!permissions.canCollapseGroups} onClick={()=>permissions.canCollapseGroups&&toggleGroup(group)} aria-expanded={!collapsed} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:0,background:'transparent',border:0,textAlign:'left',cursor:permissions.canCollapseGroups?'pointer':'default'}}>
           <h2 style={{margin:0,display:'flex',alignItems:'center',gap:8,color:groupStatus?.color||undefined}}>{permissions.canCollapseGroups&&<span style={{display:'inline-block',transform:collapsed?'rotate(-90deg)':'rotate(0deg)',transition:'transform .18s ease'}}>▾</span>}{group}<small>{items.length}</small></h2>
           {permissions.canCollapseGroups&&<small>{collapsed?'Expandir':'Minimizar'}</small>}
@@ -3847,15 +3847,16 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
           const statusColor=statusById[t.status]?.color||'#9ca3af';
           const deadlineColor=taskDeadlineColor(t,statuses,statusById);
           return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>
-            {permissions.canSelectTasks&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>}
-            <button className="task-row" disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
-              <b>{t.title}{t.archived?' • Arquivada':''}</b>
-              {(permissions.showPostDate||permissions.showDeadline||permissions.showStatus)&&<span style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                {permissions.showPostDate&&<small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:'1px solid rgba(156,163,175,.38)',background:'rgba(156,163,175,.08)',color:'#aeb4bd',fontSize:12,fontWeight:400,lineHeight:1.2}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>}
-                {permissions.showDeadline&&<small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${deadlineColor}66`,background:`${deadlineColor}18`,color:deadlineColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{fmtDate(t.internalDate)}</small>}
-                {permissions.showStatus&&<small style={{display:'inline-flex',alignItems:'center',minHeight:28,padding:'4px 9px',borderRadius:8,border:`1px solid ${statusColor}66`,background:`${statusColor}18`,color:statusColor,fontSize:12,fontWeight:400,lineHeight:1.2}}>{statusById[t.status]?.name||t.status}</small>}
-              </span>}
-              {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars">{permissions.showCompany&&<AvatarMini value={c?.logo} label={c?.name}/>} {permissions.showResponsible&&<AvatarMini value={r?.avatar} label={r?.name}/>}</span>}
+            {permissions.canSelectTasks&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>} 
+            <button className="task-row task-list-row" disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+              <span className="task-list-main"><b title={t.title}>{t.title}{t.archived?' • Arquivada':''}</b></span>
+              <span className="task-list-meta">
+                {permissions.showCompany&&<span className="task-list-company-avatar" title={`Empresa: ${c?.name||'Sem empresa'}`}><AvatarMini value={c?.logo} label={c?.name}/></span>}
+                {permissions.showResponsible&&<span className="task-list-responsible" title={`Responsável: ${r?.name||'Sem responsável'}`}>{r&&<AvatarMini value={r.avatar} label={r.name}/>}</span>}
+                {permissions.showStatus&&<small className="task-list-status" style={{borderColor:`${statusColor}66`,background:`${statusColor}18`,color:statusColor}}>{statusById[t.status]?.name||t.status}</small>}
+                {permissions.showDeadline&&<small className="task-list-deadline" style={{borderColor:`${deadlineColor}66`,background:`${deadlineColor}18`,color:deadlineColor}}>{fmtDate(t.internalDate)}</small>}
+                {permissions.showPostDate&&<small className="task-list-postdate">{t.postDate?fmtDate(t.postDate):'Sem data'}</small>}
+              </span>
             </button>
           </div>
         })}</div>}
@@ -4096,7 +4097,7 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''})
     <div className="kanban">{allowed.map(s=>{
       const columnTasks=filtered.filter(t=>t.status===s.id);
       const visibleTasks=columnTasks.slice(0,visibleLimit(s.id));
-      return <div className="col" key={s.id} style={{borderTopColor:s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{
+      return <div className="col" key={s.id} style={{borderTopColor:s.color,'--status-color':s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{
         const companyEntity=companies.find(c=>c.id===t.companyId);
         const respUser=users.find(u=>u.id===t.responsibleId);
         return <button className="kcard" key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
@@ -4173,14 +4174,16 @@ function CopyTextButton({text}){
 }
 
 function TextFieldWithCopy({label,value,onChange,placeholder,minHeight=92}){
-  return <label style={{display:'block'}}>
+  return <label className="plain-text-field-with-copy" style={{display:'block'}}>
     {label}
-    <div style={{position:'relative'}}>
+    <div className="plain-text-editor-shell" style={{position:'relative'}}>
       <AutoTextarea
+        rows={1}
         value={value||''}
         onChange={onChange}
         placeholder={placeholder}
         minHeight={minHeight}
+        className="plain-text-editor"
         style={{paddingRight:48}}
       />
       <CopyTextButton text={value}/>
@@ -4712,7 +4715,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
   {canViewDetail('responsibleId')&&<label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!canEditDetail('responsibleId')} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label>}
   {canViewDetail('type')&&<label>Tipo<select disabled={!canEditDetail('type')} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label>}
-  {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label>}
+  {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined,'--status-color':statusById[task.status]?.color||'var(--line)'}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label>}
   {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
   {canViewDetail('postDate')&&<label>Data do post<input disabled={!canEditDetail('postDate')} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label>}
 </div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2>{canEditDetail('comments')&&<div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{canViewDetail('history')&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
@@ -5507,7 +5510,7 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
   }
   return <div className="settings-section">
     <div className="section-header"><div><h2>Padrões de acesso</h2><p className="muted">Usuários que usam o padrão acompanham automaticamente qualquer mudança salva aqui.</p></div></div>
-    <div className="view-tabs" style={{justifyContent:'flex-start',margin:'0 0 18px'}}>{[['team','Equipe'],['client','Responsável']].map(([id,label])=><button key={id} className={role===id?'active primary':''} aria-pressed={role===id} onClick={()=>setRole(id)}>{role===id?'✓ ':''}{label}</button>)}</div>
+    <div className="view-tabs access-role-tabs" style={{justifyContent:'flex-start',margin:'0 0 18px'}}>{[['team','Equipe'],['client','Responsável']].map(([id,label])=><button key={id} className={role===id?'active primary':''} aria-pressed={role===id} onClick={()=>setRole(id)}>{label}</button>)}</div>
     <div className="panel"><h2>Padrão de {roleLabel}</h2>
 
       <h3>Regras de acesso</h3>
@@ -5600,26 +5603,20 @@ const ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS = `
 
 .settings-tabs > button.active,
 .settings-tabs > button[aria-current="page"]{
-  color:#f4dda0!important;
-  border-color:rgba(225,177,44,.58)!important;
-  border-bottom-color:rgba(12,12,12,1)!important;
-  background:linear-gradient(180deg,rgba(225,177,44,.17) 0%,rgba(225,177,44,.075) 100%)!important;
-  box-shadow:inset 0 1px 0 rgba(255,224,139,.08),0 -1px 10px rgba(225,177,44,.055)!important;
+  color:#f0d58a!important;
+  border-color:#b8943f!important;
+  border-bottom-color:#b8943f!important;
+  background:#3a2f17!important;
+  box-shadow:inset 0 0 0 1px rgba(240,213,138,.08)!important;
+  font-weight:500!important;
   opacity:1!important;
   z-index:2!important;
 }
 
 .settings-tabs > button.active::after,
 .settings-tabs > button[aria-current="page"]::after{
-  content:""!important;
-  position:absolute!important;
-  left:11px!important;
-  right:11px!important;
-  bottom:-2px!important;
-  height:2px!important;
-  border-radius:999px!important;
-  background:#d9ad38!important;
-  box-shadow:0 0 8px rgba(225,177,44,.42)!important;
+  content:none!important;
+  display:none!important;
 }
 
 @media (max-width:760px){
@@ -5663,7 +5660,7 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
   const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Geral']];
   if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
-  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} type="button" className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)'}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
+  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} type="button" className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -6191,35 +6188,46 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     const value=String(color||'');
     return /^#[0-9a-f]{6}$/i.test(value)?`${value}${alpha}`:'rgba(255,255,255,.05)';
   }
+  const preparedNotifications=list.map(n=>({n,info:notificationInfo(n)}));
+  const notificationGroups=preparedNotifications.reduce((groups,item)=>{
+    const companyKey=item.info.task?.companyId||item.info.company?.id||'sem-empresa';
+    const previous=groups[groups.length-1];
+    if(previous&&previous.companyKey===companyKey) previous.items.push(item);
+    else groups.push({companyKey,items:[item]});
+    return groups;
+  },[]);
   return <section><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><h1>Notificações</h1><button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button></div>
     {(permissions.showTabs||permissions.canCompleteAll||permissions.canDeleteCompleted)&&<div className="filters">
       {permissions.showTabs&&<><button className={effectiveTab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={effectiveTab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></>}
       {effectiveTab==='open'&&permissions.canCompleteAll&&<button onClick={doneAll} disabled={!openCount}>Concluir todas</button>}
       {effectiveTab==='done'&&permissions.canDeleteCompleted&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}
     </div>}
-    <div className="notifications-list">{list.length?list.map(n=>{const info=notificationInfo(n);const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';return <div className="panel notification-item" key={n.id}>
-      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:18}}>
-        <div style={{minWidth:0,flex:1}}>
-          {permissions.showDateTime&&<small>{new Date(n.at).toLocaleString('pt-BR')}</small>}
-          {info.task&&<div style={{fontWeight:750,fontSize:'14px',marginTop:12,marginBottom:6}}>{info.task.title}</div>}
-          {info.actorName&&<div style={{fontWeight:700,fontSize:'13px',marginBottom:4,color:'var(--text)'}}>{info.actorName}:</div>}
-          <div style={{lineHeight:1.5,color:'var(--text)',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{info.content}</div>
+    <div className="notifications-list">{list.length?notificationGroups.map((group,groupIndex)=><div className="panel notification-company-group" key={`${group.companyKey}-${groupIndex}`}>
+      {group.items.map(({n,info})=>{const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';const canOpenRow=!!(permissions.canOpenTasks&&info.task);return <div className={'notification-item notification-list-row'+(canOpenRow?' is-clickable':'')} key={n.id} role={canOpenRow?'button':undefined} tabIndex={canOpenRow?0:undefined} onClick={canOpenRow?()=>open(n.taskId):undefined} onKeyDown={canOpenRow?(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open(n.taskId);}}:undefined}>
+      <span className="notification-leading-action">
+        {!n.done&&permissions.canComplete&&<button type="button" className="notification-complete-x" aria-label="Concluir notificação" title="Concluir notificação" onClick={event=>{event.stopPropagation();done(n.id);}}>×</button>}
+      </span>
+      <div className="notification-list-main">
+        <div className="notification-copy">
+          <div className="notification-copy-line notification-copy-head">
+            {info.task&&<b title={info.task.title}>{info.task.title}</b>}
+            {permissions.showDateTime&&<small>{new Date(n.at).toLocaleString('pt-BR')}</small>}
+          </div>
+          <div className="notification-copy-line notification-copy-message" title={`${info.actorName?`${info.actorName}: `:''}${info.content||''}`}>
+            {info.actorName&&<strong>{info.actorName}: </strong>}
+            <span>{info.content}</span>
+          </div>
         </div>
-        {(permissions.showCompany||permissions.showResponsible)&&<div style={{display:'flex',alignItems:'center',gap:14,flex:'0 0 auto',padding:'6px 8px 0 0'}}>
-          {permissions.showCompany&&info.company&&<span title={`Empresa: ${info.company.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.company.logo} label={info.company.name}/></span>}
-          {permissions.showResponsible&&info.responsible&&<span title={`Responsável: ${info.responsible.name}`} style={{display:'inline-flex',transform:'scale(1.35)',transformOrigin:'center'}}><AvatarMini value={info.responsible.avatar} label={info.responsible.name}/></span>}
-        </div>}
       </div>
-      {(permissions.showPostDate||permissions.showDeadline||permissions.showStatus)&&(info.postDate||info.deadline||info.status)&&<div style={{display:'flex',flexWrap:'wrap',gap:'7px 12px',margin:'12px 0',fontSize:'12px'}}>
-        {permissions.showPostDate&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:'#aeb4bd',background:'rgba(156,163,175,.08)',border:'1px solid rgba(156,163,175,.38)'}}>{info.postDate?fmtDate(info.postDate):'Sem data'}</span>}
-        {permissions.showDeadline&&info.deadline&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:deadlineTone,background:softColor(deadlineTone,'18'),border:`1px solid ${softColor(deadlineTone,'66')}`}}>{fmtDate(info.deadline)}</span>}
-        {permissions.showStatus&&info.status&&<span style={{display:'inline-flex',alignItems:'center',minHeight:'28px',padding:'4px 9px',borderRadius:'8px',color:statusTone,background:softColor(statusTone,'18'),border:`1px solid ${softColor(statusTone,'66')}`}}>{info.status.name}</span>}
-      </div>}
-      {(permissions.canOpenTasks||(!n.done&&permissions.canComplete))&&<div className="row-actions">
-        {permissions.canOpenTasks&&info.task&&<button onClick={()=>open(n.taskId)}>Abrir tarefa</button>}
-        {!n.done&&permissions.canComplete&&<button className="primary" onClick={()=>done(n.id)}>Concluir notificação</button>}
-      </div>}
-    </div>}):<div className="panel notification-empty-state">
+      <div className="notification-list-meta">
+        {permissions.showCompany&&<span className="notification-company-avatar" title={`Empresa: ${info.company?.name||'Sem empresa'}`}>{info.company&&<AvatarMini value={info.company.logo} label={info.company.name}/>}</span>}
+        {permissions.showResponsible&&<span className="notification-responsible" title={`Responsável: ${info.responsible?.name||'Sem responsável'}`}>{info.responsible&&<AvatarMini value={info.responsible.avatar} label={info.responsible.name}/>}</span>}
+        {permissions.showStatus&&<span className={`notification-status${info.status?'':' meta-empty'}`} style={info.status?{color:statusTone,background:softColor(statusTone,'18'),borderColor:softColor(statusTone,'66')}:undefined}>{info.status?.name||''}</span>}
+        {permissions.showDeadline&&<span className={`notification-deadline${info.deadline?'':' meta-empty'}`} style={info.deadline?{color:deadlineTone,background:softColor(deadlineTone,'18'),borderColor:softColor(deadlineTone,'66')}:undefined}>{info.deadline?fmtDate(info.deadline):''}</span>}
+        {permissions.showPostDate&&<span className="notification-postdate">{info.postDate?fmtDate(info.postDate):'Sem data'}</span>}
+      </div>
+    </div>})}
+    </div>):<div className="panel notification-empty-state">
       <div className="notification-empty-icon" aria-hidden="true">✓</div>
       <p>Nenhuma notificação pendente para você, <strong>{String(user?.name||'Argonauta').trim().split(/\s+/)[0]}</strong>.</p>
       <strong className="notification-empty-congrats">Excelente trabalho, Argonauta!</strong>
@@ -9416,4 +9424,22 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style127);
   }
   style127.textContent = ARGOS_ROUND127_MEDIA_SURGICAL_CSS;
+}
+
+const ARGOS_ROUND191_CHECKBOX_COLOR_STANDARD_CSS = `
+/* Round193A — vermelho-cereja para todos os checkboxes do sistema.
+   Preserva dimensões, alinhamento e aparência nativa definidos por cada painel. */
+input[type="checkbox"]{
+  accent-color:#f20d4f!important;
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style191 = document.getElementById('argos-round191-checkbox-color-standard');
+  if (!style191) {
+    style191 = document.createElement('style');
+    style191.id = 'argos-round191-checkbox-color-standard';
+    document.head.appendChild(style191);
+  }
+  style191.textContent = ARGOS_ROUND191_CHECKBOX_COLOR_STANDARD_CSS;
 }
