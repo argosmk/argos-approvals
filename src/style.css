@@ -5915,20 +5915,20 @@ button.primary:hover,
 /* Confirmação inequívoca nas abas superiores de Configurações. */
 .settings-tabs > button.active,
 .settings-tabs > button[aria-current="page"]{
-  border:1px solid #a98a35!important;
-  background:#332b18!important;
-  color:#f0d58a!important;
+  border:1px solid #806821!important;
+  background:#17150f!important;
+  color:#d7b96f!important;
   opacity:1!important;
   font-weight:500!important;
-  box-shadow:inset 0 0 0 1px rgba(240,213,138,.06)!important;
+  box-shadow:inset 0 0 0 1px rgba(215,185,111,.035)!important;
 }
 
 .settings-tabs > button.active:hover,
 .settings-tabs > button[aria-current="page"]:hover{
-  background:#3b311a!important;
-  border-color:#c09d42!important;
-  color:#f5dea0!important;
-  box-shadow:inset 0 0 0 1px rgba(245,222,160,.075)!important;
+  background:#1d1a11!important;
+  border-color:#a48732!important;
+  color:#e0c57f!important;
+  box-shadow:inset 0 0 0 1px rgba(224,197,127,.05)!important;
 }
 
 .settings-tabs > button.active::before,

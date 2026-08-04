@@ -2899,11 +2899,7 @@ function App(){
   function openCreate(){
     const permissions=effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role);
     if(!permissions.canCreate) return;
-    const linkedCompanies=effectiveUser.role==='client'
-      ? companies.filter(c=>c.active&&(effectiveUser.companyIds||[]).includes(c.id))
-      : companies.filter(c=>c.active);
-    const firstResponsible=users.find(u=>u.active&&(u.role==='team'||u.role==='admin'));
-    setForm({ title:'', companyId:linkedCompanies[0]?.id||'', responsibleId:firstResponsible?.id||'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:'', internalDate:'', copyInstructions:'', editorInstructions:'', usefulLinks:'', copy:'', caption:'', materialLinks:'' });
+    setForm({ title:'', companyId:'', responsibleId:'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:'', internalDate:'', copyInstructions:'', editorInstructions:'', usefulLinks:'', copy:'', caption:'', materialLinks:'' });
     setCreateOpen(true);
   }
   function createTask(){
@@ -2962,6 +2958,7 @@ function App(){
 
     setCreateOpen(false);
     setForm(null);
+    openTaskRoute(t.id);
   }
   function notifyTask(task,text,event,statusId=null,actorId=effectiveUser?.id,meta={}){
     if(!task || isSystemNoise(text)) return;
@@ -3364,11 +3361,13 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
   const F=(k,v)=>setForm(k==='postDate'&&permissions?.creationMode==='request'
     ? {...form,postDate:v,internalDate:v}
     : {...form,[k]:v});
-  const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
+  const byName=(a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'});
+  const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).sort(byName);
   const fields=permissions?.createFields||{};
   const allowedCompanies=user?.role==='client'
     ? companies.filter(c=>c.active&&(user.companyIds||[]).includes(c.id))
     : companies.filter(c=>c.active);
+  const sortedAllowedCompanies=[...allowedCompanies].sort(byName);
   const isRequest=permissions?.creationMode==='request';
 
   return <div className="modal-bg"><div className="modal create">
@@ -3387,16 +3386,22 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
     {(fields.companyId||fields.responsibleId)&&<div className="form-two">
       {fields.companyId&&<label>Cliente / Empresa
         <div className="select-entity create-select-entity">
-          <AvatarMini value={allowedCompanies.find(c=>c.id===form.companyId)?.logo} label={allowedCompanies.find(c=>c.id===form.companyId)?.name||'Empresa'}/>
+          {form.companyId
+            ? <AvatarMini value={sortedAllowedCompanies.find(c=>c.id===form.companyId)?.logo} label={sortedAllowedCompanies.find(c=>c.id===form.companyId)?.name||'Empresa'}/>
+            : <span className="create-select-placeholder">Selecionar</span>}
           <select value={form.companyId} onChange={e=>F('companyId',e.target.value)}>
-            {allowedCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}
+            <option value="">Selecionar</option>
+            {sortedAllowedCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}
           </select>
         </div>
       </label>}
       {fields.responsibleId&&<label>Responsável
         <div className="select-entity create-select-entity">
-          <AvatarMini value={teams.find(u=>u.id===form.responsibleId)?.avatar} label={teams.find(u=>u.id===form.responsibleId)?.name||'Responsável'}/>
+          {form.responsibleId
+            ? <AvatarMini value={teams.find(u=>u.id===form.responsibleId)?.avatar} label={teams.find(u=>u.id===form.responsibleId)?.name||'Responsável'}/>
+            : <span className="create-select-placeholder">Selecionar</span>}
           <select value={form.responsibleId} onChange={e=>F('responsibleId',e.target.value)}>
+            <option value="">Selecionar</option>
             {teams.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}
           </select>
         </div>
@@ -3837,11 +3842,11 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
       const collapsed=permissions.canCollapseGroups?isGroupCollapsed(group):false;
       const groupStatus=mode==='status'?activeStatuses.find(s=>s.name===group):null;
       return <div className="panel task-group" style={{width:'100%',borderColor:groupStatus?.color||undefined,'--status-color':groupStatus?.color||'var(--line)'}} key={group}>
-        <button type="button" disabled={!permissions.canCollapseGroups} onClick={()=>permissions.canCollapseGroups&&toggleGroup(group)} aria-expanded={!collapsed} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:0,background:'transparent',border:0,textAlign:'left',cursor:permissions.canCollapseGroups?'pointer':'default'}}>
+        <button className="task-group-toggle" type="button" disabled={!permissions.canCollapseGroups} onClick={()=>permissions.canCollapseGroups&&toggleGroup(group)} aria-expanded={!collapsed} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:0,background:'transparent',border:0,textAlign:'left',cursor:permissions.canCollapseGroups?'pointer':'default'}}>
           <h2 style={{margin:0,display:'flex',alignItems:'center',gap:8,color:groupStatus?.color||undefined}}>{permissions.canCollapseGroups&&<span style={{display:'inline-block',transform:collapsed?'rotate(-90deg)':'rotate(0deg)',transition:'transform .18s ease'}}>▾</span>}{group}<small>{items.length}</small></h2>
           {permissions.canCollapseGroups&&<small>{collapsed?'Expandir':'Minimizar'}</small>}
         </button>
-        {!collapsed&&<div style={{marginTop:12}}>{items.map(t=>{
+        {!collapsed&&<div className="task-group-list" style={{marginTop:12}}>{items.map(t=>{
           const c=companies.find(x=>x.id===t.companyId);
           const r=users.find(x=>x.id===t.responsibleId);
           const statusColor=statusById[t.status]?.color||'#9ca3af';
@@ -4228,17 +4233,35 @@ function ReadOnlyInstruction({title,text}){
 function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open,user}){
   const permissions={...builtInPlanningPermissionsForRole(user?.role),...(user?.planningPermissions||{})};
   const [weekStart,setWeekStart]=useState(nextWeekStartStr());
-  const [weeksAhead,setWeeksAhead]=useState(1);
   const [editingTemplate,setEditingTemplate]=useState(null);
-  const targetWeekStart=(ahead)=>addDays(nextWeekStartStr(),(Math.max(1,Number(ahead)||1)-1)*7);
+  const [companySort,setCompanySort]=useState('template-first');
 
-  function changeWeeksAhead(value){
-    const n=Math.max(1,Number(value)||1);
-    setWeeksAhead(n);
-    setWeekStart(targetWeekStart(n));
+  function changePlanningDate(value){
+    if(!value) return;
+    setWeekStart(weekStartStr(value));
   }
 
   const activeCompanies=companies.filter(c=>c.active);
+  const compareCompanyNames=(a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'});
+  const companyCreatedTime=(company)=>{
+    const value=new Date(company?.createdAt||0).getTime();
+    return Number.isFinite(value)?value:0;
+  };
+  const sortedPlanningCompanies=[...activeCompanies].sort((a,b)=>{
+    const aHasTemplate=(a.weeklyTemplate||[]).length>0;
+    const bHasTemplate=(b.weeklyTemplate||[]).length>0;
+    if(companySort==='template-first'&&aHasTemplate!==bHasTemplate) return aHasTemplate?-1:1;
+    if(companySort==='no-template-first'&&aHasTemplate!==bHasTemplate) return aHasTemplate?1:-1;
+    if(companySort==='newest'){
+      const dateDiff=companyCreatedTime(b)-companyCreatedTime(a);
+      if(dateDiff) return dateDiff;
+    }
+    if(companySort==='oldest'){
+      const dateDiff=companyCreatedTime(a)-companyCreatedTime(b);
+      if(dateDiff) return dateDiff;
+    }
+    return compareCompanyNames(a,b);
+  });
   const weekEnd=weekEndStr(weekStart);
   const totalExpected=activeCompanies.reduce((acc,c)=>acc+(c.weeklyTemplate||[]).reduce((a,item)=>a+(Number(item.quantity)||0),0),0);
   const totalCreated=tasks.filter(t=>t.generatedWeek===weekStart).length;
@@ -4270,18 +4293,22 @@ function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open
 
     {(permissions.showWeekControls||permissions.showIndicators)&&<div className="filters planning-top-filters">
       {permissions.showWeekControls&&<>
-        <label className="planning-date-filter">Remessa<select value={weeksAhead} onChange={e=>changeWeeksAhead(e.target.value)}><option value={1}>Próxima semana</option><option value={2}>Daqui 2 semanas</option><option value={3}>Daqui 3 semanas</option><option value={4}>Daqui 4 semanas</option></select></label>
-        <label className="planning-date-filter">Semana começa em<input type="date" value={weekStart} onChange={e=>{const picked=weekStartStr(e.target.value);const next=nextWeekStartStr();setWeekStart(picked<=weekStartStr()?next:picked);const diffDays=Math.round((new Date((picked<=weekStartStr()?next:picked)+'T00:00:00')-new Date(next+'T00:00:00'))/86400000);const nextOffset=Math.max(1,Math.floor(diffDays/7)+1);if(nextOffset>=1&&nextOffset<=4)setWeeksAhead(nextOffset);}}/></label>
+        <label className="planning-date-filter planning-company-sort">Ordenar clientes<select value={companySort} onChange={e=>setCompanySort(e.target.value)}><option value="template-first">Com template primeiro</option><option value="no-template-first">Sem template primeiro</option><option value="name">Nome A–Z</option><option value="newest">Cadastro mais recente</option><option value="oldest">Cadastro mais antigo</option></select></label>
+        <label className="panel planning-kpi-card planning-kpi-period planning-period-selector">
+          <small>Período</small>
+          <b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b>
+          <input type="date" value={weekStart} min={nextWeekStartStr()} onChange={e=>changePlanningDate(e.target.value)} aria-label="Selecionar semana do planejamento"/>
+        </label>
       </>}
       {permissions.showIndicators&&<>
-        <div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div>
+        {!permissions.showWeekControls&&<div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div>}
         <div className="panel planning-kpi-card planning-kpi-small"><small>Total previsto</small><b>{totalExpected}</b></div>
         <div className="panel planning-kpi-card planning-kpi-small"><small>Já geradas</small><b>{totalCreated}</b></div>
       </>}
     </div>}
 
     {permissions.showCompanies&&<div className="client-grid compact-admin-grid planning-grid" style={{display:'flex',flexDirection:'column',gap:16}}>
-      {activeCompanies.map(c=>{
+      {sortedPlanningCompanies.map(c=>{
         const template=c.weeklyTemplate||[];
         const expected=template.reduce((a,item)=>a+(Number(item.quantity)||0),0);
         const createdTasks=tasks.filter(t=>t.companyId===c.id&&t.generatedWeek===weekStart);
@@ -4712,8 +4739,8 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
     {canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material pronto" placeholder="Adicionar material pronto"/>:<ReadOnlyReadyLinks title="Links de material pronto" text={task.materialLinks||''}/>) }
   </div>
 </div><aside className="task-side">{['companyId','responsibleId','type','status','internalDate','postDate'].some(canViewDetail)&&<div className="panel panel-config"><h2>Configurações</h2>
-  {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{companies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
-  {canViewDetail('responsibleId')&&<label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!canEditDetail('responsibleId')} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label>}
+  {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{[...companies].sort((a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'})).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
+  {canViewDetail('responsibleId')&&<label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!canEditDetail('responsibleId')} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).sort((a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'})).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label>}
   {canViewDetail('type')&&<label>Tipo<select disabled={!canEditDetail('type')} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label>}
   {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined,'--status-color':statusById[task.status]?.color||'var(--line)'}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label>}
   {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
@@ -4768,6 +4795,7 @@ function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[]
     const data={...c,id:c.id||slug(c.name)||safeUUID(),createdAt:c.createdAt||now(),active:c.active!==false};
     setCompanies(exists?companies.map(x=>x.id===data.id?data:x):[...companies,data]);
     setEditing(null);
+    notifySettingsSaved('Empresa salva');
   }
   function archiveCompany(c){
     if(c.active===false){
@@ -4828,6 +4856,7 @@ function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,acc
       }
       setUsers(exists?users.map(x=>x.id===data.id?data:x):[...users,data]);
       setEditing(null);
+      notifySettingsSaved('Responsável salvo');
     }catch(err){
       console.error(err);
       alert('Não foi possível criar o acesso deste responsável: '+(err.message||err));
@@ -4860,6 +4889,7 @@ function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,acc
   function saveClientSettings(nextUser){
     setUsers(users.map(x=>x.id===nextUser.id?nextUser:x));
     setConfiguring(null);
+    notifySettingsSaved('Configurações do responsável salvas');
   }
   return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div></div>)}</div>{editing&&<UserEditor u={editing} save={save} cancel={()=>setEditing(null)} clientMode currentUser={currentUser} onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={companies} statuses={statuses} save={saveClientSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
 }
@@ -4905,6 +4935,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefau
       }
       setUsers(exists?users.map(x=>x.id===data.id?data:x):[...users,data]);
       setEditing(null);
+      notifySettingsSaved('Usuário salvo');
     }catch(err){
       console.error(err);
       alert('Não foi possível criar o acesso deste usuário: '+(err.message||err));
@@ -4935,15 +4966,20 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefau
       alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
-  function saveTeamSettings(nextUser){
-    setUsers(users.map(x=>x.id===nextUser.id?nextUser:x));
-    if(isSupabaseConfigured){
-      updateProfileNotificationPrefs(nextUser.id, {
-        notificationPrefs: nextUser.notificationPrefs || events,
-        notificationStatusPrefs: nextUser.notificationStatusPrefs || {}
-      }).catch(err=>alert('Não foi possível salvar notificações no perfil: '+(err.message||err)));
+  async function saveTeamSettings(nextUser){
+    try{
+      if(isSupabaseConfigured){
+        await updateProfileNotificationPrefs(nextUser.id, {
+          notificationPrefs: nextUser.notificationPrefs || events,
+          notificationStatusPrefs: nextUser.notificationStatusPrefs || {}
+        });
+      }
+      setUsers(users.map(x=>x.id===nextUser.id?nextUser:x));
+      setConfiguring(null);
+      notifySettingsSaved('Configurações do usuário salvas');
+    }catch(err){
+      alert('Não foi possível salvar notificações no perfil: '+(err.message||err));
     }
-    setConfiguring(null);
   }
   return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=><div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
       <div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small>{u.role==='admin'?'Admin':(u.title||'Equipe')} {u.active===false?'• Arquivado':''}</small></div></div>
@@ -5484,7 +5520,7 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
   }
   function saveDefaults(){
     setSystem({...system,accessDefaults:{...(system?.accessDefaults||{}),[role]:clonePayload(draft)}});
-    alert('Padrão salvo.');
+    notifySettingsSaved('Padrão de acesso salvo');
   }
   function restoreBuiltIn(){
     if(!confirm('Restaurar o padrão original desta função?'))return;
@@ -5603,10 +5639,10 @@ const ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS = `
 
 .settings-tabs > button.active,
 .settings-tabs > button[aria-current="page"]{
-  color:#f0d58a!important;
-  border-color:#b8943f!important;
-  border-bottom-color:#b8943f!important;
-  background:#3a2f17!important;
+  color:#d7b96f!important;
+  border-color:#806821!important;
+  border-bottom-color:#806821!important;
+  background:#17150f!important;
   box-shadow:inset 0 0 0 1px rgba(240,213,138,.08)!important;
   font-weight:500!important;
   opacity:1!important;
@@ -5652,15 +5688,102 @@ if(typeof document!=='undefined'){
   style155S.textContent=ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS;
 }
 
+/* Round206A — confirmação única das abas e retorno visual de salvamento.
+   Inserido após o estilo legado para valer igualmente no desktop e mobile. */
+if(typeof document!=='undefined'){
+  let style206A=document.getElementById('argos-round206a-settings-feedback');
+  if(!style206A){
+    style206A=document.createElement('style');
+    style206A.id='argos-round206a-settings-feedback';
+    document.head.appendChild(style206A);
+  }
+  style206A.textContent=`
+    .settings-tabs > button.active,
+    .settings-tabs > button[aria-current="page"]{
+      color:#d7b96f!important;
+      border:1px solid #806821!important;
+      border-radius:8px!important;
+      background:#17150f!important;
+      box-shadow:inset 0 0 0 1px rgba(215,185,111,.035)!important;
+      font-weight:400!important;
+      opacity:1!important;
+    }
+    .settings-tabs > button.active::before,
+    .settings-tabs > button.active::after,
+    .settings-tabs > button[aria-current="page"]::before,
+    .settings-tabs > button[aria-current="page"]::after{
+      content:none!important;
+      display:none!important;
+    }
+    .settings-save-notice{
+      position:fixed;
+      right:20px;
+      bottom:20px;
+      z-index:100000;
+      display:flex;
+      align-items:center;
+      gap:9px;
+      max-width:min(360px,calc(100vw - 28px));
+      padding:11px 14px;
+      border:1px solid rgba(212,181,109,.68);
+      border-radius:9px;
+      background:#17150f;
+      color:#ead08a;
+      box-shadow:0 14px 34px rgba(0,0,0,.38),inset 0 0 0 1px rgba(215,185,111,.04);
+      font-size:13px;
+      font-weight:400;
+      opacity:0;
+      pointer-events:none;
+      transform:translateY(8px);
+      transition:opacity .18s ease,transform .18s ease;
+    }
+    .settings-save-notice.show{opacity:1;transform:translateY(0);}
+    .settings-save-notice > span:first-child{color:#ff174f;font-size:15px;line-height:1;}
+    @media (max-width:760px){
+      .settings-tabs > button.active,
+      .settings-tabs > button[aria-current="page"]{
+        color:#d7b96f!important;
+        border-color:#806821!important;
+        background:#17150f!important;
+      }
+      .settings-save-notice{left:14px;right:14px;bottom:14px;max-width:none;}
+    }
+  `;
+}
+
+let settingsNoticeTimer;
+function notifySettingsSaved(message='Alterações salvas'){
+  if(typeof document==='undefined') return;
+  let notice=document.getElementById('argos-settings-save-notice');
+  if(!notice){
+    notice=document.createElement('div');
+    notice.id='argos-settings-save-notice';
+    notice.className='settings-save-notice';
+    notice.setAttribute('role','status');
+    notice.setAttribute('aria-live','polite');
+    document.body.appendChild(notice);
+  }
+  notice.replaceChildren();
+  const icon=document.createElement('span');
+  icon.setAttribute('aria-hidden','true');
+  icon.textContent='✓';
+  const text=document.createElement('span');
+  text.textContent=String(message);
+  notice.append(icon,text);
+  notice.classList.add('show');
+  clearTimeout(settingsNoticeTimer);
+  settingsNoticeTimer=setTimeout(()=>notice.classList.remove('show'),2600);
+}
+
 function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanies,users,setUsers,system,setSystem,reset,currentUser=null}){ 
   const [tab,setTab]=useState('status'); 
   const [editing,setEditing]=useState(null); 
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
-  function save(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); } 
+  function save(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); notifySettingsSaved('Status salvo'); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
   const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Geral']];
   if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
-  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=><button key={id} type="button" className={tab===id?'active':''} aria-current={tab===id?'page':undefined} onClick={()=>setTab(id)}>{label}</button>)}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
+  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=>{const selected=tab===id;return <button key={id} type="button" className={selected?'active':''} aria-current={selected?'page':undefined} aria-pressed={selected} onClick={()=>setTab(id)} style={{position:'relative',overflow:'hidden'}}>{selected&&<span aria-hidden="true" style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'none',background:'#17150f',border:'1px solid #806821',borderRadius:8,boxSizing:'border-box'}}/>}<span style={{position:'relative',zIndex:1,color:selected?'#d7b96f':undefined,fontWeight:400}}>{label}</span></button>})}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -5816,6 +5939,7 @@ function PublicPortfolioSettings({currentUser}){
         active:row.active!==false,
       });
       setMessage('Configurações do portfólio público salvas.');
+      notifySettingsSaved('Portfólio público salvo');
     }catch(err){
       setError(err.message||'Não foi possível salvar as configurações.');
     }finally{
@@ -5860,6 +5984,7 @@ function PublicPortfolioSettings({currentUser}){
 function GeneralSettings({system,setSystem,reset}){
   const [f,setF]=useState(system||{logo:'',title:'Painel de Aprovação'});
   const set=(k,v)=>setF({...f,[k]:v});
+  const saveGeneral=()=>{setSystem(f);notifySettingsSaved('Configurações gerais salvas');};
   return <div className="settings-section"><div className="panel general-panel"><h2>Geral</h2>
     <h3>Painel interno</h3>
     <label>Texto do painel<input value={f.title||''} onChange={e=>set('title',e.target.value)} placeholder="Painel de Aprovação"/></label>
@@ -5869,7 +5994,7 @@ function GeneralSettings({system,setSystem,reset}){
     <label>Título da tela de login<input value={f.loginTitle||''} onChange={e=>set('loginTitle',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Texto de apoio da tela de login<input value={f.loginSubtitle||''} onChange={e=>set('loginSubtitle',e.target.value)} placeholder="Entre com seu acesso."/></label>
     <label>Logo da tela de login<input value={f.loginLogo||''} onChange={e=>set('loginLogo',e.target.value)} placeholder="URL, link do Drive ou upload. Se vazio, usa a logo do sistema."/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('loginLogo',v),'system/login')}/></label>
-    <div className="row-actions"><button onClick={()=>setF(system)}>Cancelar</button><button className="primary" onClick={()=>setSystem(f)}>Salvar configurações</button></div>
+    <div className="row-actions"><button onClick={()=>setF(system)}>Cancelar</button><button className="primary" onClick={saveGeneral}>Salvar configurações</button></div>
     <div className="danger-zone"><h3>Zona de risco</h3><p>Use esta opção apenas em ambiente de teste ou com certeza absoluta.</p><button onClick={reset}>Resetar demo</button></div>
   </div></div>
 }
@@ -9442,4 +9567,286 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style191);
   }
   style191.textContent = ARGOS_ROUND191_CHECKBOX_COLOR_STANDARD_CSS;
+}
+
+const ARGOS_ROUND209_VISUAL_REFINEMENT_CSS = `
+/* Round209A — tipografia fina e linhas contínuas no painel de Tarefas */
+button,
+button.primary,
+.primary,
+.settings-tabs > button,
+.filters > button,
+.status-pill,
+.task-list-status,
+.task-list-deadline,
+.task-list-postdate,
+.notification-status,
+.notification-deadline,
+.notification-postdate {
+  font-weight:400!important;
+}
+
+/* Títulos e rótulos de campos continuam com hierarquia própria. */
+.task-list-main b {
+  color:#eee9df!important;
+  font-weight:600!important;
+}
+
+.task-group-toggle {
+  min-height:36px!important;
+  padding:0!important;
+  border-radius:8px!important;
+}
+.task-group-toggle > small {
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-width:92px!important;
+  min-height:32px!important;
+  padding:6px 10px!important;
+  color:#b8ad9a!important;
+  font-weight:400!important;
+  text-align:center!important;
+}
+.task-group-toggle:hover > small {
+  color:#d7b96f!important;
+}
+
+@media(min-width:761px) {
+  .tasks-board .task-group {
+    overflow:hidden!important;
+  }
+  .task-group-list {
+    margin:12px -16px -14px!important;
+  }
+  .task-group-list .task-row-wrap {
+    width:100%!important;
+    min-height:44px!important;
+    margin:0!important;
+    padding:0 16px!important;
+    gap:10px!important;
+    border-top:1px solid rgba(255,255,255,.075)!important;
+    border-radius:0!important;
+    background:transparent!important;
+    transition:background-color .16s ease!important;
+    box-sizing:border-box!important;
+  }
+  .task-group-list .task-row-wrap:first-child {
+    border-top:1px solid rgba(255,255,255,.075)!important;
+  }
+  .task-group-list .task-row-wrap:hover {
+    background:rgba(255,255,255,.025)!important;
+  }
+  .task-group-list .task-list-row,
+  .task-group-list .task-list-row:hover {
+    min-height:43px!important;
+    padding:7px 0!important;
+    border:0!important;
+    border-radius:0!important;
+    background:transparent!important;
+  }
+}
+
+/* Round209B — preenchimento funcional chapado nos campos de prazo. */
+.date-field.late input {
+  background:#1c0b0d!important;
+}
+.date-field.hot input {
+  background:#1c0e09!important;
+}
+.date-field.warn input {
+  background:#1b1607!important;
+}
+.date-field.ok input {
+  background:#091c0a!important;
+}
+
+/* Round211A — seleções explícitas, ordenação e campos uniformes. */
+.modal.create .form-two {
+  align-items:start!important;
+}
+.modal.create .form-two > label {
+  min-width:0!important;
+}
+.modal.create .form-two > label > input,
+.modal.create .form-two > label > select,
+.modal.create .create-select-entity,
+.modal.create .status-select {
+  width:100%!important;
+  min-width:0!important;
+  height:42px!important;
+  min-height:42px!important;
+  box-sizing:border-box!important;
+}
+.modal.create .create-select-entity,
+.modal.create .status-select {
+  grid-template-columns:42px minmax(0,1fr)!important;
+}
+.modal.create .create-select-entity > .avatar-mini,
+.modal.create .create-select-placeholder,
+.modal.create .status-select > .status-dot {
+  justify-self:center!important;
+  align-self:center!important;
+}
+.modal.create .create-select-placeholder {
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:42px!important;
+  height:42px!important;
+  overflow:hidden!important;
+  color:transparent!important;
+  font-size:0!important;
+}
+.modal.create .create-select-placeholder::before {
+  content:'—';
+  color:#8f887a!important;
+  font-size:14px!important;
+}
+.modal.create .create-select-entity select,
+.modal.create .status-select select,
+.panel-config .select-entity select,
+.panel-config .status-select select,
+.panel-config label > select,
+.panel-config label > input {
+  width:100%!important;
+  min-width:0!important;
+  height:42px!important;
+  min-height:42px!important;
+  box-sizing:border-box!important;
+}
+.planning-company-sort {
+  min-width:190px!important;
+}
+
+/* Round211B — evita que os controles do Planejamento fiquem espremidos. */
+@media (min-width:761px) and (max-width:1600px) {
+  .planning-top-filters {
+    flex-wrap:wrap!important;
+    align-items:flex-end!important;
+  }
+  .planning-top-filters .planning-date-filter {
+    width:calc((100% - 10px) / 2)!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 calc((100% - 10px) / 2)!important;
+  }
+  .planning-top-filters .planning-company-sort {
+    width:calc((100% - 10px) / 2)!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 calc((100% - 10px) / 2)!important;
+  }
+  .planning-top-filters .planning-kpi-period {
+    width:calc(50% - 10px)!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 calc(50% - 10px)!important;
+  }
+  .planning-top-filters .planning-kpi-small {
+    width:calc(25% - 5px)!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 calc(25% - 5px)!important;
+  }
+}
+
+@media(max-width:760px) {
+  .planning-company-sort {
+    width:100%!important;
+    min-width:0!important;
+  }
+}
+
+/* Round211E — o próprio Período seleciona a semana; Remessa removida. */
+.planning-period-selector {
+  position:relative!important;
+  cursor:pointer!important;
+  padding-right:44px!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+}
+.planning-period-selector > small,
+.planning-period-selector > b {
+  display:block!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.planning-period-selector::after {
+  content:'▾';
+  position:absolute;
+  right:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#d7b96f;
+  font-size:11px;
+  pointer-events:none;
+}
+.planning-period-selector input[type="date"] {
+  position:absolute!important;
+  top:0!important;
+  right:0!important;
+  bottom:0!important;
+  left:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  opacity:0!important;
+  cursor:pointer!important;
+}
+.planning-period-selector input[type="date"]::-webkit-calendar-picker-indicator {
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  opacity:0!important;
+  cursor:pointer!important;
+}
+
+@media (min-width:761px) and (max-width:1600px) {
+  .planning-top-filters .planning-period-selector {
+    width:calc(35% - 9px)!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 calc(35% - 9px)!important;
+  }
+  .planning-top-filters .planning-company-sort {
+    width:calc(35% - 9px)!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 calc(35% - 9px)!important;
+  }
+  .planning-top-filters .planning-kpi-small {
+    width:calc(15% - 9px)!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 calc(15% - 9px)!important;
+  }
+}
+
+@media(max-width:760px) {
+  .planning-top-filters .planning-period-selector {
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:auto!important;
+  }
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style209 = document.getElementById('argos-round209-visual-refinement');
+  if (!style209) {
+    style209 = document.createElement('style');
+    style209.id = 'argos-round209-visual-refinement';
+    document.head.appendChild(style209);
+  }
+  style209.textContent = ARGOS_ROUND209_VISUAL_REFINEMENT_CSS;
 }
