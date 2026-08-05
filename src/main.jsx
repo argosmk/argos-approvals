@@ -2430,6 +2430,44 @@ function App(){
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
   const realtimeRefreshTimerRef=useRef(null);
+  const pendingTaskFieldsRef=useRef(new Map());
+
+  function applyRemoteTasks(latest){
+    setTasksState(current=>{
+      if(!pendingTaskFieldsRef.current.size) return latest;
+      const currentById=new Map(current.map(item=>[String(item.id),item]));
+
+      return latest.map(remoteTask=>{
+        const taskId=String(remoteTask.id);
+        const pendingFields=pendingTaskFieldsRef.current.get(taskId);
+        if(!pendingFields?.size) return remoteTask;
+
+        const localTask=currentById.get(taskId);
+        let mergedTask=remoteTask;
+
+        for(const [field,pendingValue] of pendingFields){
+          const remoteValue=remoteTask[field]??'';
+          const localValue=pendingValue??'';
+
+          if(JSON.stringify(remoteValue)===JSON.stringify(localValue)){
+            pendingFields.delete(field);
+            setRealtimeConflict(currentConflict=>
+              currentConflict?.taskId===taskId && currentConflict?.field===field
+                ? null
+                : currentConflict
+            );
+            continue;
+          }
+
+          mergedTask={...mergedTask,[field]:pendingValue};
+          if(taskSyncBusyRef.current===0) setRealtimeConflict({taskId,field});
+        }
+
+        if(!pendingFields.size) pendingTaskFieldsRef.current.delete(taskId);
+        return localTask ? mergedTask : remoteTask;
+      });
+    });
+  }
 
   useEffect(()=>{
     const syncRoute=()=>{
@@ -2667,7 +2705,7 @@ function App(){
       refreshInFlight=true;
       try{
         const latest=await loadTaskRecords(auth.organizationId);
-        if(alive) setTasksState(latest);
+        if(alive) applyRemoteTasks(latest);
       }catch(err){
         console.warn('task table refresh failed',err);
       }finally{
@@ -2691,8 +2729,9 @@ function App(){
     };
   },[cloudReady,auth?.organizationId,taskTablesReady]);
 
-  // Round212B: sincronização seletiva das tabelas de tarefa.
-  // Mantém o campo em foco intacto e avisa quando o mesmo campo mudou remotamente.
+  // Sincronização seletiva das tabelas de tarefa.
+  // Campos locais pendentes ficam protegidos até o banco confirmar o mesmo valor.
+  // Os demais campos da tarefa continuam recebendo atualizações em tempo real.
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady) return;
     let alive=true;
@@ -2706,24 +2745,8 @@ function App(){
       try{
         const latest=await loadTaskRecords(auth.organizationId);
         if(!alive) return;
-        const activeElement=document.activeElement;
-        const activeFieldElement=activeElement?.closest?.('[data-task-id][data-task-field]');
-        const editingTaskId=activeFieldElement?.dataset?.taskId||null;
-        const editingField=activeFieldElement?.dataset?.taskField||null;
 
-        setTasksState(current=>{
-          if(!editingTaskId || !editingField) return latest;
-          const localTask=current.find(item=>String(item.id)===String(editingTaskId));
-          const remoteTask=latest.find(item=>String(item.id)===String(editingTaskId));
-          if(!localTask || !remoteTask) return latest;
-          const localValue=localTask[editingField]??'';
-          const remoteValue=remoteTask[editingField]??'';
-          if(JSON.stringify(localValue)===JSON.stringify(remoteValue)) return latest;
-          setRealtimeConflict({taskId:editingTaskId,field:editingField});
-          return latest.map(item=>String(item.id)===String(editingTaskId)
-            ? {...item,[editingField]:localValue}
-            : item);
-        });
+        applyRemoteTasks(latest);
       }catch(err){
         console.warn('task realtime refresh failed',err);
       }finally{
@@ -3034,6 +3057,17 @@ function App(){
       setRealtimeConflict(null);
     }
     const original=tasks.find(t=>t.id===id);
+    const transientPatchFields=new Set(['extraLogs','statusLogText','suppressStatusLog']);
+    const taskId=String(id);
+    let pendingFields=pendingTaskFieldsRef.current.get(taskId);
+    if(!pendingFields){
+      pendingFields=new Map();
+      pendingTaskFieldsRef.current.set(taskId,pendingFields);
+    }
+    Object.keys(patch).forEach(field=>{
+      if(!transientPatchFields.has(field)) pendingFields.set(field,patch[field]);
+    });
+    if(!pendingFields.size) pendingTaskFieldsRef.current.delete(taskId);
     const statusChanged=!!(original && patch.status && patch.status!==original.status);
     const nextStatusId=statusChanged ? patch.status : null;
     const extraLogs=Array.isArray(patch.extraLogs)?patch.extraLogs:[];
@@ -3546,18 +3580,19 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){
     visible.averageEditing&&<Card key="averageEditing" title="Média em edição" value={fmtSec(avg(filtered.map(t=>t.totalEditSeconds||0)))}/>,
     visible.averageAlteration&&<Card key="averageAlteration" title="Média em alteração" value={fmtSec(avg(filtered.map(t=>t.totalAlterSeconds||0)))}/>
   ].filter(Boolean);
+  const sortChartRows=rows=>[...rows].sort((a,b)=>b[1]-a[1] || String(a[0]).localeCompare(String(b[0]),'pt-BR',{sensitivity:'base'}));
   const charts=[
     visible.statusChart&&<Bar key="statusChart" title="Post por Status" rows={statuses.map(s=>[s.name,filtered.filter(t=>t.status===s.id).length,s.color])}/>,
-    visible.typeChart&&<Bar key="typeChart" title="Por tipo" rows={TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c'])}/>,
-    visible.companyChart&&<Bar key="companyChart" title="Por cliente" rows={activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#6ee7b7',c.logo])}/>,
-    isAdmin&&visible.memberChart&&<Bar key="memberChart" title="Por membro" rows={activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#c084fc',u.avatar])}/>
+    visible.typeChart&&<Bar key="typeChart" title="Por tipo" tone="gold" rows={sortChartRows(TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c']))}/>,
+    visible.companyChart&&<Bar key="companyChart" title="Por cliente" tone="gold" rows={sortChartRows(activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#e1b12c',c.logo]))}/>,
+    isAdmin&&visible.memberChart&&<Bar key="memberChart" title="Por membro" tone="gold" rows={sortChartRows(activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#e1b12c',u.avatar]))}/>
   ].filter(Boolean);
   return <section><h1>Dashboard</h1><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</section>
 }
 function Card({title,value}){ return <div className="card"><small>{title}</small><b>{value}</b></div> }
-function Bar({title,rows}){
+function Bar({title,rows,tone=''}){
   const max=Math.max(1,...rows.map(r=>r[1]));
-  return <div className="panel"><h2>{title}</h2>{rows.map(([label,val,color,avatar])=><div className="bar" key={label} style={{display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',columnGap:12}}><span className="bar-label" style={{display:'inline-flex',alignItems:'center',gap:8,minWidth:0}}>{avatar&&<AvatarMini value={avatar} label={label}/>}<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</span></span><b>{val}</b><i style={{gridColumn:'1 / -1'}}><em style={{width:`${val/max*100}%`,background:color}}/></i></div>)}</div>
+  return <div className={`panel dashboard-chart${tone?` dashboard-chart--${tone}`:''}`}><h2>{title}</h2>{rows.map(([label,val,color,avatar])=><div className="bar" key={label} style={{display:'grid',gridTemplateColumns:'1fr auto',alignItems:'center',columnGap:12}}><span className="bar-label" style={{display:'inline-flex',alignItems:'center',gap:8,minWidth:0}}>{avatar&&<AvatarMini value={avatar} label={label}/>}<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</span></span><b>{val}</b><i style={{gridColumn:'1 / -1'}}><em style={{width:`${val/max*100}%`,background:color,color}}/></i></div>)}</div>
 }
 
 function TeamHubPage({users,setUsers,setAuth,tasks,statuses,auth,viewer,open}){

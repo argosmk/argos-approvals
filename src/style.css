@@ -2655,21 +2655,9 @@ a,
   border-color:rgba(193,158,83,.20)!important;
 }
 
-/* Divisores e trilhos das barras */
+/* Divisores das barras */
 .main > section:has(> .dash-zone) .bar{
   border-color:rgba(255,255,255,.055)!important;
-}
-
-.main > section:has(> .dash-zone) .bar i{
-  background:#191a1d!important;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.018)!important;
-}
-
-/* Mantém integralmente a cor configurada de cada barra */
-.main > section:has(> .dash-zone) .bar em{
-  box-shadow:none!important;
-  filter:none!important;
-  opacity:1!important;
 }
 
 /* Hierarquia mais limpa nos painéis analíticos */
@@ -2787,20 +2775,6 @@ a,
   text-shadow:none!important;
 }
 
-/* Trilhos das barras */
-.main > div > section > .grid2 .bar i{
-  background:#1a1812!important;
-  border:1px solid rgba(193,158,83,.10)!important;
-  box-shadow:inset 0 1px 2px rgba(0,0,0,.36)!important;
-}
-
-/* Preserva integralmente as cores funcionais das barras */
-.main > div > section > .grid2 .bar em{
-  filter:none!important;
-  opacity:1!important;
-  box-shadow:none!important;
-}
-
 /* Linhas e textos */
 .main > div > section > .grid2 .bar span{
   color:#c7bdad!important;
@@ -2826,48 +2800,6 @@ a,
 }
 
 /* Busca e botão do topo permanecem universais e intactos */
-
-/* ==========================================================================
-   Round150.2D — Barras douradas com brilho LED
-   Escopo exclusivo: gráficos do Dashboard.
-   Mantém cores funcionais apenas em "Post por Status".
-   ========================================================================== */
-
-/* Todas as barras do Dashboard recebem acabamento luminoso discreto */
-.main > div > section > .grid2 .bar em{
-  box-shadow:
-    0 0 5px currentColor,
-    0 0 10px rgba(212,181,109,.18)!important;
-  filter:brightness(1.06) saturate(1.04)!important;
-}
-
-/* Painéis 2, 3 e 4: dourado institucional */
-.main > div > section > .grid2 > .panel:nth-child(2) .bar em,
-.main > div > section > .grid2 > .panel:nth-child(3) .bar em,
-.main > div > section > .grid2 > .panel:nth-child(4) .bar em{
-  background:#d4b56d!important;
-  color:#d4b56d!important;
-  box-shadow:
-    0 0 5px rgba(212,181,109,.72),
-    0 0 11px rgba(212,181,109,.26)!important;
-}
-
-/* Primeiro painel mantém as cores configuradas dos status */
-.main > div > section > .grid2 > .panel:first-child .bar em{
-  box-shadow:
-    0 0 5px currentColor,
-    0 0 10px currentColor!important;
-  filter:brightness(1.08) saturate(1.08)!important;
-}
-
-/* Trilhos permanecem escuros para realçar o efeito */
-.main > div > section > .grid2 .bar i{
-  background:#17150f!important;
-  border-color:rgba(193,158,83,.11)!important;
-  box-shadow:
-    inset 0 1px 2px rgba(0,0,0,.45),
-    inset 0 0 4px rgba(193,158,83,.025)!important;
-}
 
 /* ==========================================================================
    Round150.3 — Interativos com gradiente sutil
@@ -5508,13 +5440,6 @@ button.primary:hover,.primary:hover{background:#d7bc7a!important;border-color:#d
 .main > section:has(> .dash-zone) > .filters select,.main > section:has(> .dash-zone) > .filters input{
   background:#08090a!important;border-color:rgba(255,255,255,.105)!important;box-shadow:none!important
 }
-.main > div > section > .grid2 .bar i{background:#17181a!important;border-color:rgba(255,255,255,.05)!important;box-shadow:none!important}
-.main > div > section > .grid2 > .panel:nth-child(2) .bar em,
-.main > div > section > .grid2 > .panel:nth-child(3) .bar em,
-.main > div > section > .grid2 > .panel:nth-child(4) .bar em{
-  background:#cbae6c!important;color:#cbae6c!important;box-shadow:0 0 6px rgba(203,174,108,.20)!important;filter:none!important
-}
-.main > div > section > .grid2 > .panel:first-child .bar em{box-shadow:0 0 5px currentColor!important;filter:brightness(1.03)!important}
 .status-pill,.priority-pill,.date-field input,.status-dot,.task-row[class*="priority-"],.kcard[class*="priority-"]{filter:none!important}
 
 /* ========================================================================== 
@@ -5824,6 +5749,45 @@ input[type="checkbox"],
 .status-editor-modal .status-editor-checks input[type="checkbox"],
 .public-portfolio-active input[type="checkbox"]{
   accent-color:#ff174f!important;
+}
+
+/* Round212H — Portfólios e gráficos analíticos do Dashboard */
+.main > div > section.team-hub > .team-hub-hero{
+  margin:0 0 14px!important;
+}
+.main > div > section.team-hub > .team-hub-hero h1{
+  margin:0!important;
+  font-size:25px!important;
+  line-height:1.08!important;
+  letter-spacing:-.035em!important;
+  font-weight:780!important;
+}
+
+/* Uma única fonte visual para os trilhos e preenchimentos dos gráficos. */
+.main > div > section > .grid2 > .dashboard-chart .bar i{
+  background:rgba(255,255,255,.055)!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  box-sizing:border-box;
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,.42),
+    inset 0 0 5px rgba(255,255,255,.025)!important;
+}
+
+/* O dourado é semântico: nunca depende da posição do gráfico na grade. */
+.main > div > section > .grid2 > .dashboard-chart--gold .bar em{
+  background:linear-gradient(90deg,#8f6105 0%,#bd870c 34%,#d3a323 58%,#a56f06 82%,#765004 100%)!important;
+  filter:none!important;
+  box-shadow:
+    0 0 4px rgba(190,135,12,.92),
+    0 0 10px rgba(190,135,12,.62),
+    0 0 20px rgba(150,98,5,.32)!important;
+}
+.main > div > section > .grid2 > .dashboard-chart:not(.dashboard-chart--gold) .bar em{
+  filter:brightness(1.08) saturate(1.22)!important;
+  box-shadow:
+    0 0 4px currentColor,
+    0 0 10px currentColor,
+    0 0 19px currentColor!important;
 }
 
 /* Round212E: tipografia consistente nos títulos principais dos painéis */
