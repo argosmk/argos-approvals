@@ -2414,6 +2414,7 @@ function App(){
   const [cloudError,setCloudError]=useState('');
   const [saveTick,setSaveTick]=useState(0);
   const [saveStatus,setSaveStatus]=useState('');
+  const [realtimeConflict,setRealtimeConflict]=useState(null);
   const [taskTablesReady,setTaskTablesReady]=useState(false);
   const [notificationTablesReady,setNotificationTablesReady]=useState(false);
   const taskTablesReadyRef=useRef(false);
@@ -2428,6 +2429,7 @@ function App(){
   const taskOpenSessionRef=useRef({});
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
   const saveRetryRef=useRef(null);
+  const realtimeRefreshTimerRef=useRef(null);
 
   useEffect(()=>{
     const syncRoute=()=>{
@@ -2689,6 +2691,67 @@ function App(){
     };
   },[cloudReady,auth?.organizationId,taskTablesReady]);
 
+  // Round212B: sincronização seletiva das tabelas de tarefa.
+  // Mantém o campo em foco intacto e avisa quando o mesmo campo mudou remotamente.
+  useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady) return;
+    let alive=true;
+    let refreshInFlight=false;
+    let refreshAgain=false;
+
+    async function refreshChangedTasks(){
+      if(!alive){ return; }
+      if(refreshInFlight){ refreshAgain=true; return; }
+      refreshInFlight=true;
+      try{
+        const latest=await loadTaskRecords(auth.organizationId);
+        if(!alive) return;
+        const activeElement=document.activeElement;
+        const activeFieldElement=activeElement?.closest?.('[data-task-id][data-task-field]');
+        const editingTaskId=activeFieldElement?.dataset?.taskId||null;
+        const editingField=activeFieldElement?.dataset?.taskField||null;
+
+        setTasksState(current=>{
+          if(!editingTaskId || !editingField) return latest;
+          const localTask=current.find(item=>String(item.id)===String(editingTaskId));
+          const remoteTask=latest.find(item=>String(item.id)===String(editingTaskId));
+          if(!localTask || !remoteTask) return latest;
+          const localValue=localTask[editingField]??'';
+          const remoteValue=remoteTask[editingField]??'';
+          if(JSON.stringify(localValue)===JSON.stringify(remoteValue)) return latest;
+          setRealtimeConflict({taskId:editingTaskId,field:editingField});
+          return latest.map(item=>String(item.id)===String(editingTaskId)
+            ? {...item,[editingField]:localValue}
+            : item);
+        });
+      }catch(err){
+        console.warn('task realtime refresh failed',err);
+      }finally{
+        refreshInFlight=false;
+        if(refreshAgain){ refreshAgain=false; refreshChangedTasks(); }
+      }
+    }
+
+    function scheduleRefresh(){
+      if(realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
+      realtimeRefreshTimerRef.current=setTimeout(refreshChangedTasks,120);
+    }
+
+    const channel=supabase
+      .channel(`argos-task-realtime-${auth.organizationId}`)
+      .on('postgres_changes',{event:'*',schema:'public',table:'app_tasks',filter:`organization_id=eq.${auth.organizationId}`},scheduleRefresh)
+      .on('postgres_changes',{event:'*',schema:'public',table:'app_task_logs'},scheduleRefresh)
+      .subscribe(status=>{
+        if(status==='CHANNEL_ERROR' || status==='TIMED_OUT') console.warn('task realtime subscription unavailable:',status);
+      });
+
+    return()=>{
+      alive=false;
+      if(realtimeRefreshTimerRef.current){ clearTimeout(realtimeRefreshTimerRef.current); realtimeRefreshTimerRef.current=null; }
+      supabase.removeChannel(channel);
+    };
+  },[cloudReady,auth?.organizationId,taskTablesReady]);
+
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId) return;
     let alive=true;
@@ -2850,31 +2913,6 @@ function App(){
     return ()=>clearInterval(interval);
   },[cloudReady, auth?.id, auth?.role]);
 
-  useEffect(()=>{
-    if(!cloudReady) return;
-    const STALE_MS = 150000;
-    const checkStaleTimers = () => {
-      const current = Date.now();
-      let changed = false;
-      const next = tasks.map(t=>{
-        if(!t.startedAt || !t.timerHeartbeatAt) return t;
-        const heartbeatTime = new Date(t.timerHeartbeatAt).getTime();
-        if(!Number.isFinite(heartbeatTime) || current - heartbeatTime <= STALE_MS) return t;
-        const patch = closeTimerPatch(t, t.timerHeartbeatAt);
-        if(!patch) return t;
-        changed = true;
-        return {
-          ...t,
-          ...patch
-        };
-      });
-      if(changed) setTasks(next);
-    };
-    checkStaleTimers();
-    const interval = setInterval(checkStaleTimers, 60000);
-    return ()=>clearInterval(interval);
-  },[cloudReady,tasks]);
-
   if(cloudLoading) return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Carregando Argos</h1><p>Conectando ao Supabase...</p></div></div>;
   if(isSupabaseConfigured && !auth) return <CloudLogin setAuth={setAuth} setUsersState={setUsersState} setCompaniesState={setCompaniesState} setStatusesState={setStatusesState} setTasksState={setTasksState} setNotificationsState={setNotificationsState} setDocumentsState={setDocumentsState} setSystemState={setSystemState} setCloudReady={setCloudReady} setCloudError={setCloudError} setWorkspaceMeta={(meta)=>{workspaceMetaRef.current=meta}} cloudError={cloudError} system={system}/>;
   if(!auth) return <SetupRequired/>;
@@ -2992,6 +3030,9 @@ function App(){
     setNotifications(prev=>[...created,...(Array.isArray(prev)?prev:[])]);
   }
   function updateTask(id, patch, logText){
+    if(realtimeConflict?.taskId===id && Object.prototype.hasOwnProperty.call(patch,realtimeConflict.field)){
+      setRealtimeConflict(null);
+    }
     const original=tasks.find(t=>t.id===id);
     const statusChanged=!!(original && patch.status && patch.status!==original.status);
     const nextStatusId=statusChanged ? patch.status : null;
@@ -3176,7 +3217,10 @@ function App(){
     <div className="app">
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
-      {cloudError&&<div className="cloud-banner">{cloudError}</div>}
+      {(cloudError||realtimeConflict)&&<div className="cloud-alert-stack" role="status" aria-live="polite">
+        {cloudError&&<div className="cloud-banner">{cloudError}</div>}
+        {realtimeConflict&&<div className="cloud-banner">Existe uma versão mais recente deste campo. Seu texto em edição foi preservado; revise antes de continuar.</div>}
+      </div>}
       {selectedTask && (
         selectedTaskObj && selectedTaskAllowed
           ? <TaskPage task={selectedTaskObj} tasks={tasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
@@ -3184,7 +3228,7 @@ function App(){
       )}
       <div style={selectedTask ? {display:'none'} : undefined}>
         <div className="top-actions">
-          <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} user={effectiveUser} open={openTaskRoute}/>
+          <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>
           {(effectiveUser.taskPermissions?.canCreate??(effectiveUser.role!=='client'))&&<button className="new-btn" onClick={openCreate}>+ {effectiveUser.taskPermissions?.creationMode==='request'?'Nova solicitação':'Nova tarefa'}</button>}
         </div>
         {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
@@ -3263,7 +3307,7 @@ function NavIcon({id}){
   return <svg className="nav-icon" {...common}>{icons[id] || icons.dashboard}</svg>;
 }
 
-function SearchBox({value,setValue,tasks,companies,users,user,open}){
+function SearchBox({value,setValue,tasks,companies,users,statuses,statusById,user,open}){
   const [show,setShow]=useState(false);
   const wrapRef=useRef(null);
   const q=(value||'').trim().toLowerCase();
@@ -3290,7 +3334,20 @@ function SearchBox({value,setValue,tasks,companies,users,user,open}){
       <input value={value} onFocus={()=>{if(q)setShow(true)}} onChange={e=>{setValue(e.target.value);setShow(true)}} onKeyDown={e=>{if(e.key==='Escape') clearSearch();}} placeholder="Pesquisar tarefa, cliente, copy, legenda ou comentário..."/>
       {q&&<button type="button" className="search-clear" aria-label="Limpar pesquisa" onClick={clearSearch}>×</button>}
     </div>
-    {show&&q&&<div className="search-results">{results.length?results.map(t=><button key={t.id} onClick={()=>{open(t.id);setShow(false)}}><b>{t.title}</b><small>{companies.find(c=>c.id===t.companyId)?.name} • {fmtDate(t.postDate)} {t.archived?'• Arquivada':''}</small></button>):<p>Nenhuma tarefa encontrada.</p>}<small className="search-note">Pesquisa restrita às tarefas permitidas.</small></div>}
+    {show&&q&&<div className="search-results">{results.length?results.map(t=>{
+      const company=companies.find(c=>c.id===t.companyId);
+      const responsible=users.find(u=>u.id===t.responsibleId);
+      const deadlineColor=taskDeadlineColor(t,statuses,statusById);
+      return <button className="search-result-row" key={t.id} onClick={()=>{open(t.id);setShow(false)}}>
+        <span className="search-result-main"><b>{t.title}{t.archived?' • Arquivada':''}</b><small>{company?.name||'Sem empresa'}</small></span>
+        <span className="search-result-meta">
+          <span className="search-result-company" title={`Empresa: ${company?.name||'Sem empresa'}`}><AvatarMini value={company?.logo} label={company?.name}/></span>
+          <span className="search-result-responsible" title={`Responsável: ${responsible?.name||'Sem responsável'}`}>{responsible&&<AvatarMini value={responsible.avatar} label={responsible.name}/>}</span>
+          <small className="search-result-deadline" style={{borderColor:`${deadlineColor}66`,background:`${deadlineColor}18`,color:deadlineColor}}>{fmtDate(t.internalDate)}</small>
+          <small className="search-result-postdate">{t.postDate?fmtDate(t.postDate):'Sem data'}</small>
+        </span>
+      </button>;
+    }):<p>Nenhuma tarefa encontrada.</p>}<small className="search-note">Pesquisa restrita às tarefas permitidas.</small></div>}
   </div>
 }
 function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notifications=[],system,realAdmin,nav,screen,setScreen,setAuth}){
@@ -3495,7 +3552,7 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){
     visible.companyChart&&<Bar key="companyChart" title="Por cliente" rows={activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#6ee7b7',c.logo])}/>,
     isAdmin&&visible.memberChart&&<Bar key="memberChart" title="Por membro" rows={activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#c084fc',u.avatar])}/>
   ].filter(Boolean);
-  return <section><h1>Dashboard</h1><p>Relatório operacional com filtros aplicados em todo o painel.</p><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</section>
+  return <section><h1>Dashboard</h1><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</section>
 }
 function Card({title,value}){ return <div className="card"><small>{title}</small><b>{value}</b></div> }
 function Bar({title,rows}){
@@ -3817,7 +3874,7 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     clearSelected();
   }
   const totalArchived=tasks.filter(t=>t.archived).length;
-  return <section><h1>Tarefas</h1><p>Visão rápida das tarefas atribuídas e filtradas.</p>
+  return <section><h1>Tarefas</h1>
   {(permissions.showGrouping||permissions.showTypeFilter||permissions.showArchivedToggle)&&<div className="filters tasks-filters">
     {permissions.showGrouping&&<label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label>}
     {permissions.showTypeFilter&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}
@@ -4035,11 +4092,11 @@ function SpecialDatePanel({items=[]}){
 }
 
 function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); const monthTaskCount=tasks.filter(t=>{const d=dObj(t.postDate); return d&&d.getFullYear()===cur.getFullYear()&&d.getMonth()===cur.getMonth();}).length; return <div className="month"><div className="month-head month-head-export"><h2>{monthLabel(selectedDay)}</h2><button type="button" className="month-export-btn" onClick={()=>exportMonthTasksToExcel(tasks,selectedDay)}>Exportar Excel</button><small>{monthTaskCount} tarefa(s)</small>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div>}</div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
-function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div><div className="month-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div>}</div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
+function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); const weekTaskCount=tasks.filter(t=>days.includes(t.postDate)).length; return <div><div className="month-head calendar-period-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2><small>{weekTaskCount} tarefa(s) nesta semana</small>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div>}</div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
 function DayView({day,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ 
   const list=tasks.filter(t=>t.postDate===day); 
   const specials=specialDatesFor(day);
-  return <div><div className="month-head"><h2>{fmtDate(day)}</h2>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div>}<small>{list.length} tarefa(s) neste dia</small></div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{permissions.showDeadline&&<><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small></>}{permissions.showStatus!==false&&<span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span>}</button>)}</div></div> 
+  return <div><div className="month-head calendar-period-head"><h2>{fmtDate(day)}</h2><small>{list.length} tarefa(s) neste dia</small>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div>}</div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{permissions.showDeadline&&<><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small></>}{permissions.showStatus!==false&&<span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span>}</button>)}</div></div> 
 }
 function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
   const preferencesStorageKey=`argos_kanban_preferences_${user?.id||'anonymous'}`;
@@ -4108,13 +4165,13 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''})
         return <button className="kcard" key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
           <b className="k-title" title={t.title}>{t.title}</b>
           <div className="k-meta" style={{alignItems:'center',gap:6}}>
-            {(permissions.showPostDate||permissions.showDeadline)&&<span style={{display:'flex',gap:4,flexWrap:'nowrap',minWidth:0}}>
-              {permissions.showPostDate&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:'1px solid rgba(156,163,175,.30)',background:'rgba(156,163,175,.06)',color:'#aeb4bd',fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>}
-              {permissions.showDeadline&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:`1px solid ${taskDeadlineColor(t,statuses,statusById)}55`,background:`${taskDeadlineColor(t,statuses,statusById)}14`,color:taskDeadlineColor(t,statuses,statusById),fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{fmtDate(t.internalDate)}</small>}
+            {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars" style={{flex:'0 0 auto'}}>
+              {permissions.showCompany&&<AvatarMini value={companyEntity?.logo} label={companyEntity?.name}/>} 
+              {permissions.showResponsible&&<AvatarMini value={respUser?.avatar} label={respUser?.name}/>} 
             </span>}
-            {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars" style={{marginLeft:'auto',flex:'0 0 auto'}}>
-              {permissions.showCompany&&<AvatarMini value={companyEntity?.logo} label={companyEntity?.name}/>}
-              {permissions.showResponsible&&<AvatarMini value={respUser?.avatar} label={respUser?.name}/>}
+            {(permissions.showPostDate||permissions.showDeadline)&&<span style={{display:'flex',gap:4,flexWrap:'nowrap',minWidth:0,marginLeft:'auto'}}>
+              {permissions.showDeadline&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:`1px solid ${taskDeadlineColor(t,statuses,statusById)}55`,background:`${taskDeadlineColor(t,statuses,statusById)}14`,color:taskDeadlineColor(t,statuses,statusById),fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{fmtDate(t.internalDate)}</small>}
+              {permissions.showPostDate&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:'1px solid rgba(156,163,175,.30)',background:'rgba(156,163,175,.06)',color:'#aeb4bd',fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{t.postDate?fmtDate(t.postDate):'Sem data'}</small>}
             </span>}
           </div>
         </button>;
@@ -4287,7 +4344,7 @@ function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open
 
   return <section>
     <div className="calendar-titlebar">
-      <div><h1>Planejamento Semanal</h1><p>Gere remessas de tarefas por cliente a partir dos templates configurados.</p></div>
+      <div><h1>Planejamento Semanal</h1></div>
       {permissions.canGenerateAll&&<button className="primary" onClick={generateAll}>Gerar todos pendentes</button>}
     </div>
 
@@ -4379,7 +4436,7 @@ function AutoTextarea({value,onChange,minHeight=92,style,...props}){
   />;
 }
 
-function RichTextField({label,value,onChange,placeholder='Escreva aqui...',className='',minHeight}){
+function RichTextField({label,value,onChange,placeholder='Escreva aqui...',className='',minHeight,taskId,taskField}){
   const editorRef=useRef(null);
   const lastValueRef=useRef(null);
   const [toolbar,setToolbar]=useState({visible:false,left:0,top:0});
@@ -4492,6 +4549,8 @@ function RichTextField({label,value,onChange,placeholder='Escreva aqui...',class
       <div
         ref={editorRef}
         className="rich-text-editor"
+        data-task-id={taskId}
+        data-task-field={taskField}
         style={minHeight?{minHeight}:undefined}
         contentEditable
         suppressContentEditableWarning
@@ -4555,7 +4614,7 @@ function TaskLinksEditor({task,updateTask,field,title,placeholder='Cole um link'
         const filled=String(value||'').trim();
         const isTrailingEmpty=index===items.length-1&&!filled;
         return <div key={`${field}-${index}`} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto auto auto',gap:8,alignItems:'center'}}>
-          <input type="url" value={value} onChange={e=>change(index,e.target.value)} placeholder={isTrailingEmpty?placeholder:`Link ${index+1}`}/>
+          <input type="url" value={value} data-task-id={task.id} data-task-field={field} onChange={e=>change(index,e.target.value)} placeholder={isTrailingEmpty?placeholder:`Link ${index+1}`}/>
           <a href={filled||undefined} target="_blank" rel="noreferrer" aria-disabled={!filled} onClick={e=>{if(!filled)e.preventDefault();}} style={{pointerEvents:filled?'auto':'none',opacity:filled?1:.45,display:'inline-flex',alignItems:'center',justifyContent:'center',minHeight:36,padding:'0 12px',border:'1px solid rgba(225,177,44,.35)',borderRadius:10,background:'rgba(225,177,44,.04)',color:'#f3e6b2',textDecoration:'none',fontWeight:700,boxSizing:'border-box'}}>Abrir</a>
           <button type="button" onClick={()=>move(index,-1)} disabled={!filled||index===0}>↑</button>
           <button type="button" onClick={()=>move(index,1)} disabled={!filled||index>=items.length-2}>↓</button>
@@ -4618,13 +4677,9 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   }
   useEffect(()=>{
     if(!isTeam || !task.startedAt || task.startedById!==effectiveUser.id) return;
-    const interval=setInterval(()=>{
-      updateTask(task.id,{timerHeartbeatAt:now()});
-    },60000);
     const beforeUnload=()=>pauseTimer('Timer pausado automaticamente ao fechar a tela.');
     window.addEventListener('beforeunload', beforeUnload);
     return ()=>{
-      clearInterval(interval);
       window.removeEventListener('beforeunload', beforeUnload);
       pauseTimer();
     };
@@ -4657,7 +4712,26 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
     else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed;
     updateTask(task.id,patch,'Enviado para aprovação.');
   } 
-  function returnToCopy(){ const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0; const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'copy',previousWorkStatus:task.status}; if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed; else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed; updateTask(task.id,patch,'Tarefa retornada para copy.'); } 
+  function returnToCopy(){
+    const rawReason=prompt('Motivo do retorno ao Copy:');
+    if(rawReason===null) return;
+    const reason=String(rawReason||'').trim();
+    if(!reason) return alert('Informe o motivo para retornar ao Copy.');
+    const elapsed=task.startedAt?Math.floor((Date.now()-new Date(task.startedAt).getTime())/1000):0;
+    const patch={startedAt:null,startedById:null,timerHeartbeatAt:null,status:'copy',previousWorkStatus:task.status,extraLogs:[{
+      id:safeUUID(),
+      user:effectiveUser.name,
+      userId:effectiveUser.id,
+      type:'comment',
+      visibility:'internal',
+      at:now(),
+      text:`${effectiveUser.name} retornou para Copy. Motivo: ${reason}`,
+      resolved:false
+    }]};
+    if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed;
+    else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed;
+    updateTask(task.id,patch,'Retornado para Copy com motivo.');
+  } 
   function markWaiting(){
     const rawReason=prompt('Motivo do aguardando:');
     if(rawReason===null) return;
@@ -4677,7 +4751,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
         type:'comment',
         visibility:'internal',
         at:now(),
-        text:reason,
+        text:`${effectiveUser.name} enviou para Aguardando. Motivo: ${reason}`,
         resolved:false
       }];
     }
@@ -4728,14 +4802,14 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   function addComment(){ if(!comment.trim()) return; addLog(task.id,comment,'comment',isClient?'client':'internal'); setComment(''); }
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
   return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left">
-  {canViewDetail('title')&&<div className="task-title">{canEditDetail('title')?<input className="task-title-input" value={task.title||''} onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{canViewDetail('status')&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div>}
+  {canViewDetail('title')&&<div className="task-title">{canEditDetail('title')?<input className="task-title-input" value={task.title||''} data-task-id={task.id} data-task-field="title" onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{canViewDetail('status')&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div>}
   {canViewDetail('preview')&&<div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <RichTextDisplay value={task.caption||''}/></div></div>}
   <div className="content-fields">
-    {!hiddenTeam&&canViewDetail('copyInstructions')&&(canEditDetail('copyInstructions')?<RichTextField label="Instruções ao copy" value={task.copyInstructions||''} onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/>) }
-    {!hiddenTeam&&canViewDetail('editorInstructions')&&(canEditDetail('editorInstructions')?<RichTextField label="Instruções ao editor" value={task.editorInstructions||''} onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/>) }
-    {!hiddenTeam&&canViewDetail('usefulLinks')&&(canEditDetail('usefulLinks')?<RichTextField label="Links úteis" value={task.usefulLinks||''} onChange={e=>updateTask(task.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/>:<ReadOnlyInstruction title="Links úteis" text={task.usefulLinks||''}/>) }
-    {canViewDetail('copy')&&(canEditDetail('copy')?<RichTextField label="Copy" value={task.copy||''} onChange={e=>updateTask(task.id,{copy:e.target.value})}/>:<ReadOnlyInstruction title="Copy" text={task.copy||''}/>) }
-    {canViewDetail('caption')&&(canEditDetail('caption')?<RichTextField label="Legenda" value={task.caption||''} onChange={e=>updateTask(task.id,{caption:e.target.value})}/>:<ReadOnlyInstruction title="Legenda" text={task.caption||''}/>) }
+    {!hiddenTeam&&canViewDetail('copyInstructions')&&(canEditDetail('copyInstructions')?<RichTextField label="Instruções ao copy" value={task.copyInstructions||''} taskId={task.id} taskField="copyInstructions" onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/>) }
+    {!hiddenTeam&&canViewDetail('editorInstructions')&&(canEditDetail('editorInstructions')?<RichTextField label="Instruções ao editor" value={task.editorInstructions||''} taskId={task.id} taskField="editorInstructions" onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/>) }
+    {!hiddenTeam&&canViewDetail('usefulLinks')&&(canEditDetail('usefulLinks')?<RichTextField label="Links úteis" value={task.usefulLinks||''} taskId={task.id} taskField="usefulLinks" onChange={e=>updateTask(task.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/>:<ReadOnlyInstruction title="Links úteis" text={task.usefulLinks||''}/>) }
+    {canViewDetail('copy')&&(canEditDetail('copy')?<RichTextField label="Copy" value={task.copy||''} taskId={task.id} taskField="copy" onChange={e=>updateTask(task.id,{copy:e.target.value})}/>:<ReadOnlyInstruction title="Copy" text={task.copy||''}/>) }
+    {canViewDetail('caption')&&(canEditDetail('caption')?<RichTextField label="Legenda" value={task.caption||''} taskId={task.id} taskField="caption" onChange={e=>updateTask(task.id,{caption:e.target.value})}/>:<ReadOnlyInstruction title="Legenda" text={task.caption||''}/>) }
     {canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material pronto" placeholder="Adicionar material pronto"/>:<ReadOnlyReadyLinks title="Links de material pronto" text={task.materialLinks||''}/>) }
   </div>
 </div><aside className="task-side">{['companyId','responsibleId','type','status','internalDate','postDate'].some(canViewDetail)&&<div className="panel panel-config"><h2>Configurações</h2>
@@ -6169,7 +6243,7 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
   const grouped=folders.map(folder=>({folder,docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder).sort((a,b)=>((a.order??9999)-(b.order??9999))||((baseOrder.get(a.id)||0)-(baseOrder.get(b.id)||0)))}));
 
   return <section className="documents-page docs-clickup-shell">
-    <div className="section-header docs-topbar"><div><h1>Documentos</h1><p>Base interna para clientes, equipe, processos e finanças leves.</p></div></div>
+    <div className="section-header docs-topbar"><div><h1>Documentos</h1></div></div>
     <div className="docs-workspace">
       {doc?<DocumentEditor doc={doc} patchDoc={patchDoc} deleteDoc={deleteDoc} folders={folders} companies={companies} users={users} permissions={permissions}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>{permissions.canCreateDocuments?'Crie uma pasta e depois um documento para começar.':'Nenhum documento disponível.'}</p></div>}
 
@@ -6321,7 +6395,7 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     else groups.push({companyKey,items:[item]});
     return groups;
   },[]);
-  return <section><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><h1>Notificações</h1><button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button></div>
+  return <section><div className="panel-titlebar" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><h1>Notificações</h1><button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button></div>
     {(permissions.showTabs||permissions.canCompleteAll||permissions.canDeleteCompleted)&&<div className="filters">
       {permissions.showTabs&&<><button className={effectiveTab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={effectiveTab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></>}
       {effectiveTab==='open'&&permissions.canCompleteAll&&<button onClick={doneAll} disabled={!openCount}>Concluir todas</button>}

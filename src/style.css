@@ -251,6 +251,8 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
 /* Round 19 - fluxo e dados */
 .tasks-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:18px}.task-group h2{display:flex;align-items:center;justify-content:space-between}.task-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;text-align:left;margin-top:10px;border:1px solid rgba(255,255,255,.08);background:#101115;border-radius:12px;padding:12px}.task-row b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.task-row span:not(.avatars){grid-column:1;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.task-row .avatars{grid-row:1 / span 2;grid-column:2;align-self:center}.task-row.priority-late{border-color:#ef4444}.task-row.priority-hot{border-color:#f97316}.task-row.priority-warn{border-color:#eab308}.task-row.priority-ok{border-color:#22c55e}.mini-title{display:flex;gap:10px;align-items:center}.mini-title h2{margin:0}.status-notify-list label{display:flex;align-items:center;gap:8px}.status-notify-list .status-dot{position:static;width:9px;height:9px;display:inline-block;flex:0 0 9px}.comment-log{border-color:rgba(225,177,44,.26)!important}.system-log{opacity:.74}.system-log .log-head button{display:none}.client-task .log-head button{display:none!important}
 .cloud-banner,.cloud-error{border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);color:#fecaca;padding:12px 14px;border-radius:14px;margin:10px 0 18px;font-size:13px}.cloud-error{margin:0 0 12px}.login-card button:disabled{opacity:.65;cursor:not-allowed}
+.cloud-alert-stack{position:fixed;right:18px;bottom:18px;z-index:10000;display:flex;flex-direction:column;gap:10px;width:min(420px,calc(100vw - 36px));pointer-events:none}.cloud-alert-stack .cloud-banner{margin:0;background:rgba(35,12,14,.96);box-shadow:0 14px 36px rgba(0,0,0,.42);backdrop-filter:blur(12px)}
+@media(max-width:760px){.cloud-alert-stack{right:12px;bottom:12px;width:calc(100vw - 24px)}}
 
 /* Round 25: comentários priorizados e histórico recolhível */
 .comments-panel h2{margin-bottom:14px}
@@ -5822,6 +5824,89 @@ input[type="checkbox"],
 .status-editor-modal .status-editor-checks input[type="checkbox"],
 .public-portfolio-active input[type="checkbox"]{
   accent-color:#ff174f!important;
+}
+
+/* Round212E: tipografia consistente nos títulos principais dos painéis */
+.main>section>h1,
+.main>section>div:first-child>h1,
+.main>section>.calendar-titlebar h1,
+.main>section>.docs-topbar h1,
+.main>section>.team-hub-hero h1{
+  font-size:25px!important;
+  line-height:1.08!important;
+  letter-spacing:-.035em!important;
+  font-weight:780!important;
+}
+
+/* Round212D: consistência pontual de metadados, calendário e cabeçalhos */
+.search-results .search-result-row{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:14px!important;
+  padding:9px 11px!important;
+}
+.search-result-main{display:block;min-width:0;flex:1 1 auto}
+.search-result-main b,.search-result-main>small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-result-main>small{margin-top:2px;color:var(--muted)}
+.search-result-meta{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex:0 0 auto}
+.search-result-meta .avatar-mini{width:26px;height:26px;flex-basis:26px;font-size:9px}
+.search-result-deadline,.search-result-postdate{
+  display:inline-flex!important;
+  align-items:center;
+  min-height:24px;
+  margin:0!important;
+  padding:3px 7px;
+  border:1px solid rgba(156,163,175,.30);
+  border-radius:6px;
+  white-space:nowrap;
+  font-size:10px;
+}
+.search-result-postdate{background:rgba(156,163,175,.06);color:#aeb4bd}
+.calendar-main .month-head.calendar-period-head{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto auto!important;
+  align-items:center!important;
+  gap:12px!important;
+}
+.calendar-period-head>h2{grid-column:1;margin:0!important}
+.calendar-period-head>small{grid-column:2;white-space:nowrap}
+.calendar-period-head>.nav-actions{grid-column:3}
+.main>section>h1{margin-top:0!important;margin-bottom:14px!important}
+.main>section>.calendar-titlebar,
+.main>section>.docs-topbar{margin-top:0!important;margin-bottom:14px!important}
+.main>section>.calendar-titlebar h1,
+.main>section>.docs-topbar h1{margin-top:0!important;margin-bottom:0!important}
+
+/* Round212F: cabeçalhos principais com a mesma métrica e o mesmo ritmo vertical */
+.main>section>h1,
+.main>section>.calendar-titlebar h1,
+.main>section>.docs-topbar h1,
+.main>section>.team-hub-hero h1,
+.main>section>.panel-titlebar h1{
+  margin:0!important;
+  font-size:25px!important;
+  line-height:1.08!important;
+  letter-spacing:-.035em!important;
+  font-weight:780!important;
+}
+.main>section>h1{
+  margin-bottom:14px!important;
+}
+.main>section>.calendar-titlebar,
+.main>section>.docs-topbar,
+.main>section>.team-hub-hero,
+.main>section>.panel-titlebar{
+  margin-top:0!important;
+  margin-bottom:14px!important;
+}
+@media(max-width:760px){
+  .search-results .search-result-row{align-items:flex-start!important;flex-direction:column!important;gap:7px!important}
+  .search-result-meta{width:100%;justify-content:flex-start;flex-wrap:wrap}
+  .calendar-main .month-head.calendar-period-head{grid-template-columns:1fr auto!important}
+  .calendar-period-head>h2{grid-column:1 / -1}
+  .calendar-period-head>small{grid-column:1}
+  .calendar-period-head>.nav-actions{grid-column:2;justify-content:flex-end!important}
 }
 
 /* =========================================================
