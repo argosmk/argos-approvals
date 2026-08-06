@@ -85,6 +85,8 @@ const ROUTE_SCREEN_ALIASES = {
   teamhub: 'teamhub',
   documents: 'documents',
   docs: 'documents',
+  financial: 'financial',
+  financeiro: 'financial',
   settings: 'settings',
 };
 const SCREEN_TO_ROUTE = {
@@ -96,6 +98,7 @@ const SCREEN_TO_ROUTE = {
   tasks: 'tasks',
   teamhub: 'portfolios',
   documents: 'documents',
+  financial: 'financeiro',
   settings: 'settings',
 };
 
@@ -111,6 +114,7 @@ const PANEL_CATALOG = Object.freeze([
   Object.freeze({ id:'tasks', label:'Tarefas', defaultRoles:['admin','team'] }),
   Object.freeze({ id:'teamhub', label:'Portfólios', defaultRoles:['admin','team'] }),
   Object.freeze({ id:'documents', label:'Documentos', defaultRoles:['admin'] }),
+  Object.freeze({ id:'financial', label:'Financeiro', defaultRoles:['admin'] }),
   Object.freeze({ id:'settings', label:'Configurações', defaultRoles:['admin'] }),
 ]);
 
@@ -625,6 +629,7 @@ function resolveUserAccess(user,system){
           ...(user.panelPermissions||{}),
           visible:{
             ...(user.panelPermissions?.visible||{}),
+            financial:false,
             settings:false
           }
         },
@@ -3271,7 +3276,8 @@ function App(){
         {activeScreen==='planning' && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute} user={effectiveUser}/>} 
         {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
         {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
-        {activeScreen==='documents' && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>}
+        {activeScreen==='documents' && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>} 
+        {activeScreen==='financial' && <FinancialLab tasks={tasks} companies={companies} users={users} currentUser={effectiveUser}/>} 
         {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
         {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} companies={companies} users={users} statuses={statuses} user={effectiveUser} auth={auth} alertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableAlerts={enableNotificationAlerts}/>} 
       </div>
@@ -3336,6 +3342,7 @@ function NavIcon({id}){
     kanban:<><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v16M15 4v16M6.5 8h.01M11.5 12h.01M17.5 9h.01"/></>,
     tasks:<><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></>,
     documents:<><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/><path d="M9 11h6M9 15h6M9 18h4"/></>,
+    financial:<><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"/><path d="M2 19h22"/><path d="M4 7l6-4 6 6 6-6"/></>,
     settings:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1.82V22a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 20.6a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.82-.33H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.4 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1.82V2a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 3.4a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.39.29.73.63 1 1h.09a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1 1z"/></>,
   };
   return <svg className="nav-icon" {...common}>{icons[id] || icons.dashboard}</svg>;
@@ -5883,6 +5890,168 @@ function notifySettingsSaved(message='Alterações salvas'){
   clearTimeout(settingsNoticeTimer);
   settingsNoticeTimer=setTimeout(()=>notice.classList.remove('show'),2600);
 }
+
+const FINANCIAL_LAB_KEY='argos_financial_lab_v1';
+const FINANCIAL_SETTINGS_TABLE='app_financial_settings';
+const FINANCIAL_LAB_CSS=`
+.financial-lab .financial-tabs{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.financial-lab .financial-tabs button{position:relative;overflow:hidden}.financial-lab .financial-tabs button>span{position:relative;z-index:1}.financial-lab .financial-tabs button.active{background:#17150f;color:#d7b96f;border-color:#806821}
+.financial-lab .financial-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.financial-lab .financial-card{padding:16px}.financial-lab .financial-card small{display:block;color:var(--muted);margin-bottom:7px}.financial-lab .financial-card strong{display:block;font-size:23px;color:#e0bf68}.financial-lab .financial-card em{display:block;margin-top:5px;font-size:11px;font-style:normal;color:var(--muted)}
+.financial-lab .financial-toolbar{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}.financial-lab .financial-toolbar-main{display:flex;align-items:end;gap:8px;flex-wrap:wrap}.financial-lab .financial-toolbar label{min-width:180px;margin:0}.financial-lab .financial-toolbar .financial-tabs{margin:0}.financial-lab .financial-toolbar .financial-reset{margin-left:auto;white-space:nowrap}.financial-lab .financial-month-help{display:block;margin:0 0 16px}
+.financial-lab .financial-table-wrap{overflow:auto}.financial-lab .financial-summary-panel+.financial-summary-panel{margin-top:18px}.financial-lab table{width:100%;border-collapse:collapse;min-width:680px}.financial-lab th,.financial-lab td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}.financial-lab th{color:#d8bd78;font-size:11px;text-transform:uppercase;letter-spacing:.04em}.financial-lab tfoot td{border-top:1px solid rgba(216,189,120,.38);border-bottom:0;background:rgba(216,189,120,.055);font-weight:700}.financial-lab td input{min-width:120px}.financial-lab .financial-negative{color:#ff8b8b}.financial-lab .financial-positive{color:#75d69a}
+.financial-lab .financial-editor{display:grid;grid-template-columns:minmax(230px,.7fr) minmax(0,1.3fr);gap:14px}.financial-lab .financial-type-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.financial-lab .financial-type-row{display:grid;grid-template-columns:1fr 145px;align-items:center;gap:10px}.financial-lab .financial-help{color:var(--muted);font-size:12px;line-height:1.5}.financial-lab .financial-empty{padding:28px;text-align:center;color:var(--muted)}
+.financial-lab .financial-overview{margin-bottom:18px}.financial-lab .financial-overview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.financial-lab .financial-overview-head h2{margin:0}.financial-lab .financial-sort-button{flex:0 0 auto}.financial-lab .financial-overview tbody tr{cursor:pointer}.financial-lab .financial-overview tbody tr:hover,.financial-lab .financial-overview tbody tr.selected{background:rgba(216,189,120,.07)}.financial-lab .financial-overview tbody tr.selected td:first-child{color:#d7b96f}
+@media(max-width:1000px){.financial-lab .financial-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.financial-lab .financial-editor{grid-template-columns:1fr}.financial-lab .financial-type-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.financial-lab .financial-cards{grid-template-columns:1fr}.financial-lab .financial-toolbar,.financial-lab .financial-toolbar-main{align-items:stretch}.financial-lab .financial-toolbar-main{width:100%}.financial-lab .financial-toolbar label{width:100%}.financial-lab .financial-toolbar .financial-reset{margin-left:0}}
+`;
+if(typeof document!=='undefined'){
+  let financialStyle=document.getElementById('argos-round214-financial-lab');
+  if(!financialStyle){financialStyle=document.createElement('style');financialStyle.id='argos-round214-financial-lab';document.head.appendChild(financialStyle);}
+  financialStyle.textContent=FINANCIAL_LAB_CSS;
+}
+
+function financialNumber(value){const parsed=Number(value);return Number.isFinite(parsed)?Math.max(0,parsed):0;}
+function financialMoney(value){const parsed=Number(value);return (Number.isFinite(parsed)?parsed:0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+function financialMonth(){return todayStr().slice(0,7);}
+function freshFinancialLab(){
+  return {
+    market:Object.fromEntries(TASK_TYPES.map(type=>[type,{sale:0,cost:0}])),
+    companies:{},
+    users:{},
+  };
+}
+function normalizeFinancialLab(raw){
+  const base=freshFinancialLab();
+  const source=raw&&typeof raw==='object'?raw:{};
+  TASK_TYPES.forEach(type=>{base.market[type]={sale:financialNumber(source.market?.[type]?.sale),cost:financialNumber(source.market?.[type]?.cost)};});
+  base.companies=source.companies&&typeof source.companies==='object'?source.companies:{};
+  base.users=source.users&&typeof source.users==='object'?source.users:{};
+  return base;
+}
+async function loadFinancialSettings(organizationId){
+  const {data,error}=await supabase.from(FINANCIAL_SETTINGS_TABLE).select('config').eq('organization_id',organizationId).maybeSingle();
+  if(error) throw error;
+  return data?.config?normalizeFinancialLab(data.config):null;
+}
+async function saveFinancialSettings(organizationId,userId,config){
+  const {error}=await supabase.from(FINANCIAL_SETTINGS_TABLE).upsert({organization_id:organizationId,config:normalizeFinancialLab(config),updated_by:userId||null,updated_at:now()},{onConflict:'organization_id'});
+  if(error) throw error;
+}
+function FinancialLab({tasks=[],companies=[],users=[],currentUser=null}){
+  const [tab,setTab]=useState('summary');
+  const [month,setMonth]=useState(financialMonth);
+  const [companySort,setCompanySort]=useState('name');
+  const [teamSort,setTeamSort]=useState('name');
+  const [config,setConfig]=useState(()=>normalizeFinancialLab(load(FINANCIAL_LAB_KEY,freshFinancialLab())));
+  const [settingsReady,setSettingsReady]=useState(!isSupabaseConfigured);
+  const [settingsStatus,setSettingsStatus]=useState(isSupabaseConfigured?'Carregando valores...':'Salvo neste navegador');
+  const organizationId=currentUser?.organizationId;
+  const activeCompanies=companies.filter(company=>company.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
+  const team=users.filter(user=>user.active!==false&&(user.role==='team'||user.role==='admin')).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
+  const [companyId,setCompanyId]=useState(()=>activeCompanies[0]?.id||'');
+  const [userId,setUserId]=useState(()=>team[0]?.id||'');
+  useEffect(()=>{
+    if(currentUser?.role!=='admin') return;
+    let alive=true;
+    (async()=>{
+      try{
+        if(!isSupabaseConfigured||!organizationId){if(alive)setSettingsReady(true);return;}
+        const remote=await loadFinancialSettings(organizationId);
+        const initial=remote||normalizeFinancialLab(load(FINANCIAL_LAB_KEY,freshFinancialLab()));
+        if(!remote) await saveFinancialSettings(organizationId,currentUser.id,initial);
+        if(alive){setConfig(initial);save(FINANCIAL_LAB_KEY,initial);setSettingsReady(true);setSettingsStatus('Valores sincronizados');}
+      }catch(error){
+        console.error('financial settings load failed',error);
+        if(alive){setSettingsReady(false);setSettingsStatus(`Tabela financeira indisponível: ${error.message||error}`);}
+      }
+    })();
+    return()=>{alive=false;};
+  },[currentUser?.id,currentUser?.role,organizationId]);
+  useEffect(()=>{
+    save(FINANCIAL_LAB_KEY,config);
+    if(!settingsReady||!isSupabaseConfigured||!organizationId||currentUser?.role!=='admin') return;
+    setSettingsStatus('Salvando...');
+    const timer=setTimeout(()=>{
+      saveFinancialSettings(organizationId,currentUser.id,config)
+        .then(()=>setSettingsStatus('Valores sincronizados'))
+        .catch(error=>{console.error('financial settings save failed',error);setSettingsStatus(`Erro ao salvar: ${error.message||error}`);});
+    },650);
+    return()=>clearTimeout(timer);
+  },[config,settingsReady,organizationId,currentUser?.id,currentUser?.role]);
+  useEffect(()=>{if(!activeCompanies.some(item=>item.id===companyId))setCompanyId(activeCompanies[0]?.id||'');},[companies,companyId]);
+  useEffect(()=>{if(!team.some(item=>item.id===userId))setUserId(team[0]?.id||'');},[users,userId]);
+  if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Financeiro é uma área exclusiva de Admin.</p></div></section>;
+
+  const monthTasks=tasks.filter(task=>!task.archived&&String(task.postDate||task.internalDate||'').slice(0,7)===month);
+  const marketSaleFor=task=>financialNumber(config.market?.[task.type]?.sale);
+  const marketCostFor=task=>financialNumber(config.market?.[task.type]?.cost);
+  const clientRows=activeCompanies.map(company=>{
+    const companyTasks=monthTasks.filter(task=>task.companyId===company.id);
+    const rule=config.companies?.[company.id]||{};
+    const mode=rule.mode||'fixed';
+    const fixed=mode==='fixed'||mode==='hybrid'?financialNumber(rule.fixed):0;
+    const variable=mode==='variable'||mode==='hybrid'?companyTasks.reduce((sum,task)=>sum+financialNumber(rule.rates?.[task.type]),0):0;
+    const market=companyTasks.reduce((sum,task)=>sum+marketSaleFor(task),0);
+    const actual=fixed+variable;
+    return {id:company.id,name:company.name,count:companyTasks.length,market,actual,difference:actual-market,average:companyTasks.length?actual/companyTasks.length:0};
+  });
+  const teamRows=team.map(user=>{
+    const userTasks=monthTasks.filter(task=>task.responsibleId===user.id);
+    const rule=config.users?.[user.id]||{};
+    const mode=rule.mode||'fixed';
+    const fixed=mode==='fixed'||mode==='hybrid'?financialNumber(rule.fixed):0;
+    const variable=mode==='variable'||mode==='hybrid'?userTasks.reduce((sum,task)=>sum+financialNumber(rule.rates?.[task.type]),0):0;
+    const desired=userTasks.reduce((sum,task)=>sum+marketCostFor(task),0);
+    const actual=fixed+variable;
+    const generated=userTasks.reduce((sum,task)=>sum+marketSaleFor(task),0);
+    return {id:user.id,name:user.name,count:userTasks.length,desired,actual,difference:actual-desired,average:userTasks.length?actual/userTasks.length:0,generated};
+  });
+  const sortFinancialRows=(rows,sort)=>[...rows].sort((a,b)=>{
+    if(sort==='name') return String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'});
+    const field=sort==='count'?'count':sort==='desired'?'desired':sort==='actual'?'actual':sort==='difference'?'difference':'average';
+    return (Number(b[field])||0)-(Number(a[field])||0)||String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'});
+  });
+  const sortedClientRows=sortFinancialRows(clientRows,companySort);
+  const sortedTeamRows=sortFinancialRows(teamRows,teamSort);
+  const totalMarket=clientRows.reduce((sum,row)=>sum+row.market,0);
+  const totalRevenue=clientRows.reduce((sum,row)=>sum+row.actual,0);
+  const desiredCost=teamRows.reduce((sum,row)=>sum+row.desired,0);
+  const realCost=teamRows.reduce((sum,row)=>sum+row.actual,0);
+  const margin=totalRevenue-realCost;
+  const clientTaskTotal=clientRows.reduce((sum,row)=>sum+row.count,0);
+  const clientDifference=totalRevenue-totalMarket;
+  const clientAverage=clientTaskTotal?totalRevenue/clientTaskTotal:0;
+  const teamTaskTotal=teamRows.reduce((sum,row)=>sum+row.count,0);
+  const teamDifference=realCost-desiredCost;
+  const teamAverage=teamTaskTotal?realCost/teamTaskTotal:0;
+  const companyRule=normalizeFinancialRule(config.companies?.[companyId]);
+  const userRule=normalizeFinancialRule(config.users?.[userId]);
+  const patchMarket=(type,field,value)=>setConfig(prev=>({...prev,market:{...prev.market,[type]:{...(prev.market?.[type]||{}),[field]:financialNumber(value)}}}));
+  const patchCompany=patch=>setConfig(prev=>({...prev,companies:{...prev.companies,[companyId]:{...normalizeFinancialRule(prev.companies?.[companyId]),...patch}}}));
+  const patchCompanyRate=(type,value)=>patchCompany({rates:{...companyRule.rates,[type]:financialNumber(value)}});
+  const patchUser=patch=>setConfig(prev=>({...prev,users:{...prev.users,[userId]:{...normalizeFinancialRule(prev.users?.[userId]),...patch}}}));
+  const patchUserRate=(type,value)=>patchUser({rates:{...userRule.rates,[type]:financialNumber(value)}});
+  const resetLab=()=>{if(confirm('Limpar somente as simulações financeiras salvas neste navegador?'))setConfig(freshFinancialLab());};
+  return <section className="financial-lab"><h1>Financeiro</h1>
+    <div className="financial-toolbar"><div className="financial-toolbar-main"><label>Mês analisado<input type="month" value={month} onChange={event=>setMonth(event.target.value)}/></label><div className="financial-tabs">{[['summary','Resumo'],['market','Referências'],['companies','Clientes'],['team','Equipe']].map(([id,label])=>{const selected=tab===id;return <button type="button" key={id} className={selected?'active':''} aria-current={selected?'page':undefined} aria-pressed={selected} onClick={()=>setTab(id)}>{selected&&<span aria-hidden="true" style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'none',background:'#17150f',border:'1px solid #806821',borderRadius:8,boxSizing:'border-box'}}/>}<span style={{position:'relative',zIndex:1,color:selected?'#d7b96f':undefined,fontWeight:400}}>{label}</span></button>})}</div></div><button type="button" className="financial-reset" onClick={resetLab} disabled={!settingsReady}>Limpar valores</button></div>
+    <span className="financial-help financial-month-help">{monthTasks.length} tarefa(s) consideradas pela data do post ou, quando vazia, pelo prazo interno.</span>
+    {tab==='summary'&&<>
+      <div className="financial-cards"><div className="panel financial-card"><small>Valor de mercado entregue</small><strong>{financialMoney(totalMarket)}</strong><em>Venda desejada por tipo de tarefa</em></div><div className="panel financial-card"><small>Receita real simulada</small><strong>{financialMoney(totalRevenue)}</strong><em>Contratos + produção variável</em></div><div className="panel financial-card"><small>Custo real da equipe</small><strong>{financialMoney(realCost)}</strong><em>Fixos + pagamentos variáveis</em></div><div className="panel financial-card"><small>Margem simulada</small><strong className={margin<0?'financial-negative':'financial-positive'}>{financialMoney(margin)}</strong><em>{totalRevenue?`${Math.round(margin/totalRevenue*100)}% da receita`:'Preencha os valores para calcular'}</em></div></div>
+    </>}
+    {tab==='market'&&<div className="panel"><h2>Valores de referência da Argos</h2><p className="financial-help">Defina quanto a Argos gostaria de cobrar e pagar por cada tipo, independentemente do acordo real.</p><div className="financial-table-wrap"><table><thead><tr><th>Tipo de tarefa</th><th>Venda desejada</th><th>Custo desejado</th><th>Margem desejada</th></tr></thead><tbody>{TASK_TYPES.map(type=>{const sale=financialNumber(config.market?.[type]?.sale);const cost=financialNumber(config.market?.[type]?.cost);return <tr key={type}><td>{type}</td><td><MoneyInput value={sale} onChange={value=>patchMarket(type,'sale',value)}/></td><td><MoneyInput value={cost} onChange={value=>patchMarket(type,'cost',value)}/></td><td>{financialMoney(sale-cost)}</td></tr>})}</tbody></table></div></div>}
+    {tab==='companies'&&<><FinancialOverview title="Visão rápida dos clientes" entityLabel="Cliente" rows={sortedClientRows} desiredKey="market" selectedId={companyId} onSelect={setCompanyId} sort={companySort} setSort={setCompanySort} totals={{count:clientTaskTotal,desired:totalMarket,actual:totalRevenue,difference:clientDifference,average:clientAverage}}/><div className="financial-editor"><div className="panel"><h2>Contrato do cliente</h2><label>Cliente<select value={companyId} onChange={event=>setCompanyId(event.target.value)}>{activeCompanies.map(company=><option key={company.id} value={company.id}>{company.name}</option>)}</select></label><label>Modelo<select value={companyRule.mode} onChange={event=>patchCompany({mode:event.target.value})}><option value="fixed">Fixo</option><option value="variable">Variável</option><option value="hybrid">Fixo + variável</option></select></label>{companyRule.mode!=='variable'&&<label>Contrato fixo mensal<MoneyInput value={companyRule.fixed} onChange={value=>patchCompany({fixed:financialNumber(value)})}/></label>}<p className="financial-help">No híbrido, o valor variável é somado ao contrato. Neste laboratório, todas as tarefas do mês usam a tabela ao lado.</p></div><div className="panel"><h2>Valor real por tipo</h2><div className="financial-type-grid">{TASK_TYPES.map(type=><label className="financial-type-row" key={type}><span>{type}</span><MoneyInput value={companyRule.rates[type]||0} onChange={value=>patchCompanyRate(type,value)} disabled={companyRule.mode==='fixed'}/></label>)}</div></div></div></>}
+    {tab==='team'&&<><FinancialOverview title="Visão rápida da equipe" entityLabel="Equipe" rows={sortedTeamRows} desiredKey="desired" selectedId={userId} onSelect={setUserId} sort={teamSort} setSort={setTeamSort} totals={{count:teamTaskTotal,desired:desiredCost,actual:realCost,difference:teamDifference,average:teamAverage}}/><div className="financial-editor"><div className="panel"><h2>Custo da pessoa</h2><label>Funcionário<select value={userId} onChange={event=>setUserId(event.target.value)}>{team.map(user=><option key={user.id} value={user.id}>{user.name}</option>)}</select></label><label>Modelo<select value={userRule.mode} onChange={event=>patchUser({mode:event.target.value})}><option value="fixed">Fixo</option><option value="variable">Variável</option><option value="hybrid">Fixo + variável</option></select></label>{userRule.mode!=='variable'&&<label>Salário/custo fixo mensal<MoneyInput value={userRule.fixed} onChange={value=>patchUser({fixed:financialNumber(value)})}/></label>}<p className="financial-help">A média por tarefa divide o custo real da pessoa pela produção registrada no mês.</p></div><div className="panel"><h2>Pagamento real por tipo</h2><div className="financial-type-grid">{TASK_TYPES.map(type=><label className="financial-type-row" key={type}><span>{type}</span><MoneyInput value={userRule.rates[type]||0} onChange={value=>patchUserRate(type,value)} disabled={userRule.mode==='fixed'}/></label>)}</div></div></div></>}
+  </section>;
+}
+const FINANCIAL_SORTS=[['name','Nome'],['count','Qt. de tarefas'],['desired','Valor desejado'],['actual','Valor real'],['difference','Diferença'],['average','Média']];
+function FinancialOverview({title,entityLabel,rows,desiredKey,selectedId,onSelect,sort,setSort,totals}){
+  const currentIndex=Math.max(0,FINANCIAL_SORTS.findIndex(([id])=>id===sort));
+  const nextSort=()=>setSort(FINANCIAL_SORTS[(currentIndex+1)%FINANCIAL_SORTS.length][0]);
+  return <div className="panel financial-overview"><div className="financial-overview-head"><h2>{title}</h2><button type="button" className="financial-sort-button" onClick={nextSort} title="Clique para alterar a ordenação">Ordenar: {FINANCIAL_SORTS[currentIndex][1]}</button></div><div className="financial-table-wrap"><table><thead><tr><th>{entityLabel}</th><th>Qt. de tarefas</th><th>Valor desejado</th><th>Valor real</th><th>Diferença</th><th>Média</th></tr></thead><tbody>{rows.map(row=><tr key={row.id} className={selectedId===row.id?'selected':''} onClick={()=>onSelect(row.id)}><td>{row.name}</td><td>{row.count}</td><td>{financialMoney(row[desiredKey])}</td><td>{financialMoney(row.actual)}</td><td className={row.difference<0?'financial-negative':'financial-positive'}>{row.difference<0?'- ':''}{financialMoney(Math.abs(row.difference))}</td><td>{financialMoney(row.average)}</td></tr>)}</tbody><tfoot><tr><td>Total</td><td>{totals.count}</td><td>{financialMoney(totals.desired)}</td><td>{financialMoney(totals.actual)}</td><td className={totals.difference<0?'financial-negative':'financial-positive'}>{totals.difference<0?'- ':''}{financialMoney(Math.abs(totals.difference))}</td><td>{financialMoney(totals.average)}</td></tr></tfoot></table></div></div>;
+}
+function normalizeFinancialRule(rule){return {mode:['fixed','variable','hybrid'].includes(rule?.mode)?rule.mode:'fixed',fixed:financialNumber(rule?.fixed),rates:Object.fromEntries(TASK_TYPES.map(type=>[type,financialNumber(rule?.rates?.[type])]))};}
+function MoneyInput({value,onChange,disabled=false}){return <input type="number" min="0" step="0.01" inputMode="decimal" value={value??0} disabled={disabled} onChange={event=>onChange(event.target.value)} aria-label="Valor em reais"/>;}
 
 function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanies,users,setUsers,system,setSystem,reset,currentUser=null}){ 
   const [tab,setTab]=useState('status'); 
