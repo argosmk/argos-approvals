@@ -111,14 +111,34 @@ const PANEL_CATALOG = Object.freeze([
   Object.freeze({ id:'planning', label:'Planejamento', defaultRoles:['admin'] }),
   Object.freeze({ id:'calendar', label:'Calendário', defaultRoles:['admin','client'] }),
   Object.freeze({ id:'kanban', label:'Kanban', defaultRoles:['admin','team'] }),
-  Object.freeze({ id:'tasks', label:'Tarefas', defaultRoles:['admin','team'] }),
+  Object.freeze({ id:'tasks', label:'Listas', defaultRoles:['admin','team'] }),
   Object.freeze({ id:'teamhub', label:'Portfólios', defaultRoles:['admin','team'] }),
   Object.freeze({ id:'documents', label:'Documentos', defaultRoles:['admin'] }),
   Object.freeze({ id:'financial', label:'Financeiro', defaultRoles:['admin'] }),
   Object.freeze({ id:'settings', label:'Configurações', defaultRoles:['admin'] }),
 ]);
 
+const SIDEBAR_PANEL_CATALOG = Object.freeze([
+  Object.freeze({id:'dashboard',label:'Dashboard'}),
+  Object.freeze({id:'notifications',label:'Notificações'}),
+  Object.freeze({id:'planning',label:'Planejamento'}),
+  Object.freeze({id:'tasks',label:'Tarefas'}),
+  Object.freeze({id:'teamhub',label:'Portfólios'}),
+  Object.freeze({id:'documents',label:'Documentos'}),
+  Object.freeze({id:'financial',label:'Financeiro',adminOnly:true}),
+  Object.freeze({id:'settings',label:'Configurações',adminOnly:true}),
+]);
+const DEFAULT_SIDEBAR_PANEL_ORDER = SIDEBAR_PANEL_CATALOG.map(panel=>panel.id);
+
 const DASHBOARD_WIDGETS = Object.freeze([
+  Object.freeze({id:'showSummaryTab',label:'Aba Resumo'}),
+  Object.freeze({id:'showTeamTab',label:'Aba Equipe',adminOnly:true}),
+  Object.freeze({id:'showCompaniesTab',label:'Aba Clientes',adminOnly:true}),
+  Object.freeze({id:'showTypesTab',label:'Aba Tipos',adminOnly:true}),
+  Object.freeze({id:'showPeriodFilter',label:'Filtro de período'}),
+  Object.freeze({id:'showCompanyFilter',label:'Filtro de cliente',adminOnly:true}),
+  Object.freeze({id:'showTeamFilter',label:'Filtro de equipe',adminOnly:true}),
+  Object.freeze({id:'showTypeFilter',label:'Filtro de tipo de post'}),
   Object.freeze({id:'activeCompanies',label:'Clientes ativos',adminOnly:true}),
   Object.freeze({id:'postCount',label:'Quantidade de posts',teamOnly:true}),
   Object.freeze({id:'periodPosts',label:'Posts no período / finalizados'}),
@@ -155,6 +175,7 @@ const KANBAN_PERMISSION_ITEMS = Object.freeze([
 
 const NOTIFICATION_PANEL_PERMISSION_ITEMS = Object.freeze([
   Object.freeze({id:'showTabs',label:'Pendentes e concluídas'}),
+  Object.freeze({id:'canEnableAlerts',label:'Ativar som e notificações'}),
   Object.freeze({id:'canOpenTasks',label:'Abrir tarefas'}),
   Object.freeze({id:'canComplete',label:'Concluir notificações'}),
   Object.freeze({id:'canCompleteAll',label:'Concluir todas as pendentes'}),
@@ -169,8 +190,8 @@ const NOTIFICATION_PANEL_PERMISSION_ITEMS = Object.freeze([
 
 function builtInNotificationPanelPermissionsForRole(role){
   if(role==='admin') return Object.fromEntries(NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=>[item.id,true]));
-  if(role==='team') return {showTabs:true,canOpenTasks:true,canComplete:true,canCompleteAll:true,canDeleteCompleted:false,showDateTime:true,showCompany:true,showResponsible:true,showPostDate:true,showDeadline:true,showStatus:true};
-  return {showTabs:true,canOpenTasks:true,canComplete:true,canCompleteAll:false,canDeleteCompleted:false,showDateTime:true,showCompany:false,showResponsible:false,showPostDate:true,showDeadline:false,showStatus:true};
+  if(role==='team') return {showTabs:true,canEnableAlerts:true,canOpenTasks:true,canComplete:true,canCompleteAll:true,canDeleteCompleted:false,showDateTime:true,showCompany:true,showResponsible:true,showPostDate:true,showDeadline:true,showStatus:true};
+  return {showTabs:true,canEnableAlerts:true,canOpenTasks:true,canComplete:true,canCompleteAll:false,canDeleteCompleted:false,showDateTime:true,showCompany:false,showResponsible:false,showPostDate:true,showDeadline:false,showStatus:true};
 }
 
 const TASKS_LIST_PERMISSION_ITEMS = Object.freeze([
@@ -278,6 +299,7 @@ function builtInDocumentPermissionsForRole(role){
 
 const PLANNING_PERMISSION_ITEMS = Object.freeze([
   Object.freeze({id:'showWeekControls',label:'Selecionar semana'}),
+  Object.freeze({id:'showSort',label:'Ordenar clientes'}),
   Object.freeze({id:'showIndicators',label:'Período e indicadores'}),
   Object.freeze({id:'showCompanies',label:'Visualizar empresas'}),
   Object.freeze({id:'showTemplateSummary',label:'Resumo do template'}),
@@ -292,6 +314,7 @@ function builtInPlanningPermissionsForRole(role){
   if(role==='admin') return Object.fromEntries(PLANNING_PERMISSION_ITEMS.map(item=>[item.id,true]));
   if(role==='team') return {
     showWeekControls:true,
+    showSort:true,
     showIndicators:true,
     showCompanies:true,
     showTemplateSummary:true,
@@ -303,6 +326,7 @@ function builtInPlanningPermissionsForRole(role){
   };
   return {
     showWeekControls:false,
+    showSort:false,
     showIndicators:false,
     showCompanies:false,
     showTemplateSummary:false,
@@ -351,6 +375,7 @@ function builtInPortfolioPermissionsForRole(role){
 
 const CALENDAR_PERMISSION_ITEMS = Object.freeze([
   Object.freeze({id:'showViewTabs',label:'Alternar entre mês, semana e dia'}),
+  Object.freeze({id:'canExportExcel',label:'Exportar planilha Excel'}),
   Object.freeze({id:'showCompanyFilter',label:'Filtro de empresa'}),
   Object.freeze({id:'showResponsibleFilter',label:'Filtro de responsável'}),
   Object.freeze({id:'showTypeFilter',label:'Filtro de tipo'}),
@@ -370,6 +395,7 @@ function builtInCalendarPermissionsForRole(role){
   if(role==='admin') return Object.fromEntries(CALENDAR_PERMISSION_ITEMS.map(item=>[item.id,true]));
   if(role==='team') return {
     showViewTabs:true,
+    canExportExcel:true,
     showCompanyFilter:false,
     showResponsibleFilter:false,
     showTypeFilter:true,
@@ -386,6 +412,7 @@ function builtInCalendarPermissionsForRole(role){
   };
   return {
     showViewTabs:true,
+    canExportExcel:true,
     showCompanyFilter:false,
     showResponsibleFilter:false,
     showTypeFilter:true,
@@ -636,6 +663,42 @@ function resolveUserAccess(user,system){
   };
 }
 
+function sidebarPanelOrder(system){
+  const saved=Array.isArray(system?.panelOrder)?system.panelOrder.filter(id=>DEFAULT_SIDEBAR_PANEL_ORDER.includes(id)):[];
+  return [...saved,...DEFAULT_SIDEBAR_PANEL_ORDER.filter(id=>!saved.includes(id))];
+}
+function applySidebarPanelOrder(items=[],system){
+  const order=sidebarPanelOrder(system);
+  const index=new Map(order.map((id,i)=>[id,i]));
+  const taskIds=new Set(['kanban','calendar','tasks']);
+  return [...items].sort((a,b)=>{
+    const ak=taskIds.has(a[0])?'tasks':a[0], bk=taskIds.has(b[0])?'tasks':b[0];
+    const ai=index.has(ak)?index.get(ak):999, bi=index.has(bk)?index.get(bk):999;
+    if(ai!==bi) return ai-bi;
+    if(ak==='tasks'&&bk==='tasks') return ['kanban','calendar','tasks'].indexOf(a[0])-['kanban','calendar','tasks'].indexOf(b[0]);
+    return 0;
+  });
+}
+function collapseTaskPanelsInNavigation(items=[]){
+  const taskPanelIds=new Set(['kanban','calendar','tasks']);
+  const firstTaskIndex=items.findIndex(([id])=>taskPanelIds.has(id));
+  if(firstTaskIndex<0) return items;
+  const collapsed=[];
+  items.forEach(([id,label],index)=>{
+    if(!taskPanelIds.has(id)){
+      collapsed.push([id,label]);
+      return;
+    }
+    if(index===firstTaskIndex) collapsed.push(['tasks','Tarefas']);
+  });
+  return collapsed;
+}
+function taskTabsFromNavigation(items=[]){
+  const labels={kanban:'Kanban',calendar:'Calendário',tasks:'Listas'};
+  return ['kanban','calendar','tasks']
+    .filter(id=>items.some(([panelId])=>panelId===id))
+    .map(id=>[id,labels[id]]);
+}
 function panelNavigationForUser(user,system){
   const defaults=accessDefaultForRole(system,user?.role);
   const fallback=PANEL_CATALOG
@@ -2134,7 +2197,7 @@ function SortControl({value,setValue,options=null,extraOptions=[]}){
     { value:'name', label:'Nome' },
     ...extraOptions
   ];
-  return <label>Ordenar por<select value={value} onChange={e=>setValue(e.target.value)}>{baseOptions.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>;
+  return <label className="toolbar-sort-control">Ordenar por<select value={value} onChange={e=>setValue(e.target.value)}>{baseOptions.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>;
 }
 function StatusVisibilityChecks({statuses,selected=[],onToggle}){
   return <div className="arg-vs-list-v2">
@@ -3229,8 +3292,11 @@ function App(){
   }
   // Round155B: usa personalização somente quando o usuário possuir
   // panelPermissions.mode === 'custom'. Sem isso, mantém os padrões atuais.
-  const nav=panelNavigationForUser(effectiveUser,system);
-  const activeScreen = nav.some(([id])=>id===screen) ? screen : nav[0][0];
+  const rawNav=applySidebarPanelOrder(panelNavigationForUser(effectiveUser,system),system);
+  const taskTabs=taskTabsFromNavigation(rawNav);
+  const nav=collapseTaskPanelsInNavigation(rawNav);
+  const requestedScreen=['kanban','calendar','tasks'].includes(screen)&&taskTabs.length?'tasks':screen;
+  const activeScreen = nav.some(([id])=>id===requestedScreen) ? requestedScreen : nav[0][0];
   function navigateScreen(nextScreen){
     setSelectedTask(null);
     setScreen(nextScreen);
@@ -3270,12 +3336,10 @@ function App(){
           <SearchBox value={globalSearch} setValue={setGlobalSearch} tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>
           {(effectiveUser.taskPermissions?.canCreate??(effectiveUser.role!=='client'))&&<button className="new-btn" onClick={openCreate}>+ {effectiveUser.taskPermissions?.creationMode==='request'?'Nova solicitação':'Nova tarefa'}</button>}
         </div>
-        {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} search=""/>}
+        {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>}
         {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} setAuth={setAuth} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser} open={openTaskRoute}/>}
-        {activeScreen==='tasks' && <TasksPanel tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
+        {activeScreen==='tasks' && <TasksWorkspace tabs={taskTabs} requestedTab={screen} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
         {activeScreen==='planning' && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute} user={effectiveUser}/>} 
-        {activeScreen==='calendar' && <Calendar tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
-        {activeScreen==='kanban' && <Kanban tasks={visibleTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>} 
         {activeScreen==='documents' && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>} 
         {activeScreen==='financial' && <FinancialLab tasks={tasks} companies={companies} users={users} currentUser={effectiveUser}/>} 
         {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
@@ -3412,7 +3476,9 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
   },[mobileMenuOpen]);
   const clientCompany = effectiveUser.role==='client' ? companies.find(c=>(effectiveUser.companyIds||[]).includes(c.id)) : null;
   const displayAvatar = clientCompany?.logo || effectiveUser.avatar;
-  const roleLabel = viewAs ? 'Visualização simulada' : (effectiveUser.title || (effectiveUser.role==='admin'?'Administrador':effectiveUser.role==='team'?'Equipe':'Cliente'));
+  const baseRoleLabel = effectiveUser.title || (effectiveUser.role==='admin'?'Administrador':effectiveUser.role==='team'?'Equipe':'Cliente');
+  const roleLabel = viewAs ? 'Visualização simulada' : baseRoleLabel;
+  const viewCardSubtitle = realAdmin ? (viewAs ? `${baseRoleLabel} • visão simulada` : 'Minha visão') : baseRoleLabel;
   const activeViewUsers = users.filter(u=>u.active && u.role!=='admin');
   const teamViewUsers = activeViewUsers.filter(u=>u.role==='team');
   const clientViewUsers = activeViewUsers.filter(u=>u.role==='client');
@@ -3432,8 +3498,10 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
         <div className="brand-logo">{system?.logo?<img src={argosLogoSrc(system.logo)} onError={e=>{ e.currentTarget.style.display='none'; }}/>:<span>A</span>}</div>
         <small>{system?.title || 'Painel de Aprovação'}</small>
       </div>
-      <div className="user-card user-clean"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{roleLabel}</small></div></div>
-      {realAdmin&&<div className="impersonate"><select value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>────────────</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup><option disabled>────────────</option><optgroup label="Usuários clientes">{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</optgroup></select></div>}
+      <div className={`side-user-view-card ${realAdmin?'is-selectable':''}`.trim()}>
+        <div className="side-user-view-identity"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{viewCardSubtitle}</small></div></div>
+        {realAdmin&&<><span className="side-user-view-arrow" aria-hidden="true">▾</span><select className="side-user-view-select" aria-label="Selecionar visualização" value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>— Pessoas da equipe —</option>{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}<option disabled>— Usuários clientes —</option>{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</select></>}
+      </div>
       <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<span className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</span>}</button>)}</nav>
       <div className="spacer"/>
       <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
@@ -3559,8 +3627,25 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
 }
 
 function PeriodFilters({period,setPeriod,from,setFrom,to,setTo}){ return <><label>Período<select value={period} onChange={e=>setPeriod(e.target.value)}><option value="current">Atualmente</option><option value="month">Mês corrente</option><option value="lastmonth">Mês passado</option><option value="week">Essa semana</option><option value="lastweek">Semana passada</option><option value="today">Hoje</option><option value="custom">Personalizado</option></select></label>{period==='custom'&&<><label>De<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>Até<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></>}</> }
-function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){ 
-  const [period,setPeriod]=useState('current'),[from,setFrom]=useState(''),[to,setTo]=useState(''),[company,setCompany]=useState('all'),[resp,setResp]=useState('all'),[type,setType]=useState('all'); 
+function PanelTabsHeader({title,tabs=[],active,onChange,actions=null,className=''}){
+  return <div className={`panel-header-block ${className}`.trim()}><div className="panel-tabs-header"><div className="panel-tabs-heading"><h1>{title}</h1>{tabs.length>0&&<div className="panel-tabs" role="tablist">{tabs.map(([id,label])=>{const selected=active===id;return <span key={id} role="tab" tabIndex={0} aria-selected={selected} aria-current={selected?'page':undefined} className={`panel-tab-link ${selected?'active':''}`.trim()} onClick={()=>onChange(id)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onChange(id)}}}>{label}</span>})}</div>}</div></div>{actions&&<div className="panel-header-tools">{actions}</div>}</div>;
+}
+const ARGOS_ROUND218_ANALYTICS_CSS=`
+.panel-tabs-header{display:flex;align-items:center;gap:10px;min-width:0;margin:0 0 18px}.panel-tabs-header>h1{flex:0 0 210px;margin:0}.panel-tabs{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}.panel-tabs>button{min-height:38px;padding:9px 13px;border:1px solid rgba(225,177,44,.13);border-radius:8px;background:rgba(255,255,255,.025);color:rgba(255,255,255,.62);box-shadow:none}.panel-tabs>button:hover{color:#fff;border-color:rgba(225,177,44,.32);background:rgba(225,177,44,.055)}.panel-tabs-header .panel-tabs>button.active,.panel-tabs-header .panel-tabs>button[aria-current="page"],.panel-tabs-header .panel-tabs>button[aria-selected="true"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important;background-image:none!important;box-shadow:0 0 14px rgba(215,185,111,.16)!important}.panel-tabs-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tasks-workspace>.panel-tabs-header{margin-bottom:18px}.embedded-task-view{margin:0!important}.embedded-subtabs{margin:0 0 16px!important}.embedded-subtabs>h1{display:none!important}.embedded-subtabs>.panel-tabs{width:auto!important}
+section>h1+.settings-tabs{display:inline-flex!important;vertical-align:middle!important;width:calc(100% - 220px)!important;margin:-52px 0 20px 220px!important;border-bottom:0!important}.settings-tabs>button.active,.settings-tabs>button[aria-current="page"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important}
+.calendar-main .calendar-period-toolbar{display:grid!important;grid-template-columns:auto auto auto minmax(0,1fr)!important;align-items:center!important;gap:10px!important}.calendar-period-toolbar .nav-actions{grid-column:1!important;grid-row:1!important}.calendar-period-toolbar>small{grid-column:2!important;grid-row:1!important;white-space:nowrap}.calendar-period-toolbar .month-export-btn{grid-column:3!important;grid-row:1!important}.calendar-period-toolbar>h2{grid-column:4!important;grid-row:1!important;margin:0!important;text-align:right!important;justify-self:end!important}
+.dashboard-entity-list{overflow:hidden;padding:0;--dashboard-columns:minmax(230px,1.65fr) minmax(120px,.82fr) minmax(105px,.72fr) repeat(4,minmax(96px,.68fr))}.dashboard-entity-head,.dashboard-entity-summary,.dashboard-task-detail-row{display:grid;grid-template-columns:var(--dashboard-columns);align-items:center;gap:12px}.dashboard-entity-head{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)}.dashboard-sort-heading{display:flex;align-items:center;gap:5px;width:100%;padding:0!important;border:0!important;background:transparent!important;color:#d8bd78!important;font-size:10px!important;text-transform:uppercase;text-align:left;box-shadow:none!important}.dashboard-sort-heading:hover{color:#f2d78f!important}.dashboard-sort-arrow{font-size:10px;line-height:1}.dashboard-entity-group+.dashboard-entity-group{border-top:1px solid rgba(255,255,255,.08)}.dashboard-entity-summary{width:100%;min-height:58px;padding:10px 14px;border:0!important;border-radius:0!important;background:transparent!important;text-align:left;color:#eee}.dashboard-entity-summary:hover,.dashboard-entity-summary.active{background:rgba(216,189,120,.06)!important}.dashboard-entity-name{display:flex;align-items:center;gap:9px;min-width:0}.dashboard-entity-name strong,.dashboard-task-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dashboard-chevron{flex:0 0 15px;width:15px;color:#d8bd78}.dashboard-stat{text-align:left;white-space:nowrap}.dashboard-task-detail{padding:0 0 8px;background:rgba(255,255,255,.012)}.dashboard-task-detail-row{width:100%;padding:10px 14px;border:0!important;border-radius:0!important;border-top:1px solid rgba(255,255,255,.055)!important;background:transparent!important;color:#ddd;text-align:left}.dashboard-task-detail-row:hover{background:rgba(216,189,120,.045)!important}.dashboard-task-identity{display:flex;align-items:center;gap:8px;min-width:0;padding-left:26px}.dashboard-task-marks{display:inline-flex;align-items:center;gap:6px;min-width:0}.dashboard-task-marks .avatar-mini{flex:0 0 auto}.dashboard-status{display:inline-flex;padding:4px 7px;border:1px solid;border-radius:999px;font-size:11px;white-space:nowrap}.dashboard-task-empty-column{min-height:1px}.dashboard-empty-detail{padding:14px 8px;color:var(--muted)}
+@media(max-width:980px){.dashboard-entity-list{overflow-x:auto}.dashboard-entity-head,.dashboard-entity-summary,.dashboard-task-detail{min-width:960px}}
+@media(max-width:760px){.panel-tabs-header{align-items:flex-start;flex-wrap:wrap}.panel-tabs-header>h1{flex:0 0 100%;width:100%}.panel-tabs{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:3px}.panel-tabs-actions{margin-left:0;width:100%}section>h1+.settings-tabs{display:flex!important;width:100%!important;margin:0 0 20px!important}.calendar-main .calendar-period-toolbar{grid-template-columns:auto auto minmax(0,1fr)!important}.calendar-period-toolbar .month-export-btn{grid-column:3!important}.calendar-period-toolbar>h2{grid-column:1 / -1!important;grid-row:2!important;justify-self:start!important;text-align:left!important}.dashboard-entity-head,.dashboard-entity-summary,.dashboard-task-detail{min-width:920px}}
+`;
+if(typeof document!=='undefined'){let style218=document.getElementById('argos-round218-analytics');if(!style218){style218=document.createElement('style');style218.id='argos-round218-analytics';document.head.appendChild(style218)}style218.textContent=ARGOS_ROUND218_ANALYTICS_CSS;}
+function Dashboard({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
+  const preferencesStorageKey=`argos_dashboard_preferences_${user?.id||'anonymous'}`;
+  const initialPreferences=load(preferencesStorageKey,{period:'current',from:'',to:'',company:'all',resp:'all',type:'all',tab:'summary'});
+  const [period,setPeriod]=useState(initialPreferences.period||'current'),[from,setFrom]=useState(initialPreferences.from||''),[to,setTo]=useState(initialPreferences.to||''),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'); 
+  const [tab,setTab]=useState(initialPreferences.tab||'summary'),[selectedEntity,setSelectedEntity]=useState('');
+  useEffect(()=>{ save(preferencesStorageKey,{period,from,to,company,resp,type,tab}); },[preferencesStorageKey,period,from,to,company,resp,type,tab]);
   const isAdmin=user.role==='admin'; 
   const visible={...fullDashboardVisibility(),...(user.dashboardPermissions?.visible||{})};
   const activeCompanies=companies.filter(c=>c.active);
@@ -3569,7 +3654,7 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){
   // mesmo quando o status ainda não faz parte dos status visíveis dele no Kanban/Tarefas.
   const dashboardScope = user.role==='team' ? (tasks||[]).filter(t=>t.responsibleId===user.id) : (tasks||[]);
   const operationalTasks=dashboardScope.filter(t=>activeCompanies.some(c=>c.id===t.companyId) && activeUsers.some(u=>u.id===t.responsibleId));
-  const filtered=applyFilters(operationalTasks,{period,from,to,company:isAdmin?company:'all',resp:isAdmin?resp:'all',type,search,showArchived:true}); 
+  const filtered=applyFilters(operationalTasks,{period:visible.showPeriodFilter===false?'current':period,from,to,company:visible.showCompanyFilter!==false?company:'all',resp:visible.showTeamFilter!==false?resp:'all',type:visible.showTypeFilter===false?'all':type,search,showArchived:true}); 
   const alterations=filtered.reduce((a,t)=>a+(t.alterationCount||0),0);
   const finalized=filtered.filter(t=>isFinalStatus(statuses,t.status)).length;
   const rework=filtered.length?Math.round(alterations/filtered.length*100):0;
@@ -3594,7 +3679,32 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,search=''}){
     visible.companyChart&&<Bar key="companyChart" title="Por cliente" tone="gold" rows={sortChartRows(activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#e1b12c',c.logo]))}/>,
     isAdmin&&visible.memberChart&&<Bar key="memberChart" title="Por membro" tone="gold" rows={sortChartRows(activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#e1b12c',u.avatar]))}/>
   ].filter(Boolean);
-  return <section><h1>Dashboard</h1><div className="filters"><PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>{isAdmin&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{isAdmin&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label></div>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</section>
+  const detailTabs=[
+    visible.showSummaryTab!==false&&['summary','Resumo'],
+    visible.showTeamTab!==false&&['team','Equipe'],
+    visible.showCompaniesTab!==false&&['companies','Clientes'],
+    visible.showTypesTab!==false&&['types','Tipos'],
+  ].filter(Boolean);
+  const effectiveTab=detailTabs.some(([id])=>id===tab)?tab:(detailTabs[0]?.[0]||'summary');
+  useEffect(()=>{if(effectiveTab!==tab)setTab(effectiveTab);},[effectiveTab,tab]);
+  const entityOptions=effectiveTab==='team'?activeUsers.map(item=>({id:item.id,name:item.name,avatar:item.avatar})):effectiveTab==='companies'?activeCompanies.map(item=>({id:item.id,name:item.name,avatar:item.logo})):effectiveTab==='types'?TASK_TYPES.map(item=>({id:item,name:item})):[];
+  useEffect(()=>{if(effectiveTab==='summary'||!entityOptions.some(item=>item.id===selectedEntity))setSelectedEntity('');},[effectiveTab,entityOptions.map(item=>item.id).join('|')]);
+  const entityTasks=effectiveTab==='team'?filtered.map(task=>({...task,__entityId:task.responsibleId})):effectiveTab==='companies'?filtered.map(task=>({...task,__entityId:task.companyId})):effectiveTab==='types'?filtered.map(task=>({...task,__entityId:task.type})):[];
+  return <section className="dashboard-page"><PanelTabsHeader title="Dashboard" tabs={detailTabs} active={effectiveTab} onChange={setTab}/><div className="filters">{visible.showPeriodFilter!==false&&<PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={setTo}/>} {visible.showCompanyFilter!==false&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{visible.showTeamFilter!==false&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}{visible.showTypeFilter!==false&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}</div>{effectiveTab==='summary'?<>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</>:<DashboardEntityDetail mode={tab} options={entityOptions} selected={selectedEntity} setSelected={setSelectedEntity} tasks={entityTasks} companies={companies} users={users} statusById={statusById} statuses={statuses} open={open}/>}</section>
+}
+function DashboardEntityDetail({mode,options,selected,setSelected,tasks,companies,users,statusById,open}){
+  const [sort,setSort]=useState({key:'count',direction:'desc'});
+  const rows=options.map(item=>{
+    const itemTasks=tasks.filter(task=>task.__entityId===item.id);
+    const edit=itemTasks.reduce((sum,task)=>sum+(task.totalEditSeconds||0),0),alter=itemTasks.reduce((sum,task)=>sum+(task.totalAlterSeconds||0),0),total=edit+alter,changes=itemTasks.reduce((sum,task)=>sum+(task.alterationCount||0),0);
+    return {...item,tasks:itemTasks,edit,alter,total,changes,average:itemTasks.length?Math.round(total/itemTasks.length):0,rate:total?Math.round(alter/total*100):0};
+  });
+  const sortValue=(row,key)=>key==='name'?row.name:key==='count'?row.tasks.length:row[key]||0;
+  const orderedRows=[...rows].sort((a,b)=>{const av=sortValue(a,sort.key),bv=sortValue(b,sort.key);const comparison=sort.key==='name'?String(av).localeCompare(String(bv),'pt-BR',{sensitivity:'base'}):av-bv;return (sort.direction==='asc'?comparison:-comparison)||String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'});});
+  const changeSort=key=>setSort(current=>current.key===key?{key,direction:current.direction==='asc'?'desc':'asc'}:{key,direction:key==='name'?'asc':'desc'});
+  const headings=[['name','Nome'],['count','Qt. tarefas'],['average','Tempo médio'],['total','Tempo total'],['edit','Edição'],['alter','Alteração'],['rate','Taxa alt.']];
+  const marksFor=task=>{const company=companies.find(item=>item.id===task.companyId),responsible=users.find(item=>item.id===task.responsibleId),status=statusById[task.status];return <span className="dashboard-task-marks">{mode!=='companies'&&company&&<AvatarMini value={company.logo} label={company.name}/>} {mode!=='team'&&responsible&&<AvatarMini value={responsible.avatar} label={responsible.name}/>}<span className="dashboard-status" style={{color:status?.color,borderColor:`${status?.color||'#777'}66`,background:`${status?.color||'#777'}18`}}>{status?.name||task.status}</span></span>};
+  return <div className="dashboard-detail panel dashboard-entity-list"><div className="dashboard-entity-head">{headings.map(([key,label])=><button type="button" className="dashboard-sort-heading" key={key} onClick={()=>changeSort(key)} aria-label={`Ordenar por ${label}`}><span>{label}</span>{sort.key===key&&<span className="dashboard-sort-arrow">{sort.direction==='asc'?'▲':'▼'}</span>}</button>)}</div>{orderedRows.map(row=>{const expanded=selected===row.id;const sorted=[...row.tasks].sort((a,b)=>((b.totalEditSeconds||0)+(b.totalAlterSeconds||0))-((a.totalEditSeconds||0)+(a.totalAlterSeconds||0))||String(a.title||'').localeCompare(String(b.title||''),'pt-BR'));return <div className="dashboard-entity-group" key={row.id}><button type="button" className={`dashboard-entity-summary${expanded?' active':''}`} aria-expanded={expanded} onClick={()=>setSelected(expanded?'':row.id)}><span className="dashboard-entity-name"><span className="dashboard-chevron">{expanded?'⌄':'›'}</span>{row.avatar&&<AvatarMini value={row.avatar} label={row.name}/>}<strong>{row.name}</strong></span><span className="dashboard-stat">{row.tasks.length}</span><span className="dashboard-stat">{fmtSec(row.average)}</span><span className="dashboard-stat">{fmtSec(row.total)}</span><span className="dashboard-stat">{fmtSec(row.edit)}</span><span className="dashboard-stat">{fmtSec(row.alter)}</span><span className="dashboard-stat">{row.rate}%</span></button>{expanded&&<div className="dashboard-task-detail">{sorted.map(task=>{const edit=task.totalEditSeconds||0,alter=task.totalAlterSeconds||0,total=edit+alter;return <button type="button" className="dashboard-task-detail-row" key={task.id} onClick={()=>open?.(task.id)}><span className="dashboard-task-identity"><span className="dashboard-chevron">−</span><strong className="dashboard-task-name">{task.title}</strong></span>{marksFor(task)}<span className="dashboard-task-empty-column" aria-hidden="true"/><span>{fmtSec(total)}</span><span>{fmtSec(edit)}</span><span>{fmtSec(alter)}</span><span>{task.alterationCount||0}</span></button>})}{!sorted.length&&<div className="dashboard-empty-detail">Nenhuma tarefa encontrada nesse período.</div>}</div>}</div>})}{!orderedRows.length&&<div className="dashboard-empty-detail">Nenhuma opção disponível.</div>}</div>;
 }
 function Card({title,value}){ return <div className="card"><small>{title}</small><b>{value}</b></div> }
 function Bar({title,rows,tone=''}){
@@ -3644,10 +3754,10 @@ function TeamHubPage({users,setUsers,setAuth,tasks,statuses,auth,viewer,open}){
     }
   }
 
-  if(!members.length) return <section><h1>Portfólios</h1><p>Nenhum membro ativo encontrado.</p></section>;
+  if(!members.length) return <section><PanelTabsHeader title="Portfólios"/><p>Nenhum membro ativo encontrado.</p></section>;
 
   return <section className="team-hub">
-    <div className="team-hub-hero"><div><h1>Portfólios</h1></div></div>
+    <PanelTabsHeader title="Portfólios"/>
 
     {permissions.showMemberSelector&&<TeamStoriesStrip members={members} selected={selected} tasks={tasks} setSelectedId={setSelectedId}/>}
 
@@ -3782,22 +3892,50 @@ function TeamFeedItem({task,open,canOpen=true}){
   </article>;
 }
 
-function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,open}){
+function TasksWorkspace({tabs,requestedTab,tasks,setTasks,companies,users,statuses,statusById,user,open}){
+  const allowedIds=tabs.map(([id])=>id);
+  const storageKey=`argos:tasks-workspace-tab:${user?.id||user?.role||'user'}`;
+  const resolveInitialTab=()=>{
+    if(requestedTab!=='tasks'&&allowedIds.includes(requestedTab)) return requestedTab;
+    try{
+      const saved=localStorage.getItem(storageKey);
+      if(allowedIds.includes(saved)) return saved;
+    }catch{}
+    return allowedIds[0]||'tasks';
+  };
+  const [tab,setTab]=useState(resolveInitialTab);
+  useEffect(()=>{
+    if(!allowedIds.includes(tab)) setTab(resolveInitialTab());
+  },[tabs.map(([id])=>id).join('|'),requestedTab,user?.id]);
+  const changeTab=next=>{
+    if(!allowedIds.includes(next)) return;
+    setTab(next);
+    try{ localStorage.setItem(storageKey,next); }catch{}
+    if(requestedTab!=='tasks') setAppRoute({screen:'tasks'});
+  };
+  if(!tabs.length) return <section><PanelTabsHeader title="Tarefas"/><div className="panel"><p className="muted">Nenhuma visualização de tarefas está liberada para este usuário.</p></div></section>;
+  return <section className="tasks-workspace">
+    <PanelTabsHeader title="Tarefas" tabs={tabs} active={tab} onChange={changeTab}/>
+    {tab==='kanban'&&<Kanban tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} search="" embedded/>}
+    {tab==='calendar'&&<Calendar tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} search="" embedded/>}
+    {tab==='tasks'&&<TasksPanel tasks={tasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} embedded/>}
+  </section>;
+}
+function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,open,embedded=false}){
   const collapseStorageKey=`argos_tasks_collapsed_${user?.id||'anonymous'}`;
   const preferencesStorageKey=`argos_tasks_preferences_${user?.id||'anonymous'}`;
-  const initialPreferences=load(preferencesStorageKey,{mode:'priority',type:'all',showArchived:false});
-  const [mode,setMode]=useState(initialPreferences.mode==='date'?'priority':(initialPreferences.mode||'priority')),[type,setType]=useState(initialPreferences.type||'all'),[showArchived,setShowArchived]=useState(!!initialPreferences.showArchived),[selected,setSelected]=useState([]),[bulkEdit,setBulkEdit]=useState(null),[bulkValue,setBulkValue]=useState(''),[collapsedGroups,setCollapsedGroups]=useState(()=>load(collapseStorageKey,{}));
+  const initialPreferences=load(preferencesStorageKey,{mode:'priority',showArchived:false});
+  const [mode,setMode]=useState(initialPreferences.mode==='date'?'priority':(initialPreferences.mode||'priority')),[showArchived,setShowArchived]=useState(!!initialPreferences.showArchived),[selected,setSelected]=useState([]),[bulkEdit,setBulkEdit]=useState(null),[bulkValue,setBulkValue]=useState(''),[collapsedGroups,setCollapsedGroups]=useState(()=>load(collapseStorageKey,{}));
   const isAdmin=user.role==='admin';
   const permissions={...builtInTasksListPermissionsForRole(user.role),...(user.tasksListPermissions||{})};
   const teams=users.filter(u=>u.active&&(u.role==='team'||u.role==='admin'));
   const activeStatuses=statuses.filter(s=>s.active!==false);
   const visibleForArchive = permissions.showArchivedToggle && showArchived ? tasks.filter(t=>t.archived) : tasks.filter(t=>!t.archived);
   const filtered=visibleForArchive
-    .filter(t=>type==='all'||t.type===type)
     .filter(t=>showArchived || mode==='status' || !isFinishedTask(t,statuses));
   const selectedFiltered = selected.filter(id=>filtered.some(t=>t.id===id));
   const priorityOrder={late:0,hot:1,warn:2,ok:3,neutral:4,done:5};
-  useEffect(()=>{ save(preferencesStorageKey,{mode,type,showArchived}); },[preferencesStorageKey,mode,type,showArchived]);
+  useEffect(()=>{ save(preferencesStorageKey,{mode,showArchived}); },[preferencesStorageKey,mode,showArchived]);
   const groupers={
     priority:t=>taskPriorityGroup(t,statuses),
     status:t=>statusById[t.status]?.name||t.status,
@@ -3916,20 +4054,20 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
     clearSelected();
   }
   const totalArchived=tasks.filter(t=>t.archived).length;
-  return <section><h1>Tarefas</h1>
-  {(permissions.showGrouping||permissions.showTypeFilter||permissions.showArchivedToggle)&&<div className="filters tasks-filters">
-    {permissions.showGrouping&&<label>Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label>}
-    {permissions.showTypeFilter&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}
-    {permissions.showArchivedToggle&&<label className="toggle-archived tasks-archive-toggle"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span>Mostrar arquivadas{totalArchived?` (${totalArchived})`:''}</span></label>}
-  </div>}
-
-  {permissions.canSelectTasks&&<div className="panel task-bulk-panel">
-    <div className="task-bulk-left"><label className="task-select-all"><input type="checkbox" checked={filtered.length>0&&filtered.every(t=>selected.includes(t.id))} onChange={selectAllVisible}/><span></span></label><small>{selectedFiltered.length} selecionada(s)</small></div>
-    {(permissions.canBulkEdit||permissions.canBulkArchive||permissions.canBulkDuplicate||permissions.canBulkDelete)&&<div className="task-bulk-actions task-bulk-edit-actions">
-      {permissions.canBulkEdit&&<><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('responsibleId')}>Responsável</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('status')}>Status</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('internalDate')}>Prazo</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('postDate')}>Data</button></>}
-      {permissions.canBulkArchive&&<><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(true)}>Arquivar</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(false)}>Desarquivar</button></>}
-      {permissions.canBulkDuplicate&&<button disabled={!selectedFiltered.length} onClick={bulkDuplicate}>Duplicar</button>}
-      {permissions.canBulkDelete&&<button className="danger" disabled={!selectedFiltered.length} onClick={bulkDelete}>Excluir</button>}
+  return <section className={embedded?'embedded-task-view tasks-list-embedded-view':''}>{!embedded&&<PanelTabsHeader title="Tarefas"/>}
+  {(permissions.showGrouping||permissions.showArchivedToggle||permissions.canSelectTasks)&&<div className="filters tasks-filters tasks-list-toolbar">
+    <div className="tasks-list-toolbar-left">
+      {permissions.showGrouping&&<label className="toolbar-arrange-control">Agrupar por<select value={mode} onChange={e=>setMode(e.target.value)}><option value="priority">Prioridade</option><option value="status">Status</option><option value="client">Cliente</option><option value="type">Tipo de post</option>{user.role==='admin'&&<option value="responsible">Responsável</option>}</select></label>}
+      {permissions.showArchivedToggle&&<label className="toggle-archived tasks-archive-toggle"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span>Mostrar arquivadas{totalArchived?` (${totalArchived})`:''}</span></label>}
+    </div>
+    {permissions.canSelectTasks&&<div className="tasks-list-toolbar-right">
+      <div className="task-bulk-left task-bulk-inline"><label className="task-select-all"><input type="checkbox" checked={filtered.length>0&&filtered.every(t=>selected.includes(t.id))} onChange={selectAllVisible}/><span></span></label><small>Selecionar</small></div>
+      {(permissions.canBulkEdit||permissions.canBulkArchive||permissions.canBulkDuplicate||permissions.canBulkDelete)&&<div className="task-bulk-actions task-bulk-edit-actions task-bulk-inline-actions">
+        {permissions.canBulkEdit&&<><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('responsibleId')}>Responsável</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('status')}>Status</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('internalDate')}>Prazo</button><button disabled={!selectedFiltered.length} onClick={()=>openBulkEditor('postDate')}>Data</button></>}
+        {permissions.canBulkArchive&&<><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(true)}>Arquivar</button><button disabled={!selectedFiltered.length} onClick={()=>bulkArchive(false)}>Desarquivar</button></>}
+        {permissions.canBulkDuplicate&&<button disabled={!selectedFiltered.length} onClick={bulkDuplicate}>Duplicar</button>}
+        {permissions.canBulkDelete&&<button className="danger" disabled={!selectedFiltered.length} onClick={bulkDelete}>Excluir</button>}
+      </div>}
     </div>}
   </div>}
 
@@ -3969,7 +4107,7 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
   </div>
 </section>
 }
-function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
+function Calendar({tasks,companies,users,statuses,statusById,user,open,search='',embedded=false}){ 
   const preferencesStorageKey=`argos_calendar_preferences_${user?.id||'anonymous'}`;
   const initialPreferences=load(preferencesStorageKey,{view:'month',company:'all',resp:'all',type:'all',status:'all',archivedOnly:false});
   const [view,setView]=useState(initialPreferences.view||'month'),[selectedDay,setSelectedDay]=useState(todayStr()),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[status,setStatus]=useState(initialPreferences.status||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly);
@@ -3997,8 +4135,13 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
     canNavigateDates:permissions.canNavigateDates,
   };
   const hasSidebar=permissions.showCompanyFilter||permissions.showResponsibleFilter||permissions.showTypeFilter||permissions.showStatusFilter||permissions.showArchivedToggle||permissions.showLegend;
-  return <section>
-    <div className="calendar-titlebar"><h1>Calendário</h1>{permissions.showViewTabs&&<div className="view-tabs"><button className={view==='month'?'primary':''} onClick={()=>setView('month')}>Mês</button><button className={view==='week'?'primary':''} onClick={()=>setView('week')}>Semana</button><button className={view==='day'?'primary':''} onClick={()=>setView('day')}>Dia</button></div>}</div>
+  const calendarHeaderMeta=getCalendarHeaderMeta(view,selectedDay,filtered);
+  const calendarViewTabs=permissions.showViewTabs
+    ? <CalendarViewTabs active={view} onChange={setView}/>
+    : null;
+  const calendarHeaderControls=<CalendarHeaderControls view={view} selectedDay={selectedDay} setSelectedDay={setSelectedDay} countLabel={calendarHeaderMeta.countLabel} title={calendarHeaderMeta.title} permissions={permissions} onExportMonth={()=>exportMonthTasksToExcel(filtered,selectedDay)} trailing={embedded?calendarViewTabs:null}/>;
+  return <section className={embedded?'embedded-task-view calendar-embedded-view':''}>
+    {!embedded&&<PanelTabsHeader title="Calendário" tabs={permissions.showViewTabs?[['month','Mês'],['week','Semana'],['day','Dia']]:[]} active={view} onChange={setView} actions={calendarHeaderControls} className={`calendar-panel-titlebar view-${view}`}/>} 
     <div className="calendar-layout">
       {hasSidebar&&<aside className="legend">
         {(permissions.showCompanyFilter||permissions.showResponsibleFilter||permissions.showTypeFilter||permissions.showStatusFilter||permissions.showArchivedToggle)&&<h3>Filtros</h3>}
@@ -4010,9 +4153,10 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
         {permissions.showLegend&&<><h3>Legenda</h3>{legendStatuses.map(s=><button className={'legend-row '+(status===s.id?'selected':'')} key={s.id} onClick={()=>permissions.showStatusFilter&&setStatus(status===s.id?'all':s.id)}><i style={{background:s.color}}/><span>{s.name}</span><b>{filtered.filter(t=>t.status===s.id).length}</b></button>)}</>}
       </aside>}
       <div className="calendar-main">
-        {view==='month'&&<MonthView selectedDay={selectedDay} setSelectedDay={setSelectedDay} days={days} tasks={filtered} companies={companies} users={users} statusById={statusById} setDay={d=>{setSelectedDay(d);if(permissions.showViewTabs)setView('day')}} open={open} permissions={taskDisplayPermissions}/>}
-        {view==='week'&&<WeekView selectedDay={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>}
-        {view==='day'&&<DayView day={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>}
+        {embedded&&<div className={`calendar-main-header view-${view}`}>{calendarHeaderControls}</div>}
+        {view==='month'&&<MonthView selectedDay={selectedDay} days={days} tasks={filtered} companies={companies} users={users} statusById={statusById} setDay={d=>{setSelectedDay(d);if(permissions.showViewTabs)setView('day')}} open={open} permissions={taskDisplayPermissions}/>} 
+        {view==='week'&&<WeekView selectedDay={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>} 
+        {view==='day'&&<DayView day={selectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>} 
       </div>
     </div>
   </section>
@@ -4133,14 +4277,47 @@ function SpecialDatePanel({items=[]}){
   return <div className="special-date-panel"><h3>Datas especiais</h3>{items.map((item,idx)=><div className={'special-date-line'+(item.market==='us'?' market-us':'')} key={item.name+idx}><b>{item.icon||'✦'}</b><span>{item.name}</span><small>{item.market==='us'?`EUA • ${item.type}`:item.type}</small></div>)}</div>
 }
 
-function MonthView({selectedDay,setSelectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); const monthTaskCount=tasks.filter(t=>{const d=dObj(t.postDate); return d&&d.getFullYear()===cur.getFullYear()&&d.getMonth()===cur.getMonth();}).length; return <div className="month"><div className="month-head month-head-export"><h2>{monthLabel(selectedDay)}</h2><button type="button" className="month-export-btn" onClick={()=>exportMonthTasksToExcel(tasks,selectedDay)}>Exportar Excel</button><small>{monthTaskCount} tarefa(s)</small>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addMonths(selectedDay,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Esse mês</button><button onClick={()=>setSelectedDay(addMonths(selectedDay,1))}>›</button></div>}</div><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
-function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); const weekTaskCount=tasks.filter(t=>days.includes(t.postDate)).length; return <div><div className="month-head calendar-period-head"><h2>Semana de {fmtDate(days[0])} a {fmtDate(days[6])}</h2><small>{weekTaskCount} tarefa(s) nesta semana</small>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(selectedDay,-7))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Essa semana</button><button onClick={()=>setSelectedDay(addDays(selectedDay,7))}>›</button></div>}</div><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
-function DayView({day,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ 
+function shiftCalendarDate(view,selectedDay,direction){
+  if(view==='month') return addMonths(selectedDay,direction);
+  if(view==='week') return addDays(selectedDay,7*direction);
+  return addDays(selectedDay,direction);
+}
+function getCalendarHeaderMeta(view,selectedDay,tasks){
+  const base=dObj(selectedDay)||dObj(todayStr());
+  if(view==='week'){
+    const start=new Date(base);
+    start.setDate(base.getDate()-base.getDay()+1);
+    const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)});
+    const taskCount=tasks.filter(t=>days.includes(t.postDate)).length;
+    return {countLabel:`${taskCount} tarefa(s)`,title:`Semana de ${fmtDate(days[0])} a ${fmtDate(days[6])}`};
+  }
+  if(view==='day'){
+    const taskCount=tasks.filter(t=>t.postDate===selectedDay).length;
+    return {countLabel:`${taskCount} tarefa(s)`,title:fmtDate(selectedDay)};
+  }
+  const taskCount=tasks.filter(t=>{const d=dObj(t.postDate); return d&&d.getFullYear()===base.getFullYear()&&d.getMonth()===base.getMonth();}).length;
+  return {countLabel:`${taskCount} tarefa(s)`,title:monthLabel(selectedDay)};
+}
+function CalendarViewTabs({active,onChange}){
+  return <div className="calendar-inline-view-tabs panel-tabs" role="tablist">{[['month','Mês'],['week','Semana'],['day','Dia']].map(([id,label])=>{const selected=active===id;return <button key={id} type="button" role="tab" aria-selected={selected} aria-current={selected?'page':undefined} className={selected?'active':''} onClick={()=>onChange(id)} style={{position:'relative',overflow:'hidden'}}>{selected&&<span aria-hidden="true" style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'none',background:'#17150f',border:'1px solid #806821',borderRadius:8,boxSizing:'border-box'}}/>}<span style={{position:'relative',zIndex:1,color:selected?'#d7b96f':undefined,fontWeight:400}}>{label}</span></button>})}</div>;
+}
+function CalendarHeaderControls({view,selectedDay,setSelectedDay,countLabel,title,permissions={},onExportMonth,trailing=null}){
+  return <div className="calendar-header-controls">
+    {permissions.canNavigateDates!==false&&<div className="calendar-topbar-nav nav-actions"><button type="button" onClick={()=>setSelectedDay(shiftCalendarDate(view,selectedDay,-1))}>‹</button><button type="button" onClick={()=>setSelectedDay(todayStr())}>Atual</button><button type="button" onClick={()=>setSelectedDay(shiftCalendarDate(view,selectedDay,1))}>›</button></div>}
+    <small className="calendar-header-count">{countLabel}</small>
+    <h2 className="calendar-header-title">{title}</h2>
+    {view==='month'&&permissions.canExportExcel!==false&&<button type="button" className="calendar-export-btn" onClick={onExportMonth}>Exportar Excel</button>}
+    {trailing&&<div className="calendar-header-trailing">{trailing}</div>}
+  </div>;
+}
+function MonthView({selectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); return <div className="month"><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
+function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div className="calendar-period-content"><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
+function DayView({day,tasks,companies,users,statusById,open,permissions={}}){ 
   const list=tasks.filter(t=>t.postDate===day); 
   const specials=specialDatesFor(day);
-  return <div><div className="month-head calendar-period-head"><h2>{fmtDate(day)}</h2><small>{list.length} tarefa(s) neste dia</small>{permissions.canNavigateDates!==false&&<div className="nav-actions"><button onClick={()=>setSelectedDay(addDays(day,-1))}>‹</button><button onClick={()=>setSelectedDay(todayStr())}>Hoje</button><button onClick={()=>setSelectedDay(addDays(day,1))}>›</button></div>}</div><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{permissions.showDeadline&&<><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small></>}{permissions.showStatus!==false&&<span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span>}</button>)}</div></div> 
+  return <div className="calendar-period-content"><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{permissions.showDeadline&&<><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small></>}{permissions.showStatus!==false&&<span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span>}</button>)}</div></div> 
 }
-function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''}){ 
+function Kanban({tasks,companies,users,statuses,statusById,user,open,search='',embedded=false}){ 
   const preferencesStorageKey=`argos_kanban_preferences_${user?.id||'anonymous'}`;
   const initialPreferences=load(preferencesStorageKey,{period:'current',from:'',to:'',company:'all',resp:'all',type:'all',archivedOnly:false,sort:'priority'});
   const [period,setPeriod]=useState(initialPreferences.period||'current'),[from,setFrom]=useState(initialPreferences.from||''),[to,setTo]=useState(initialPreferences.to||''),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly),[sort,setSort]=useState(initialPreferences.sort||'priority');
@@ -4189,13 +4366,13 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search=''})
 
   const hasFilters=permissions.showPeriodFilter||permissions.showCompanyFilter||permissions.showResponsibleFilter||permissions.showTypeFilter||permissions.showSort||permissions.showArchivedToggle;
 
-  return <section><h1>Kanban</h1>
+  return <section className={embedded?'embedded-task-view kanban-embedded-view':''}>{!embedded&&<PanelTabsHeader title="Kanban"/>}
     {hasFilters&&<div className="filters">
       {permissions.showPeriodFilter&&<PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={to} setTo={setTo}/>}
       {permissions.showCompanyFilter&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{companies.filter(c=>c.active).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}
       {permissions.showResponsibleFilter&&<label>Responsável<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}
       {permissions.showTypeFilter&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}
-      {permissions.showSort&&<label>Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="priority">Prioridade</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="responsible">Responsável</option><option value="postDate">Data do post</option><option value="internalDate">Prazo</option></select></label>}
+      {permissions.showSort&&<label className="toolbar-sort-control">Ordenar por<select value={sort} onChange={e=>setSort(e.target.value)}><option value="priority">Prioridade</option><option value="client">Cliente</option><option value="type">Tipo de post</option><option value="responsible">Responsável</option><option value="postDate">Data do post</option><option value="internalDate">Prazo</option></select></label>}
       {permissions.showArchivedToggle&&<label className="check archive-check inline"><input type="checkbox" checked={archivedOnly} onChange={e=>setArchivedOnly(e.target.checked)}/><span>Mostrar só arquivados</span></label>}
     </div>}
     <div className="kanban">{allowed.map(s=>{
@@ -4331,9 +4508,12 @@ function ReadOnlyInstruction({title,text}){
 
 function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open,user}){
   const permissions={...builtInPlanningPermissionsForRole(user?.role),...(user?.planningPermissions||{})};
-  const [weekStart,setWeekStart]=useState(nextWeekStartStr());
+  const preferencesStorageKey=`argos_planning_preferences_${user?.id||'anonymous'}`;
+  const initialPreferences=load(preferencesStorageKey,{companySort:'template-first',weekStart:nextWeekStartStr()});
+  const [weekStart,setWeekStart]=useState(initialPreferences.weekStart&&initialPreferences.weekStart>=nextWeekStartStr()?weekStartStr(initialPreferences.weekStart):nextWeekStartStr());
   const [editingTemplate,setEditingTemplate]=useState(null);
-  const [companySort,setCompanySort]=useState('template-first');
+  const [companySort,setCompanySort]=useState(initialPreferences.companySort||'template-first');
+  useEffect(()=>{ save(preferencesStorageKey,{companySort,weekStart}); },[preferencesStorageKey,companySort,weekStart]);
 
   function changePlanningDate(value){
     if(!value) return;
@@ -4385,14 +4565,11 @@ function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open
   }
 
   return <section>
-    <div className="calendar-titlebar">
-      <div><h1>Planejamento Semanal</h1></div>
-      {permissions.canGenerateAll&&<button className="primary" onClick={generateAll}>Gerar todos pendentes</button>}
-    </div>
+    <PanelTabsHeader title="Planejamento"/>
 
-    {(permissions.showWeekControls||permissions.showIndicators)&&<div className="filters planning-top-filters">
+    {(permissions.showWeekControls||permissions.showIndicators||permissions.canGenerateAll)&&<div className="filters planning-top-filters">
       {permissions.showWeekControls&&<>
-        <label className="planning-date-filter planning-company-sort">Ordenar clientes<select value={companySort} onChange={e=>setCompanySort(e.target.value)}><option value="template-first">Com template primeiro</option><option value="no-template-first">Sem template primeiro</option><option value="name">Nome A–Z</option><option value="newest">Cadastro mais recente</option><option value="oldest">Cadastro mais antigo</option></select></label>
+        {permissions.showSort&&<label className="planning-date-filter planning-company-sort toolbar-sort-control">Ordenar por<select value={companySort} onChange={e=>setCompanySort(e.target.value)}><option value="template-first">Com template primeiro</option><option value="no-template-first">Sem template primeiro</option><option value="name">Nome A–Z</option><option value="newest">Cadastro mais recente</option><option value="oldest">Cadastro mais antigo</option></select></label>}
         <label className="panel planning-kpi-card planning-kpi-period planning-period-selector">
           <small>Período</small>
           <b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b>
@@ -4401,9 +4578,10 @@ function PlanningPage({companies,setCompanies,users,tasks,createWeeklyTasks,open
       </>}
       {permissions.showIndicators&&<>
         {!permissions.showWeekControls&&<div className="panel planning-kpi-card planning-kpi-period"><small>Período</small><b>{fmtDate(weekStart)} a {fmtDate(weekEnd)}</b></div>}
-        <div className="panel planning-kpi-card planning-kpi-small"><small>Total previsto</small><b>{totalExpected}</b></div>
-        <div className="panel planning-kpi-card planning-kpi-small"><small>Já geradas</small><b>{totalCreated}</b></div>
+        <div className="panel planning-kpi-card planning-kpi-small planning-indicator"><small>Total previsto</small><b>{totalExpected}</b></div>
+        <div className="panel planning-kpi-card planning-kpi-small planning-indicator"><small>Já geradas</small><b>{totalCreated}</b></div>
       </>}
+      {permissions.canGenerateAll&&<button className="primary planning-generate-all-inline" onClick={generateAll}>Gerar todos pendentes</button>}
     </div>}
 
     {permissions.showCompanies&&<div className="client-grid compact-admin-grid planning-grid" style={{display:'flex',flexDirection:'column',gap:16}}>
@@ -4901,12 +5079,15 @@ function Media({url}){
   return <div className="media-inner round130-media-preview">{isDrive?<DriveAdaptiveMedia url={url}/>:isVid?<video className="media-fit-image" muted playsInline loop autoPlay src={direct}/>:isImg?<img className="media-fit-image" src={direct} alt="Prévia do material"/>:<a className="media-open outside" target="_blank" href={url}>Abrir material</a>}</div> 
 }
 function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[],setUsers=()=>{}}){
+  const preferencesStorageKey='argos_settings_companies_preferences';
+  const initialPreferences=load(preferencesStorageKey,{sort:'created',showArchived:false});
   const [editing,setEditing]=useState(null);
-  const [sort,setSort]=useState('created');
-  const [showArchived,setShowArchived]=useState(false);
+  const [sort,setSort]=useState(initialPreferences.sort||'created');
+  const [showArchived,setShowArchived]=useState(!!initialPreferences.showArchived);
+  useEffect(()=>{ save(preferencesStorageKey,{sort,showArchived}); },[sort,showArchived]);
   const visibleCompanies=companies.filter(c=>showArchived ? c.active===false : c.active!==false);
   const sortedCompanies=sortEntities(visibleCompanies,sort,c=>c.name);
-  function save(c){
+  function saveCompany(c){
     const exists=companies.some(x=>x.id===c.id);
     const data={...c,id:c.id||slug(c.name)||safeUUID(),createdAt:c.createdAt||now(),active:c.active!==false};
     setCompanies(exists?companies.map(x=>x.id===data.id?data:x):[...companies,data]);
@@ -4931,13 +5112,16 @@ function CompaniesPage({companies,setCompanies,tasks=[],setTasks=()=>{},users=[]
     setCompanies(companies.filter(x=>x.id!==c.id));
     setEditing(null);
   }
-  return <div className="settings-section"><div className="section-header"><h2>Empresas</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivadas</label><SortControl value={sort} setValue={setSort} options={[{value:'created',label:'Data de criação'},{value:'name',label:'Nome'}]}/><button className="primary" onClick={()=>setEditing({id:'',name:'',instagram:'',logo:'',entryDate:'',active:true,createdAt:now()})}>+ Nova empresa</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedCompanies.map(c=><div className={'panel '+(c.active===false?'archived-card':'')} key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{c.instagram || 'Sem Instagram'} {c.active===false?'• Arquivada':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(c)}>Editar</button></div></div>)}</div>{editing&&<CompanyEditor c={editing} users={users} save={save} cancel={()=>setEditing(null)} onArchive={archiveCompany} onDelete={deleteCompany}/>}</div>
+  return <div className="settings-section"><div className="section-header section-header-actions-only"><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivadas</label><SortControl value={sort} setValue={setSort} options={[{value:'created',label:'Data de criação'},{value:'name',label:'Nome'}]}/><button className="primary" onClick={()=>setEditing({id:'',name:'',instagram:'',logo:'',entryDate:'',active:true,createdAt:now()})}>+ Nova empresa</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedCompanies.map(c=><div className={'panel '+(c.active===false?'archived-card':'')} key={c.id}><div className="mini-title"><AvatarMini value={c.logo} label={c.name}/><div><h2>{c.name}</h2><small>{c.instagram || 'Sem Instagram'} {c.active===false?'• Arquivada':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(c)}>Editar</button></div></div>)}</div>{editing&&<CompanyEditor c={editing} users={users} save={saveCompany} cancel={()=>setEditing(null)} onArchive={archiveCompany} onDelete={deleteCompany}/>}</div>
 }
 function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,accessDefaults=null}){
+  const preferencesStorageKey=`argos_settings_clients_preferences_${currentUser?.id||'admin'}`;
+  const initialPreferences=load(preferencesStorageKey,{sort:'company',showArchived:false});
   const [editing,setEditing]=useState(null);
   const [configuring,setConfiguring]=useState(null);
-  const [sort,setSort]=useState('company');
-  const [showArchived,setShowArchived]=useState(false);
+  const [sort,setSort]=useState(initialPreferences.sort||'company');
+  const [showArchived,setShowArchived]=useState(!!initialPreferences.showArchived);
+  useEffect(()=>{ save(preferencesStorageKey,{sort,showArchived}); },[preferencesStorageKey,sort,showArchived]);
   const clients=users.filter(u=>u.role==='client' && (showArchived ? u.active===false : u.active!==false));
   const sortedClients=sortEntities(clients,sort,u=>{
     if(sort==='company') return (u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name||'').filter(Boolean).join(' ') || 'zzzz sem empresa';
@@ -4960,7 +5144,7 @@ function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,acc
       alert('Não foi possível excluir o acesso no Supabase Auth. Instale/atualize a Edge Function manage-app-user e tente novamente. Erro: '+(err.message||err));
     }
   }
-  async function save(u){
+  async function saveClient(u){
     const exists=users.some(x=>x.id===u.id);
     try{
       let data={...u,role:'client',createdAt:u.createdAt||now(),visibleStatuses:u.visibleStatuses||CLIENT_DEFAULT,active:u.active!==false};
@@ -5007,12 +5191,15 @@ function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,acc
     setConfiguring(null);
     notifySettingsSaved('Configurações do responsável salvas');
   }
-  return <div className="settings-section"><div className="section-header"><h2>Responsáveis</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div></div>)}</div>{editing&&<UserEditor u={editing} save={save} cancel={()=>setEditing(null)} clientMode currentUser={currentUser} onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={companies} statuses={statuses} save={saveClientSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
+  return <div className="settings-section"><div className="section-header section-header-actions-only"><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div></div>)}</div>{editing&&<UserEditor u={editing} save={saveClient} cancel={()=>setEditing(null)} clientMode currentUser={currentUser} onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={companies} statuses={statuses} save={saveClientSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
 }
 function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefaults=null}){
+  const preferencesStorageKey=`argos_settings_team_preferences_${currentUser?.id||'admin'}`;
+  const initialPreferences=load(preferencesStorageKey,{sort:'role',showArchived:false});
   const [editing,setEditing]=useState(null);
-  const [sort,setSort]=useState('role');
-  const [showArchived,setShowArchived]=useState(false);
+  const [sort,setSort]=useState(initialPreferences.sort||'role');
+  const [showArchived,setShowArchived]=useState(!!initialPreferences.showArchived);
+  useEffect(()=>{ save(preferencesStorageKey,{sort,showArchived}); },[preferencesStorageKey,sort,showArchived]);
   const [configuring,setConfiguring]=useState(null);
   const people=users.filter(u=>(u.role==='team'||u.role==='admin') && (showArchived ? u.active===false : u.active!==false));
   const sortedPeople=sortEntities(people,sort,u=>u.name);
@@ -5038,7 +5225,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefau
       alert('Não foi possível excluir o acesso no Supabase Auth. Instale/atualize a Edge Function manage-app-user e tente novamente. Erro: '+(err.message||err));
     }
   }
-  async function save(u){
+  async function saveTeamUser(u){
     const role=u.role||'team';
     const exists=users.some(x=>x.id===u.id);
     try{
@@ -5097,10 +5284,10 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefau
       alert('Não foi possível salvar notificações no perfil: '+(err.message||err));
     }
   }
-  return <div className="settings-section"><div className="section-header"><h2>Equipe e admins</h2><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=><div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
+  return <div className="settings-section"><div className="section-header section-header-actions-only"><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=><div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
       <div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small>{u.role==='admin'?'Admin':(u.title||'Equipe')} {u.active===false?'• Arquivado':''}</small></div></div>
       <div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div>
-    </div>)}</div>{editing&&<UserEditor u={editing} save={save} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={[]} statuses={statuses} save={saveTeamSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
+    </div>)}</div>{editing&&<UserEditor u={editing} save={saveTeamUser} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={[]} statuses={statuses} save={saveTeamSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
 }
 function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
   const [f,setF]=useState(c);
@@ -5280,7 +5467,8 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   function togglePanel(id,checked){
     if(editingOtherAdmin) return;
     if(f.role==='admin'&&id==='settings'&&!checked) return alert('Configurações precisa permanecer visível para o próprio administrador.');
-    const next={...resolvedVisible,[id]:checked};
+    const current={...resolvedVisible};
+    const next=id==='tasks'?{...current,kanban:checked,calendar:checked,tasks:checked}:{...current,[id]:checked};
     if(!Object.values(next).some(Boolean)) return alert('O usuário precisa ter pelo menos um painel visível.');
     set('panelPermissions',{mode:'custom',visible:next,order:Array.isArray(f.panelPermissions?.order)?f.panelPermissions.order:[]});
     if(!checked&&openSection===`panel:${id}`) setOpenSection(null);
@@ -5412,26 +5600,13 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
     if(panel.id==='dashboard') return <div>
       <label>Configuração do Dashboard<select value={dashboardInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('dashboard',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
       <div className="checks one-col compact-checks-v3" style={dashboardInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {DASHBOARD_WIDGETS.filter(item=>!(item.adminOnly&&f.role!=='admin')&&!(item.teamOnly&&f.role!=='team')).map(item=><label key={item.id}><input type="checkbox" checked={dashboardInheritance==='custom'?(f.dashboardPermissions?.visible?.[item.id]??true):(roleDefault.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}
+        {DASHBOARD_WIDGETS.map(item=><label key={item.id}><input type="checkbox" checked={dashboardInheritance==='custom'?(f.dashboardPermissions?.visible?.[item.id]??true):(roleDefault.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}
       </div>
     </div>;
-    if(panel.id==='calendar') return <div>
-      <label>Configuração do Calendário<select value={calendarInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('calendar',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div className="checks one-col compact-checks-v3" style={calendarInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {CALENDAR_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={calendarConfig?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}
-      </div>
-    </div>;
-    if(panel.id==='tasks') return <div>
-      <label>Configuração da lista de tarefas<select value={tasksListInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('tasksList',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div className="checks one-col compact-checks-v3" style={tasksListInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={tasksListConfig?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}
-      </div>
-    </div>;
-    if(panel.id==='kanban') return <div>
-      <label>Configuração do Kanban<select value={kanbanInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('kanban',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {KANBAN_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}
-      </div>
+    if(panel.id==='tasks') return <div className="access-tasks-groups">
+      <h3>Kanban</h3><label>Configuração do Kanban<select value={kanbanInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('kanban',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{KANBAN_PERMISSION_ITEMS.map(item=><label key={`kanban:${item.id}`}><input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      <h3 style={{marginTop:18}}>Calendário</h3><label>Configuração do Calendário<select value={calendarInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('calendar',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={calendarInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{CALENDAR_PERMISSION_ITEMS.map(item=><label key={`calendar:${item.id}`}><input type="checkbox" checked={calendarConfig?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      <h3 style={{marginTop:18}}>Listas</h3><label>Configuração das Listas<select value={tasksListInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('tasksList',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={tasksListInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={`lists:${item.id}`}><input type="checkbox" checked={tasksListConfig?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
     </div>;
     if(panel.id==='teamhub') return <div>
       <label>Configuração dos Portfólios<select value={portfolioInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('portfolio',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
@@ -5501,8 +5676,8 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
     <h3 style={{marginTop:22}}>Painéis do menu lateral</h3>
     <label>Modelo de acesso<select value={panelPermissionMode} disabled={editingOtherAdmin} onChange={e=>setMode(e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select><small>{panelPermissionMode==='default'?'Os painéis acompanham automaticamente o padrão da função.':'Ative ou desative os painéis e abra cada item para configurar.'}</small></label>
     <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:14}}>
-      {PANEL_CATALOG.filter(panel=>f.role==='admin'||panel.id!=='settings').map(panel=>{
-        const enabled=resolvedVisible[panel.id]===true;
+      {SIDEBAR_PANEL_CATALOG.filter(panel=>f.role==='admin'||!panel.adminOnly).map(panel=>{
+        const enabled=panel.id==='tasks'?['kanban','calendar','tasks'].some(id=>resolvedVisible[id]===true):resolvedVisible[panel.id]===true;
         const sectionId=`panel:${panel.id}`;
         return <AccessConfigCard
           key={panel.id}
@@ -5564,16 +5739,22 @@ function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,curren
 }
 
 function AccessDefaultsEditor({system,setSystem,statuses=[]}){
-  const [role,setRole]=useState('team');
+  const [mode,setMode]=useState('team');
+  const role=mode==='client'?'client':'team';
   const [draft,setDraft]=useState(()=>clonePayload(accessDefaultForRole(system,'team')));
   const [openSection,setOpenSection]=useState(null);
-  useEffect(()=>{setDraft(clonePayload(accessDefaultForRole(system,role)));setOpenSection(null);},[role,system?.accessDefaults]);
+  const [panelOrder,setPanelOrder]=useState(()=>sidebarPanelOrder(system));
+  useEffect(()=>{if(mode==='order')return;setDraft(clonePayload(accessDefaultForRole(system,role)));setOpenSection(null);},[mode,role,system?.accessDefaults]);
+  useEffect(()=>{setPanelOrder(sidebarPanelOrder(system));},[system?.panelOrder]);
 
   function setDraftValue(key,value){setDraft(prev=>({...prev,[key]:value}));}
   function togglePanel(id,checked){
-    if(role==='admin'&&id==='settings'&&!checked) return alert('Configurações precisa permanecer ativa no padrão de Admin.');
-    const next={...(draft.panels?.visible||{}),[id]:checked};
-    if(!Object.values(next).some(Boolean)) return alert('O padrão precisa ter pelo menos um painel ativo.');
+    const current={...(draft.panels?.visible||{})};
+    const next=id==='tasks'
+      ? {...current,kanban:checked,calendar:checked,tasks:checked}
+      : {...current,[id]:checked};
+    const operationalIds=PANEL_CATALOG.filter(panel=>!['financial','settings'].includes(panel.id)).map(panel=>panel.id);
+    if(!operationalIds.some(panelId=>next[panelId]===true)) return alert('O padrão precisa ter pelo menos um painel ativo.');
     setDraft(prev=>({...prev,panels:{...(prev.panels||{}),visible:next}}));
     if(!checked&&openSection===`panel:${id}`)setOpenSection(null);
   }
@@ -5634,6 +5815,19 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
       editable:{...(prev.tasks?.detailFields?.editable||{})},
     }}}));
   }
+  function moveSidebarPanel(index,direction){
+    const target=index+direction;
+    if(target<0||target>=panelOrder.length)return;
+    setPanelOrder(current=>{const next=[...current];[next[index],next[target]]=[next[target],next[index]];return next;});
+  }
+  function savePanelOrder(){
+    setSystem({...system,panelOrder:[...panelOrder]});
+    notifySettingsSaved('Ordenação dos painéis salva');
+  }
+  function restorePanelOrder(){
+    setPanelOrder([...DEFAULT_SIDEBAR_PANEL_ORDER]);
+    setSystem({...system,panelOrder:[...DEFAULT_SIDEBAR_PANEL_ORDER]});
+  }
   function saveDefaults(){
     setSystem({...system,accessDefaults:{...(system?.accessDefaults||{}),[role]:clonePayload(draft)}});
     notifySettingsSaved('Padrão de acesso salvo');
@@ -5651,19 +5845,20 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
       <h4>Painel e ações</h4><div className="checks one-col compact-checks-v3">{NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.notificationPanel?.[item.id]===true} onChange={e=>toggleNotificationPanelPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
       <div className="notification-prefs-grid" style={{marginTop:18}}><div><h4>Eventos</h4><div className="checks one-col compact-checks-v3">{NOTIFICATION_VISIBLE_EVENTS.map(ev=><label key={ev}><input type="checkbox" checked={(draft.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}</div></div><div><h4>Status que geram notificação</h4><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" checked={(draft.notificationStatusPrefs?.[st.id]??true)} onChange={e=>setDraftValue('notificationStatusPrefs',{...(draft.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div></div>
     </div>;
-    if(panel.id==='dashboard') return <div><h4>Cards e gráficos visíveis</h4><div className="checks one-col compact-checks-v3">{DASHBOARD_WIDGETS.filter(item=>!(item.adminOnly&&role!=='admin')&&!(item.teamOnly&&role!=='team')).map(item=><label key={item.id}><input type="checkbox" checked={(draft.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
-    if(panel.id==='tasks') return <div><h4>Filtros, grupos e dados visíveis</h4><div className="checks one-col compact-checks-v3">{TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.tasksList?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
-    if(panel.id==='calendar') return <div><h4>Filtros, navegação e tarefas</h4><div className="checks one-col compact-checks-v3">{CALENDAR_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.calendar?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
-    if(panel.id==='kanban') return <div><h4>Filtros, cards e navegação</h4><div className="checks one-col compact-checks-v3">{KANBAN_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.kanban?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='dashboard') return <div><h4>Abas, filtros, cards e gráficos</h4><div className="checks one-col compact-checks-v3">{DASHBOARD_WIDGETS.map(item=><label key={item.id}><input type="checkbox" checked={(draft.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='tasks') return <div className="access-tasks-groups">
+      <h4>Kanban</h4><div className="checks one-col compact-checks-v3">{KANBAN_PERMISSION_ITEMS.map(item=><label key={`kanban:${item.id}`}><input type="checkbox" checked={draft.kanban?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      <h4>Calendário</h4><div className="checks one-col compact-checks-v3">{CALENDAR_PERMISSION_ITEMS.map(item=><label key={`calendar:${item.id}`}><input type="checkbox" checked={draft.calendar?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      <h4>Listas</h4><div className="checks one-col compact-checks-v3">{TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={`lists:${item.id}`}><input type="checkbox" checked={draft.tasksList?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+    </div>;
     if(panel.id==='teamhub') return <div><h4>Perfis e trabalhos visíveis</h4><div className="checks one-col compact-checks-v3">{PORTFOLIO_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.portfolio?.[item.id]===true} onChange={e=>togglePortfolioPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
     if(panel.id==='planning') return <div><h4>Semanas, templates e geração</h4><div className="checks one-col compact-checks-v3">{PLANNING_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.planning?.[item.id]===true} onChange={e=>togglePlanningPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
     if(panel.id==='documents') return <div><h4>Pastas, conteúdo e ações</h4><div className="checks one-col compact-checks-v3">{DOCUMENT_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.documents?.[item.id]===true} onChange={e=>toggleDocumentPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
     return <p className="muted">As configurações internas deste painel serão adicionadas no módulo correspondente. A visibilidade já está funcional.</p>;
   }
   return <div className="settings-section">
-    <div className="section-header"><div><h2>Padrões de acesso</h2><p className="muted">Usuários que usam o padrão acompanham automaticamente qualquer mudança salva aqui.</p></div></div>
-    <div className="view-tabs access-role-tabs" style={{justifyContent:'flex-start',margin:'0 0 18px'}}>{[['team','Equipe'],['client','Responsável']].map(([id,label])=><button key={id} className={role===id?'active primary':''} aria-pressed={role===id} onClick={()=>setRole(id)}>{label}</button>)}</div>
-    <div className="panel"><h2>Padrão de {roleLabel}</h2>
+    <div className="view-tabs access-role-tabs">{[['team','Equipe'],['client','Responsável'],['order','Ordenação']].map(([id,label])=><button key={id} className={mode===id?'active primary':''} aria-pressed={mode===id} onClick={()=>setMode(id)}>{label}</button>)}</div>
+    {mode==='order'?<div className="panel access-order-panel"><h2>Ordenação dos painéis</h2><p className="muted">Define a ordem-base da barra lateral para todos os perfis. Financeiro e Configurações aparecem somente para Admin, mas também respeitam esta ordem.</p><div className="access-order-list">{panelOrder.map((id,index)=>{const panel=SIDEBAR_PANEL_CATALOG.find(item=>item.id===id);return <div className="access-order-row" key={id}><b>{index+1}. {panel?.label||id}</b><div><button onClick={()=>moveSidebarPanel(index,-1)} disabled={index===0}>↑ Subir</button><button onClick={()=>moveSidebarPanel(index,1)} disabled={index===panelOrder.length-1}>↓ Descer</button></div></div>})}</div><div className="modal-actions"><button onClick={restorePanelOrder}>Restaurar ordem</button><button className="primary" onClick={savePanelOrder}>Salvar ordenação</button></div></div>:<div className="panel"><h2>Padrão de {roleLabel}</h2>
 
       <h3>Regras de acesso</h3>
       <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -5694,14 +5889,15 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
 
       <h3 style={{marginTop:22}}>Painéis do menu lateral</h3>
       <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        {PANEL_CATALOG.filter(panel=>panel.id!=='settings').map(panel=>{
-          const active=draft.panels?.visible?.[panel.id]===true;
+        {SIDEBAR_PANEL_CATALOG.map(panel=>{
+          const active=panel.id==='tasks'
+            ? ['kanban','calendar','tasks'].some(id=>draft.panels?.visible?.[id]===true)
+            : draft.panels?.visible?.[panel.id]===true;
           const sectionId=`panel:${panel.id}`;
           return <AccessConfigCard
             key={panel.id}
             title={panel.label}
             active={active}
-            disabled={role==='admin'&&panel.id==='settings'}
             open={openSection===sectionId}
             onToggleOpen={()=>toggleSection(sectionId)}
             onToggleActive={checked=>togglePanel(panel.id,checked)}
@@ -5712,7 +5908,7 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
       </div>
 
       <div className="modal-actions"><button onClick={restoreBuiltIn}>Restaurar padrão original</button><button className="primary" onClick={saveDefaults}>Salvar padrão</button></div>
-    </div>
+    </div>}
   </div>;
 }
 
@@ -5940,12 +6136,15 @@ async function saveFinancialSettings(organizationId,userId,config){
 }
 function FinancialLab({tasks=[],companies=[],users=[],currentUser=null}){
   const [tab,setTab]=useState('summary');
-  const [month,setMonth]=useState(financialMonth);
+  const financialPreferencesKey=`argos_financial_preferences_${currentUser?.id||'admin'}`;
+  const initialFinancialPreferences=load(financialPreferencesKey,{month:financialMonth()});
+  const [month,setMonth]=useState(initialFinancialPreferences.month||financialMonth());
   const [companySort,setCompanySort]=useState('name');
   const [teamSort,setTeamSort]=useState('name');
   const [config,setConfig]=useState(()=>normalizeFinancialLab(load(FINANCIAL_LAB_KEY,freshFinancialLab())));
   const [settingsReady,setSettingsReady]=useState(!isSupabaseConfigured);
   const [settingsStatus,setSettingsStatus]=useState(isSupabaseConfigured?'Carregando valores...':'Salvo neste navegador');
+  useEffect(()=>{ save(financialPreferencesKey,{month}); },[financialPreferencesKey,month]);
   const organizationId=currentUser?.organizationId;
   const activeCompanies=companies.filter(company=>company.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
   const team=users.filter(user=>user.active!==false&&(user.role==='team'||user.role==='admin')).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
@@ -6033,8 +6232,8 @@ function FinancialLab({tasks=[],companies=[],users=[],currentUser=null}){
   const patchUser=patch=>setConfig(prev=>({...prev,users:{...prev.users,[userId]:{...normalizeFinancialRule(prev.users?.[userId]),...patch}}}));
   const patchUserRate=(type,value)=>patchUser({rates:{...userRule.rates,[type]:financialNumber(value)}});
   const resetLab=()=>{if(confirm('Limpar somente as simulações financeiras salvas neste navegador?'))setConfig(freshFinancialLab());};
-  return <section className="financial-lab"><h1>Financeiro</h1>
-    <div className="financial-toolbar"><div className="financial-toolbar-main"><label>Mês analisado<input type="month" value={month} onChange={event=>setMonth(event.target.value)}/></label><div className="financial-tabs">{[['summary','Resumo'],['market','Referências'],['companies','Clientes'],['team','Equipe']].map(([id,label])=>{const selected=tab===id;return <button type="button" key={id} className={selected?'active':''} aria-current={selected?'page':undefined} aria-pressed={selected} onClick={()=>setTab(id)}>{selected&&<span aria-hidden="true" style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'none',background:'#17150f',border:'1px solid #806821',borderRadius:8,boxSizing:'border-box'}}/>}<span style={{position:'relative',zIndex:1,color:selected?'#d7b96f':undefined,fontWeight:400}}>{label}</span></button>})}</div></div><button type="button" className="financial-reset" onClick={resetLab} disabled={!settingsReady}>Limpar valores</button></div>
+  return <section className="financial-lab"><PanelTabsHeader title="Financeiro" tabs={[["summary","Resumo"],["market","Referências"],["companies","Clientes"],["team","Equipe"]]} active={tab} onChange={setTab}/>
+    <div className="financial-toolbar"><div className="financial-toolbar-main"><label>Mês analisado<input type="month" value={month} onChange={event=>setMonth(event.target.value)}/></label></div></div>
     <span className="financial-help financial-month-help">{monthTasks.length} tarefa(s) consideradas pela data do post ou, quando vazia, pelo prazo interno.</span>
     {tab==='summary'&&<>
       <div className="financial-cards"><div className="panel financial-card"><small>Valor de mercado entregue</small><strong>{financialMoney(totalMarket)}</strong><em>Venda desejada por tipo de tarefa</em></div><div className="panel financial-card"><small>Receita real simulada</small><strong>{financialMoney(totalRevenue)}</strong><em>Contratos + produção variável</em></div><div className="panel financial-card"><small>Custo real da equipe</small><strong>{financialMoney(realCost)}</strong><em>Fixos + pagamentos variáveis</em></div><div className="panel financial-card"><small>Margem simulada</small><strong className={margin<0?'financial-negative':'financial-positive'}>{financialMoney(margin)}</strong><em>{totalRevenue?`${Math.round(margin/totalRevenue*100)}% da receita`:'Preencha os valores para calcular'}</em></div></div>
@@ -6054,14 +6253,17 @@ function normalizeFinancialRule(rule){return {mode:['fixed','variable','hybrid']
 function MoneyInput({value,onChange,disabled=false}){return <input type="number" min="0" step="0.01" inputMode="decimal" value={value??0} disabled={disabled} onChange={event=>onChange(event.target.value)} aria-label="Valor em reais"/>;}
 
 function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanies,users,setUsers,system,setSystem,reset,currentUser=null}){ 
-  const [tab,setTab]=useState('status'); 
+  const preferencesStorageKey=`argos_settings_preferences_${currentUser?.id||'admin'}`;
+  const initialPreferences=load(preferencesStorageKey,{tab:'status'});
+  const [tab,setTab]=useState(initialPreferences.tab||'status');
+  useEffect(()=>{ save(preferencesStorageKey,{tab}); },[preferencesStorageKey,tab]); 
   const [editing,setEditing]=useState(null); 
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
-  function save(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); notifySettingsSaved('Status salvo'); } 
+  function saveStatus(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); notifySettingsSaved('Status salvo'); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
   const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Geral']];
   if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
-  return <section><h1>Configurações</h1><div className="settings-tabs">{tabs.map(([id,label])=>{const selected=tab===id;return <button key={id} type="button" className={selected?'active':''} aria-current={selected?'page':undefined} aria-pressed={selected} onClick={()=>setTab(id)} style={{position:'relative',overflow:'hidden'}}>{selected&&<span aria-hidden="true" style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'none',background:'#17150f',border:'1px solid #806821',borderRadius:8,boxSizing:'border-box'}}/>}<span style={{position:'relative',zIndex:1,color:selected?'#d7b96f':undefined,fontWeight:400}}>{label}</span></button>})}</div>{tab==='status'&&<div className="settings-section"><div className="section-header"><h2>Status</h2><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={save} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
+  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -6225,11 +6427,11 @@ function PublicPortfolioSettings({currentUser}){
     }
   }
 
-  if(loading) return <div className="settings-section"><div className="panel public-portfolio-settings"><h2>Portfólio público</h2><p>Carregando configurações...</p></div></div>;
+  if(loading) return <div className="settings-section"><div className="panel public-portfolio-settings"><p>Carregando configurações...</p></div></div>;
 
   return <div className="settings-section"><div className="panel public-portfolio-settings">
     <div className="public-portfolio-settings-head">
-      <div><h2>Portfólio público</h2><p>Configure o perfil público da Argos. Os trabalhos em Pronto aparecem automaticamente, inclusive os arquivados.</p></div>
+      <div><p>Configure o perfil público da Argos. Os trabalhos em Pronto aparecem automaticamente, inclusive os arquivados.</p></div>
       <label className="public-portfolio-active"><input type="checkbox" checked={form.active} onChange={e=>set('active',e.target.checked)}/><span>Portfólio ativo</span></label>
     </div>
     {error&&<div className="cloud-error">{error}</div>}
@@ -6263,7 +6465,7 @@ function GeneralSettings({system,setSystem,reset}){
   const [f,setF]=useState(system||{logo:'',title:'Painel de Aprovação'});
   const set=(k,v)=>setF({...f,[k]:v});
   const saveGeneral=()=>{setSystem(f);notifySettingsSaved('Configurações gerais salvas');};
-  return <div className="settings-section"><div className="panel general-panel"><h2>Geral</h2>
+  return <div className="settings-section"><div className="panel general-panel">
     <h3>Painel interno</h3>
     <label>Texto do painel<input value={f.title||''} onChange={e=>set('title',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Logo do sistema<input value={f.logo||''} onChange={e=>set('logo',e.target.value)} placeholder="URL, link do Drive ou upload"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),'system/logo')}/></label>
@@ -6447,7 +6649,7 @@ function DocumentsPage({documents,setDocuments,companies,users,tasks,statuses,cu
   const grouped=folders.map(folder=>({folder,docs:filteredDocs.filter(d=>(d.folder||'Clientes')===folder).sort((a,b)=>((a.order??9999)-(b.order??9999))||((baseOrder.get(a.id)||0)-(baseOrder.get(b.id)||0)))}));
 
   return <section className="documents-page docs-clickup-shell">
-    <div className="section-header docs-topbar"><div><h1>Documentos</h1></div></div>
+    <PanelTabsHeader title="Documentos" className="docs-topbar"/>
     <div className="docs-workspace">
       {doc?<DocumentEditor doc={doc} patchDoc={patchDoc} deleteDoc={deleteDoc} folders={folders} companies={companies} users={users} permissions={permissions}/>:<div className="docs-empty-editor"><h2>Nenhum documento</h2><p>{permissions.canCreateDocuments?'Crie uma pasta e depois um documento para começar.':'Nenhum documento disponível.'}</p></div>}
 
@@ -6599,12 +6801,12 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     else groups.push({companyKey,items:[item]});
     return groups;
   },[]);
-  return <section><div className="panel-titlebar" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><h1>Notificações</h1><button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button></div>
-    {(permissions.showTabs||permissions.canCompleteAll||permissions.canDeleteCompleted)&&<div className="filters">
-      {permissions.showTabs&&<><button className={effectiveTab==='open'?'primary':''} onClick={()=>setTab('open')}>Pendentes</button><button className={effectiveTab==='done'?'primary':''} onClick={()=>setTab('done')}>Concluídas</button></>}
+  return <section><PanelTabsHeader title="Notificações" tabs={permissions.showTabs?[["open","Pendentes"],["done","Concluídas"]]:[]} active={effectiveTab} onChange={setTab}/>
+    <div className="filters notification-top-controls">
+      {permissions.canEnableAlerts!==false&&<button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button>}
       {effectiveTab==='open'&&permissions.canCompleteAll&&<button onClick={doneAll} disabled={!openCount}>Concluir todas</button>}
       {effectiveTab==='done'&&permissions.canDeleteCompleted&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}
-    </div>}
+    </div>
     <div className="notifications-list">{list.length?notificationGroups.map((group,groupIndex)=><div className="panel notification-company-group" key={`${group.companyKey}-${groupIndex}`}>
       {group.items.map(({n,info})=>{const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';const canOpenRow=!!(permissions.canOpenTasks&&info.task);return <div className={'notification-item notification-list-row'+(canOpenRow?' is-clickable':'')} key={n.id} role={canOpenRow?'button':undefined} tabIndex={canOpenRow?0:undefined} onClick={canOpenRow?()=>open(n.taskId):undefined} onKeyDown={canOpenRow?(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open(n.taskId);}}:undefined}>
       <span className="notification-leading-action">
@@ -6785,7 +6987,7 @@ const ARGOS_ROUND44_MOBILE_POLISH_CSS = `
     align-items:center!important;
     gap:8px!important;
     line-height:1.25!important;
-    font-size:14px!important;
+    font-size:13px!important;
   }
 }
 @media (max-width:520px){
@@ -6840,6 +7042,972 @@ if (typeof document !== 'undefined') {
   }
   style50.textContent = ARGOS_ROUND50_TEAM_NOTIFS_BRAND_CSS;
 }
+
+
+const ARGOS_ROUND224_CALENDAR_STANDARD_CSS = `
+.calendar-embedded-heading{margin:0 0 14px}
+.calendar-embedded-heading h1{margin:0}
+.calendar-main-header{margin:0 0 12px;width:100%;min-width:0}.calendar-main-header.view-week .calendar-header-trailing,.calendar-main-header.view-day .calendar-header-trailing{margin-right:-8px}.calendar-panel-titlebar.view-week .calendar-header-trailing,.calendar-panel-titlebar.view-day .calendar-header-trailing{margin-right:-8px}
+.calendar-panel-titlebar{align-items:flex-start!important}
+.calendar-panel-titlebar .panel-tabs-actions{margin-left:auto;min-width:0}
+.calendar-header-controls{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;align-items:center;gap:10px;min-width:0;width:100%;box-sizing:border-box}
+.calendar-topbar-nav{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.calendar-header-count{white-space:nowrap;color:var(--muted);font-size:12px;line-height:1.2}
+.calendar-header-title{margin:0;text-align:center;justify-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-size:14px;line-height:1.2;color:#f3efe3}
+.calendar-export-btn{min-height:32px!important;height:32px!important;padding:0 12px!important;font-size:12px!important;white-space:nowrap!important;width:auto!important;flex:0 0 auto}
+.calendar-header-trailing{justify-self:end;display:flex;align-items:center;min-width:0;margin-left:auto}
+.calendar-inline-view-tabs{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;min-width:0}
+.calendar-inline-view-tabs>button{min-height:38px;padding:9px 13px;border:1px solid rgba(225,177,44,.13);border-radius:8px;background:rgba(255,255,255,.025);color:rgba(255,255,255,.62);box-shadow:none}
+.calendar-inline-view-tabs>button:hover{color:#fff;border-color:rgba(225,177,44,.32);background:rgba(225,177,44,.055)}
+.calendar-inline-view-tabs>button.active,.calendar-inline-view-tabs>button[aria-current="page"],.calendar-inline-view-tabs>button[aria-selected="true"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important;background-image:none!important;box-shadow:0 0 14px rgba(215,185,111,.16)!important}
+.calendar-main{width:100%;min-width:0}.calendar-main .month{padding:0!important;overflow:auto;width:100%}
+.calendar-main .week-grid{margin-top:0!important;width:100%;box-sizing:border-box}
+.calendar-main .day-list{margin-top:0!important;width:100%;box-sizing:border-box}
+.calendar-main > div,.calendar-main .calendar-period-content{display:flex;flex-direction:column;gap:12px;width:100%;min-width:0}
+.calendar-main .weeknames b{padding:11px 9px!important}
+.calendar-main .day{min-height:126px!important}
+.calendar-main .week-col{min-height:430px!important}
+.calendar-main .day-num{font-weight:600}
+.calendar-main .month-head,.calendar-main .calendar-period-head,.calendar-main .calendar-period-toolbar,.month-head-export{display:none!important}
+@media(max-width:980px){
+  .calendar-header-controls{grid-template-columns:auto auto minmax(0,1fr);justify-items:start}
+  .calendar-header-title{justify-self:start;text-align:left;grid-column:1 / -1}
+  .calendar-export-btn{grid-column:2}
+  .calendar-header-trailing{grid-column:3;justify-self:end}
+}
+@media(max-width:760px){
+  .calendar-header-controls{grid-template-columns:1fr;gap:8px}
+  .calendar-topbar-nav,.calendar-header-count,.calendar-header-title,.calendar-export-btn,.calendar-header-trailing{grid-column:auto;justify-self:start}
+  .calendar-header-title{text-align:left;white-space:normal}
+  .calendar-inline-view-tabs{overflow-x:auto;padding-bottom:3px;max-width:100%}
+  .calendar-main .weeknames,.calendar-main .days{min-width:760px}
+}
+`
+if (typeof document !== 'undefined') {
+  let style224 = document.getElementById('argos-round224-calendar-standard');
+  if (!style224) {
+    style224 = document.createElement('style');
+    style224.id = 'argos-round224-calendar-standard';
+    document.head.appendChild(style224);
+  }
+  style224.textContent = ARGOS_ROUND224_CALENDAR_STANDARD_CSS;
+}
+
+
+const ARGOS_ROUND230_PLAIN_PANEL_TABS_CSS = `
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs){
+  gap:18px!important;
+  flex-wrap:wrap!important;
+}
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button{
+  min-height:0!important;
+  height:auto!important;
+  padding:0 0 12px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:rgba(255,255,255,.64)!important;
+  box-shadow:none!important;
+  outline:none!important;
+}
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button:hover{
+  color:#f2e6c9!important;
+  border-bottom-color:rgba(215,185,111,.32)!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button.active,
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button[aria-current="page"],
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button[aria-selected="true"]{
+  color:#d7b96f!important;
+  border-color:transparent transparent #d7b96f transparent!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button::before,
+.panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button::after{
+  display:none!important;
+  content:none!important;
+}
+@media(max-width:760px){
+  .panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs){
+    flex-wrap:nowrap!important;
+    overflow-x:auto!important;
+    padding-bottom:2px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style230 = document.getElementById('argos-round230-plain-panel-tabs');
+  if (!style230) {
+    style230 = document.createElement('style');
+    style230.id = 'argos-round230-plain-panel-tabs';
+    document.head.appendChild(style230);
+  }
+  style230.textContent = ARGOS_ROUND230_PLAIN_PANEL_TABS_CSS;
+}
+
+
+const ARGOS_ROUND234_HEADER_ROWS_CSS = `
+.main .panel-header-block{
+  margin:0 0 18px!important;
+}
+.main .panel-header-block .panel-tabs-header{
+  display:block!important;
+  margin:0!important;
+  padding:0 0 14px!important;
+  border-bottom:1px solid rgba(255,255,255,.09)!important;
+  min-height:0!important;
+}
+.main .panel-header-block .panel-tabs-heading{
+  display:grid!important;
+  grid-template-columns:240px minmax(0,1fr)!important;
+  align-items:end!important;
+  column-gap:34px!important;
+  row-gap:10px!important;
+  width:100%!important;
+}
+.main .panel-header-block .panel-tabs-heading>h1,
+.main .panel-header-block .panel-tabs-header>h1{
+  width:240px!important;
+  min-width:240px!important;
+  max-width:240px!important;
+  margin:0!important;
+  font-size:20px!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+}
+.main .panel-header-block .panel-tabs{
+  justify-content:flex-start!important;
+  align-items:flex-end!important;
+  gap:24px!important;
+  min-width:0!important;
+  width:100%!important;
+}
+.main .panel-header-block .panel-header-tools{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  flex-wrap:wrap!important;
+  width:100%!important;
+  margin:14px 0 0!important;
+}
+.main .panel-header-block .panel-header-tools > *{
+  margin:0!important;
+}
+.main .panel-header-block .panel-tabs-actions{
+  display:contents!important;
+}
+.main .panel-header-block.docs-topbar .panel-tabs-header,
+.main .panel-header-block.calendar-panel-titlebar .panel-tabs-header{
+  border-bottom-color:rgba(255,255,255,.09)!important;
+}
+.main .panel-header-block.calendar-panel-titlebar .panel-header-tools{
+  margin-top:12px!important;
+}
+@media(max-width:980px){
+  .main .panel-header-block .panel-tabs-heading{
+    grid-template-columns:220px minmax(0,1fr)!important;
+    column-gap:26px!important;
+  }
+  .main .panel-header-block .panel-tabs-heading>h1,
+  .main .panel-header-block .panel-tabs-header>h1{
+    width:220px!important;
+    min-width:220px!important;
+    max-width:220px!important;
+  }
+}
+@media(max-width:760px){
+  .main .panel-header-block .panel-tabs-header{
+    padding-bottom:12px!important;
+  }
+  .main .panel-header-block .panel-tabs-heading{
+    grid-template-columns:1fr!important;
+    row-gap:12px!important;
+  }
+  .main .panel-header-block .panel-tabs-heading>h1,
+  .main .panel-header-block .panel-tabs-header>h1{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+  }
+  .main .panel-header-block .panel-tabs{
+    gap:20px!important;
+    overflow-x:auto!important;
+    padding-bottom:2px!important;
+    flex-wrap:nowrap!important;
+  }
+  .main .panel-header-block .panel-header-tools{
+    margin-top:12px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style234 = document.getElementById('argos-round234-header-rows');
+  if (!style234) {
+    style234 = document.createElement('style');
+    style234.id = 'argos-round234-header-rows';
+    document.head.appendChild(style234);
+  }
+  style234.textContent = ARGOS_ROUND234_HEADER_ROWS_CSS;
+}
+
+
+const ARGOS_ROUND235_HEADER_ALIGNMENT_CSS = `
+.main .panel-header-block .panel-tabs-header{
+  padding:0!important;
+}
+.main .panel-header-block .panel-tabs-heading>h1,
+.main .panel-header-block .panel-tabs-header>h1{
+  padding:0 0 9px!important;
+}
+.main .panel-header-block .panel-tab-link{
+  padding:0 0 9px!important;
+}
+.main .panel-header-block .panel-header-tools{
+  margin-top:10px!important;
+}
+.main .notification-top-controls,
+.main .planning-top-filters{
+  margin-top:14px!important;
+}
+.main .notification-top-controls{
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:12px!important;
+  flex-wrap:wrap!important;
+}
+.main .notification-top-controls > button,
+.main .planning-top-filters > button{
+  width:auto!important;
+  flex:0 0 auto!important;
+}
+@media(max-width:760px){
+  .main .panel-header-block .panel-tabs-heading>h1,
+  .main .panel-header-block .panel-tabs-header>h1,
+  .main .panel-header-block .panel-tab-link{
+    padding-bottom:8px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style235 = document.getElementById('argos-round235-header-alignment');
+  if (!style235) {
+    style235 = document.createElement('style');
+    style235.id = 'argos-round235-header-alignment';
+    document.head.appendChild(style235);
+  }
+  style235.textContent = ARGOS_ROUND235_HEADER_ALIGNMENT_CSS;
+}
+
+
+const ARGOS_ROUND236_PLANNING_TOPBAR_COMPACT_CSS = `
+@media (min-width: 761px) {
+  .main .planning-top-filters {
+    display:flex!important;
+    align-items:flex-end!important;
+    flex-wrap:nowrap!important;
+    gap:10px!important;
+  }
+  .main .planning-top-filters .planning-company-sort,
+  .main .planning-top-filters .planning-date-filter.planning-company-sort {
+    width:300px!important;
+    min-width:300px!important;
+    max-width:300px!important;
+    flex:0 0 300px!important;
+  }
+  .main .planning-top-filters .planning-kpi-period,
+  .main .planning-top-filters .planning-period-selector {
+    width:300px!important;
+    min-width:300px!important;
+    max-width:300px!important;
+    flex:0 0 300px!important;
+  }
+  .main .planning-top-filters .planning-kpi-small {
+    width:165px!important;
+    min-width:165px!important;
+    max-width:165px!important;
+    flex:0 0 165px!important;
+  }
+  .main .planning-top-filters .planning-generate-all-inline {
+    width:auto!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 auto!important;
+    white-space:nowrap!important;
+    align-self:flex-end!important;
+  }
+  .main .planning-top-filters .planning-kpi-card {
+    min-height:40px!important;
+    height:40px!important;
+    max-height:40px!important;
+    padding:0 12px!important;
+    gap:10px!important;
+  }
+  .main .planning-top-filters .planning-kpi-card small {
+    font-size:11px!important;
+  }
+  .main .planning-top-filters .planning-kpi-card b {
+    font-size:13px!important;
+  }
+  .main .planning-top-filters .planning-period-selector {
+    padding-right:38px!important;
+  }
+  .main .planning-top-filters .planning-period-selector::after {
+    right:12px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style236 = document.getElementById('argos-round236-planning-topbar-compact');
+  if (!style236) {
+    style236 = document.createElement('style');
+    style236.id = 'argos-round236-planning-topbar-compact';
+    document.head.appendChild(style236);
+  }
+  style236.textContent = ARGOS_ROUND236_PLANNING_TOPBAR_COMPACT_CSS;
+}
+
+
+const ARGOS_ROUND237_CONTROL_ROWS_STANDARD_CSS = `
+.main .filters,
+.main .settings-toolbar,
+.main .planning-top-filters,
+.main .notification-top-controls{
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:12px!important;
+  flex-wrap:wrap!important;
+}
+.main .filters > label,
+.main .settings-toolbar > label,
+.main .planning-top-filters > label{
+  margin:0!important;
+}
+.main .filters > label > select,
+.main .filters > label > input,
+.main .settings-toolbar > label > select,
+.main .settings-toolbar > label > input,
+.main .planning-top-filters > label > select,
+.main .planning-top-filters > label > input,
+.main .toolbar-sort-control > select,
+.main .toolbar-arrange-control > select{
+  height:42px!important;
+  min-height:42px!important;
+  box-sizing:border-box!important;
+}
+.main .filters > button,
+.main .settings-toolbar > button,
+.main .planning-top-filters > button,
+.main .notification-top-controls > button,
+.main .section-header-actions-only > button,
+.main .section-header-actions-only .settings-toolbar > button{
+  min-height:42px!important;
+  height:42px!important;
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+.main .filters .toggle-archived,
+.main .filters .archive-check.inline,
+.main .filters .check.archive-check.inline,
+.main .settings-toolbar .toggle-archived,
+.main label.toggle-archived{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:10px!important;
+  min-height:42px!important;
+  height:42px!important;
+  margin:0!important;
+  padding:0 2px!important;
+  box-sizing:border-box!important;
+}
+.main .filters .toggle-archived input,
+.main .filters .archive-check.inline input,
+.main .filters .check.archive-check.inline input,
+.main .settings-toolbar .toggle-archived input,
+.main label.toggle-archived input{
+  margin:0!important;
+  align-self:center!important;
+}
+.main .filters .toggle-archived span,
+.main .filters .archive-check.inline span,
+.main .filters .check.archive-check.inline span,
+.main .settings-toolbar .toggle-archived span,
+.main label.toggle-archived span{
+  display:inline-flex!important;
+  align-items:center!important;
+}
+.main .filters > :not(.toolbar-sort-control):not(.toolbar-arrange-control),
+.main .settings-toolbar > :not(.toolbar-sort-control):not(button.primary),
+.main .planning-top-filters > :not(.planning-company-sort):not(.planning-generate-all-inline){
+  order:10;
+}
+.main .filters > .toolbar-arrange-control,
+.main .filters > .toolbar-sort-control,
+.main .settings-toolbar > .toolbar-sort-control,
+.main .planning-top-filters > .planning-company-sort{
+  order:30;
+  margin-left:auto!important;
+}
+.main .filters > button,
+.main .settings-toolbar > button.primary,
+.main .planning-top-filters > .planning-generate-all-inline{
+  order:40;
+}
+.main .notification-top-controls{
+  justify-content:flex-end!important;
+}
+.main .notification-top-controls > button.primary{
+  order:30;
+  margin-left:auto!important;
+}
+.main .notification-top-controls > button:not(.primary){
+  order:40;
+}
+@media(max-width:760px){
+  .main .filters,
+  .main .settings-toolbar,
+  .main .planning-top-filters,
+  .main .notification-top-controls{
+    align-items:stretch!important;
+    gap:10px!important;
+  }
+  .main .filters > .toolbar-arrange-control,
+  .main .filters > .toolbar-sort-control,
+  .main .settings-toolbar > .toolbar-sort-control,
+  .main .planning-top-filters > .planning-company-sort,
+  .main .notification-top-controls > button.primary{
+    margin-left:0!important;
+  }
+  .main .filters > label,
+  .main .settings-toolbar > label,
+  .main .planning-top-filters > label,
+  .main .filters > button,
+  .main .settings-toolbar > button,
+  .main .planning-top-filters > button,
+  .main .notification-top-controls > button{
+    width:100%!important;
+    min-width:0!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style237 = document.getElementById('argos-round237-control-rows-standard');
+  if (!style237) {
+    style237 = document.createElement('style');
+    style237.id = 'argos-round237-control-rows-standard';
+    document.head.appendChild(style237);
+  }
+  style237.textContent = ARGOS_ROUND237_CONTROL_ROWS_STANDARD_CSS;
+}
+
+
+const ARGOS_ROUND238_CONTROL_EXCEPTIONS_CSS = `
+.main .planning-top-filters > .planning-period-selector,
+.main .planning-top-filters > .planning-kpi-period{order:10!important}
+.main .planning-top-filters > .planning-indicator{order:20!important}
+.main .planning-top-filters > .planning-company-sort{order:30!important;margin-left:auto!important}
+.main .planning-top-filters > .planning-generate-all-inline{order:40!important}
+
+.main .tasks-filters > .toolbar-arrange-control{order:0!important;margin-left:0!important}
+.main .tasks-filters > label:not(.toolbar-arrange-control):not(.toggle-archived){order:10!important}
+.main .tasks-filters > .toggle-archived{order:20!important}
+
+.main .settings-toolbar > .toolbar-sort-control{order:10!important;margin-left:0!important}
+.main .settings-toolbar > .toggle-archived,
+.main .settings-toolbar > label.toggle-archived{order:20!important;margin-left:0!important}
+.main .settings-toolbar > button.primary{order:40!important;margin-left:auto!important}
+
+.main .access-role-tabs{
+  justify-content:flex-end!important;
+  gap:12px!important;
+  margin:0 0 18px!important;
+}
+.main .access-role-tabs > button{
+  min-height:42px!important;
+  height:42px!important;
+  padding:0 16px!important;
+  min-width:118px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+}
+@media(max-width:760px){
+  .main .planning-top-filters > .planning-company-sort,
+  .main .settings-toolbar > .toolbar-sort-control,
+  .main .settings-toolbar > button.primary{margin-left:0!important}
+  .main .access-role-tabs{
+    justify-content:flex-start!important;
+  }
+  .main .access-role-tabs > button{
+    width:auto!important;
+    min-width:0!important;
+    flex:1 1 140px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style238 = document.getElementById('argos-round238-control-exceptions');
+  if (!style238) {
+    style238 = document.createElement('style');
+    style238.id = 'argos-round238-control-exceptions';
+    document.head.appendChild(style238);
+  }
+  style238.textContent = ARGOS_ROUND238_CONTROL_EXCEPTIONS_CSS;
+}
+
+
+const ARGOS_ROUND239_TOOLBAR_REFINEMENTS_CSS = `
+.main .settings-section .section-header-actions-only{
+  width:100%!important;
+  justify-content:flex-start!important;
+}
+.main .settings-section .settings-toolbar{
+  width:100%!important;
+  justify-content:flex-start!important;
+  margin-left:0!important;
+}
+.main .settings-section .settings-toolbar > .toolbar-sort-control{
+  order:10!important;
+  margin-left:0!important;
+  width:170px!important;
+  min-width:170px!important;
+  max-width:170px!important;
+}
+.main .settings-section .settings-toolbar > .toggle-archived{
+  order:20!important;
+  margin-left:0!important;
+}
+.main .settings-section .settings-toolbar > button.primary{
+  order:40!important;
+  margin-left:auto!important;
+}
+.main .planning-top-filters > .planning-company-sort{
+  order:0!important;
+  margin-left:0!important;
+  width:220px!important;
+  min-width:220px!important;
+  max-width:220px!important;
+  flex:0 0 220px!important;
+}
+.main .planning-top-filters > .planning-period-selector{order:10!important}
+.main .planning-top-filters > .planning-indicator{order:20!important}
+.main .planning-top-filters > .planning-generate-all-inline{order:40!important;margin-left:auto!important}
+.main .tasks-list-toolbar{
+  flex-wrap:nowrap!important;
+  align-items:flex-end!important;
+  overflow-x:auto!important;
+  padding-bottom:2px!important;
+}
+.main .tasks-list-toolbar > .toolbar-arrange-control{
+  order:0!important;
+  margin-left:0!important;
+  flex:0 0 150px!important;
+  width:150px!important;
+}
+.main .tasks-list-toolbar > .tasks-archive-toggle{
+  order:10!important;
+  flex:0 0 auto!important;
+}
+.main .tasks-list-toolbar > .task-bulk-inline{
+  order:20!important;
+  display:flex!important;
+  align-items:center!important;
+  min-height:42px!important;
+  height:42px!important;
+  gap:8px!important;
+  flex:0 0 auto!important;
+}
+.main .tasks-list-toolbar > .task-bulk-inline-actions{
+  order:30!important;
+  margin-left:auto!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  flex-wrap:nowrap!important;
+}
+.main .tasks-list-toolbar > .task-bulk-inline-actions > button{
+  min-height:42px!important;
+  height:42px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  white-space:nowrap!important;
+}
+@media(max-width:760px){
+  .main .settings-section .settings-toolbar > .toolbar-sort-control,
+  .main .planning-top-filters > .planning-company-sort{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:1 1 100%!important;
+  }
+  .main .settings-section .settings-toolbar > button.primary,
+  .main .planning-top-filters > .planning-generate-all-inline{
+    margin-left:0!important;
+  }
+  .main .tasks-list-toolbar{
+    flex-wrap:wrap!important;
+    overflow-x:visible!important;
+  }
+  .main .tasks-list-toolbar > .task-bulk-inline-actions{
+    margin-left:0!important;
+    width:100%!important;
+    overflow-x:auto!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style239=document.getElementById('argos-round239-toolbar-refinements');
+  if(!style239){style239=document.createElement('style');style239.id='argos-round239-toolbar-refinements';document.head.appendChild(style239);}
+  style239.textContent=ARGOS_ROUND239_TOOLBAR_REFINEMENTS_CSS;
+}
+
+
+const ARGOS_ROUND240_SETTINGS_FIX_CSS = `
+.main .settings-section .section-header-actions-only{
+  display:flex!important;
+  justify-content:flex-end!important;
+  align-items:center!important;
+}
+.main .settings-section .section-header-actions-only > button.primary{
+  margin-left:auto!important;
+}
+.main .kanban-embedded-view > .filters > .toolbar-sort-control,
+.main section:not(.calendar-embedded-view) > .filters > .toolbar-sort-control{
+  order:0!important;
+  margin-left:0!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style240=document.getElementById('argos-round240-settings-fix');
+  if(!style240){style240=document.createElement('style');style240.id='argos-round240-settings-fix';document.head.appendChild(style240);}
+  style240.textContent=ARGOS_ROUND240_SETTINGS_FIX_CSS;
+}
+
+
+const ARGOS_ROUND242_DOCS_TASKS_REFINEMENT_CSS = `
+.main .documents-page .panel-header-block.docs-topbar{
+  margin:0 0 18px!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-header{
+  min-height:52px!important;
+  margin:0!important;
+  padding:0 0 14px!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+  grid-template-columns:240px minmax(0,1fr)!important;
+  column-gap:34px!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading>h1{
+  width:240px!important;
+  min-width:240px!important;
+  max-width:240px!important;
+  margin:0!important;
+  padding:0 0 9px!important;
+  font-size:20px!important;
+  line-height:1.15!important;
+}
+.main .tasks-list-toolbar{
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:space-between!important;
+  gap:22px!important;
+  width:100%!important;
+  flex-wrap:nowrap!important;
+}
+.main .tasks-list-toolbar-left,
+.main .tasks-list-toolbar-right{
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:18px!important;
+  min-width:0!important;
+}
+.main .tasks-list-toolbar-right{
+  margin-left:auto!important;
+  gap:12px!important;
+}
+.main .tasks-list-toolbar .tasks-archive-toggle{
+  margin-left:6px!important;
+  white-space:nowrap!important;
+}
+.main .tasks-list-toolbar .task-bulk-inline{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  height:42px!important;
+  min-height:42px!important;
+  padding:0 4px!important;
+  white-space:nowrap!important;
+}
+.main .tasks-list-toolbar .task-bulk-inline small{
+  display:inline-flex!important;
+  align-items:center!important;
+  height:100%!important;
+  color:rgba(255,255,255,.70)!important;
+}
+.main .tasks-list-toolbar .task-bulk-inline-actions{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  flex-wrap:nowrap!important;
+}
+.main .tasks-list-toolbar .task-bulk-inline-actions>button{
+  height:42px!important;
+  min-height:42px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+@media(max-width:980px){
+  .main .tasks-list-toolbar{
+    flex-wrap:wrap!important;
+  }
+  .main .tasks-list-toolbar-right{
+    width:100%!important;
+    margin-left:0!important;
+    overflow-x:auto!important;
+    padding-bottom:2px!important;
+  }
+}
+@media(max-width:760px){
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+    grid-template-columns:1fr!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading>h1{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+  }
+  .main .tasks-list-toolbar-left{
+    width:100%!important;
+    flex-wrap:wrap!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style242=document.getElementById('argos-round242-docs-tasks-refinement');
+  if(!style242){style242=document.createElement('style');style242.id='argos-round242-docs-tasks-refinement';document.head.appendChild(style242);}
+  style242.textContent=ARGOS_ROUND242_DOCS_TASKS_REFINEMENT_CSS;
+}
+
+
+const ARGOS_ROUND246_DOCUMENTS_HEADER_MATCH_CSS = `
+.main .documents-page .panel-header-block.docs-topbar{
+  margin:0 0 18px!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-header{
+  display:block!important;
+  margin:0!important;
+  padding:0 0 14px!important;
+  min-height:0!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+  display:grid!important;
+  grid-template-columns:240px minmax(0,1fr)!important;
+  align-items:end!important;
+  column-gap:34px!important;
+  row-gap:10px!important;
+  width:100%!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading>h1{
+  width:240px!important;
+  min-width:240px!important;
+  max-width:240px!important;
+  margin:0!important;
+  padding:0 0 9px!important;
+  font-size:20px!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+}
+.main .documents-page .docs-workspace{
+  margin-top:0!important;
+}
+@media(max-width:980px){
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+    grid-template-columns:220px minmax(0,1fr)!important;
+    column-gap:26px!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading>h1{
+    width:220px!important;
+    min-width:220px!important;
+    max-width:220px!important;
+  }
+}
+@media(max-width:760px){
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-header{
+    padding-bottom:12px!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+    grid-template-columns:1fr!important;
+    row-gap:12px!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading>h1{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    padding-bottom:8px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style246 = document.getElementById('argos-round246-documents-header-match');
+  if (!style246) {
+    style246 = document.createElement('style');
+    style246.id = 'argos-round246-documents-header-match';
+    document.head.appendChild(style246);
+  }
+  style246.textContent = ARGOS_ROUND246_DOCUMENTS_HEADER_MATCH_CSS;
+}
+
+
+const ARGOS_ROUND247_DOCUMENTS_DIVIDER_FIX_CSS = `
+.main .documents-page .docs-topbar{
+  display:block!important;
+  min-height:0!important;
+  margin:0 0 18px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.main .documents-page .docs-topbar .panel-tabs-header{
+  display:block!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0 0 14px!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+}
+.main .documents-page .docs-topbar .panel-tabs-heading{
+  display:grid!important;
+  grid-template-columns:132px minmax(0,1fr)!important;
+  align-items:end!important;
+  gap:0!important;
+  min-width:0!important;
+}
+.main .documents-page .docs-topbar .panel-tabs-heading > h1{
+  width:132px!important;
+  min-width:132px!important;
+  max-width:132px!important;
+  margin:0!important;
+  padding:0 0 13px!important;
+  font-size:22px!important;
+  line-height:1.15!important;
+  font-weight:750!important;
+  white-space:nowrap!important;
+}
+@media(max-width:760px){
+  .main .documents-page .docs-topbar .panel-tabs-heading{
+    grid-template-columns:1fr!important;
+  }
+  .main .documents-page .docs-topbar .panel-tabs-heading > h1{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style247 = document.getElementById('argos-round247-documents-divider-fix');
+  if (!style247) {
+    style247 = document.createElement('style');
+    style247.id = 'argos-round247-documents-divider-fix';
+    document.head.appendChild(style247);
+  }
+  style247.textContent = ARGOS_ROUND247_DOCUMENTS_DIVIDER_FIX_CSS;
+}
+
+
+const ARGOS_ROUND248_DOCUMENTS_HEADER_TRUE_MATCH_CSS = `
+.main .documents-page .panel-header-block.docs-topbar{
+  display:block!important;
+  width:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.main .documents-page .panel-header-block.docs-topbar > .panel-tabs-header{
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:space-between!important;
+  gap:18px!important;
+  width:100%!important;
+  min-height:52px!important;
+  margin:0 0 18px!important;
+  padding:0!important;
+  border:0!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+  box-sizing:border-box!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+  display:grid!important;
+  grid-template-columns:132px minmax(0,1fr)!important;
+  align-items:end!important;
+  gap:0!important;
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{
+  width:132px!important;
+  min-width:132px!important;
+  max-width:132px!important;
+  margin:0!important;
+  padding:0 0 13px!important;
+  font-size:22px!important;
+  line-height:1.15!important;
+  font-weight:750!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+}
+@media(max-width:760px){
+  .main .documents-page .panel-header-block.docs-topbar > .panel-tabs-header{
+    align-items:flex-start!important;
+    flex-wrap:wrap!important;
+    min-height:0!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+    grid-template-columns:1fr!important;
+    width:100%!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    padding-bottom:10px!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style248 = document.getElementById('argos-round248-documents-header-true-match');
+  if (!style248) {
+    style248 = document.createElement('style');
+    style248.id = 'argos-round248-documents-header-true-match';
+    document.head.appendChild(style248);
+  }
+  style248.textContent = ARGOS_ROUND248_DOCUMENTS_HEADER_TRUE_MATCH_CSS;
+}
+
+
+const ARGOS_ROUND249_ACCESS_STRUCTURE_CSS = `
+.main .access-role-tabs{justify-content:flex-end!important;margin:0 0 18px!important}
+.main .access-order-list{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.main .access-order-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.018)}
+.main .access-order-row>div{display:flex;gap:8px}
+.main .access-order-row button{height:38px;min-height:38px}
+.main .access-tasks-groups>h4{margin:20px 0 8px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}
+.main .access-tasks-groups>h4:first-child{margin-top:0;padding-top:0;border-top:0}
+@media(max-width:760px){.main .access-order-row{align-items:flex-start;flex-direction:column}.main .access-order-row>div{width:100%}.main .access-order-row button{flex:1}}
+`;
+if(typeof document!=='undefined'){let style249=document.getElementById('argos-round249-access-structure');if(!style249){style249=document.createElement('style');style249.id='argos-round249-access-structure';document.head.appendChild(style249)}style249.textContent=ARGOS_ROUND249_ACCESS_STRUCTURE_CSS;}
 
 createRoot(document.getElementById('root')).render(<RootApp/>);
 
@@ -10127,4 +11295,371 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(style209);
   }
   style209.textContent = ARGOS_ROUND209_VISUAL_REFINEMENT_CSS;
+}
+
+if(typeof document!=='undefined'){
+  let style218Final=document.getElementById('argos-round218-final-tabs');
+  if(!style218Final){style218Final=document.createElement('style');style218Final.id='argos-round218-final-tabs';document.head.appendChild(style218Final);}
+  style218Final.textContent=`
+    section>h1+.settings-tabs{display:inline-flex!important;vertical-align:middle!important;width:calc(100% - 220px)!important;margin:-52px 0 20px 220px!important;border-bottom:0!important}
+    section>h1+.settings-tabs>button.active,section>h1+.settings-tabs>button[aria-current="page"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important;box-shadow:0 0 14px rgba(215,185,111,.16)!important}
+    @media(max-width:760px){section>h1+.settings-tabs{display:flex!important;width:100%!important;margin:0 0 20px!important}}
+  `;
+}
+
+
+const ARGOS_ROUND229_HEADER_SYSTEM_CSS = `
+/* Round229: cabeçalhos e abas padronizados, preservando controles do calendário */
+.main>section>h1{
+  margin:0 0 18px!important;
+  padding:0 0 14px!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+  font-size:22px!important;
+  line-height:1.2!important;
+  font-weight:750!important;
+}
+.panel-tabs-header{
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:space-between!important;
+  gap:18px!important;
+  min-width:0!important;
+  margin:0 0 18px!important;
+  padding:0 0 0!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+}
+.panel-tabs-heading{
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:26px!important;
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+.panel-tabs-heading>h1{
+  flex:0 0 auto!important;
+  margin:0!important;
+  padding:0 0 14px!important;
+  font-size:22px!important;
+  line-height:1.2!important;
+  font-weight:750!important;
+}
+.panel-tabs-header .panel-tabs{
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:24px!important;
+  min-width:0!important;
+  flex-wrap:wrap!important;
+}
+.panel-tabs-header .panel-tabs>button{
+  width:auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  height:auto!important;
+  margin:0!important;
+  padding:0 0 14px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  border-radius:0!important;
+  background:transparent!important;
+  background-image:none!important;
+  color:rgba(255,255,255,.66)!important;
+  box-shadow:none!important;
+  font-weight:500!important;
+  white-space:nowrap!important;
+}
+.panel-tabs-header .panel-tabs>button:hover{
+  color:#f3ead6!important;
+  border-bottom-color:rgba(215,185,111,.38)!important;
+  background:transparent!important;
+}
+.panel-tabs-header .panel-tabs>button.active,
+.panel-tabs-header .panel-tabs>button[aria-current="page"],
+.panel-tabs-header .panel-tabs>button[aria-selected="true"]{
+  color:#d7b96f!important;
+  border-bottom-color:#d7b96f!important;
+  background:transparent!important;
+  background-image:none!important;
+  box-shadow:none!important;
+}
+.panel-tabs-actions{
+  margin-left:auto!important;
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:8px!important;
+  min-width:0!important;
+  padding-bottom:8px!important;
+}
+/* Mês/Semana/Dia continuam controles, não abas de painel */
+.calendar-inline-view-tabs.panel-tabs{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  flex-wrap:nowrap!important;
+}
+.calendar-inline-view-tabs.panel-tabs>button{
+  min-height:38px!important;
+  height:38px!important;
+  padding:9px 13px!important;
+  border:1px solid rgba(225,177,44,.13)!important;
+  border-radius:8px!important;
+  background:rgba(255,255,255,.025)!important;
+  color:rgba(255,255,255,.72)!important;
+  box-shadow:none!important;
+}
+.calendar-inline-view-tabs.panel-tabs>button:hover{
+  color:#fff!important;
+  border-color:rgba(225,177,44,.32)!important;
+  background:rgba(225,177,44,.055)!important;
+}
+.calendar-inline-view-tabs.panel-tabs>button.active,
+.calendar-inline-view-tabs.panel-tabs>button[aria-current="page"],
+.calendar-inline-view-tabs.panel-tabs>button[aria-selected="true"]{
+  color:#d7b96f!important;
+  border-color:#806821!important;
+  background:#17150f!important;
+  box-shadow:0 0 12px rgba(215,185,111,.12)!important;
+}
+/* Identificação e visão em um único elemento compacto */
+.side-user-view-card{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:8px!important;
+  margin:0 0 12px!important;
+  padding:8px 11px!important;
+  min-height:52px!important;
+  border:1px solid rgba(225,177,44,.16)!important;
+  border-radius:12px!important;
+  background:rgba(255,255,255,.022)!important;
+}
+.side-user-view-card.is-selectable{cursor:pointer!important}
+.side-user-view-identity{
+  display:flex!important;
+  align-items:center!important;
+  gap:9px!important;
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+.side-user-view-identity>div{min-width:0!important;flex:1 1 auto!important}
+.side-user-view-identity b,
+.side-user-view-identity small{
+  display:block!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.side-user-view-identity b{font-size:12.5px!important;line-height:1.15!important}
+.side-user-view-identity small{color:rgba(255,255,255,.56)!important;font-size:10.5px!important;line-height:1.1!important;margin-top:1px!important}
+.side-user-view-arrow{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:0 0 auto!important;
+  color:rgba(255,255,255,.62)!important;
+  font-size:14px!important;
+  line-height:1!important;
+  pointer-events:none!important;
+}
+.side-user-view-select{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  opacity:0!important;
+  cursor:pointer!important;
+  border:0!important;
+  background:transparent!important;
+  appearance:none!important;
+}
+.side-user-view-select option,
+.side-user-view-select optgroup{
+  background:#0c0d0f!important;
+  color:#f4ecdb!important;
+}
+.side-user-view-select option:disabled{
+  background:#0c0d0f!important;
+  color:rgba(244,236,219,.5)!important;
+}
+.side-user-view-card:not(.is-selectable) .side-user-view-arrow,
+.side-user-view-card:not(.is-selectable) .side-user-view-select{display:none!important}
+@media(max-width:760px){
+  .panel-tabs-header{
+    align-items:flex-start!important;
+    flex-wrap:wrap!important;
+    gap:10px!important;
+  }
+  .panel-tabs-heading{
+    width:100%!important;
+    flex-wrap:wrap!important;
+    gap:10px!important;
+  }
+  .panel-tabs-header .panel-tabs{
+    width:100%!important;
+    flex-wrap:nowrap!important;
+    overflow-x:auto!important;
+    gap:20px!important;
+  }
+  .panel-tabs-actions{
+    width:100%!important;
+    margin-left:0!important;
+    justify-content:flex-start!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style229=document.getElementById('argos-round229-header-system');
+  if(!style229){style229=document.createElement('style');style229.id='argos-round229-header-system';document.head.appendChild(style229);}
+  style229.textContent=ARGOS_ROUND229_HEADER_SYSTEM_CSS;
+}
+
+const ARGOS_ROUND231_FINAL_PLAIN_TABS_CSS = `
+/* Round231: abas de painel como links, sem herdar estilos globais de botão */
+.main .panel-tabs-header .panel-tabs>.panel-tab-link{
+  display:inline-flex!important;
+  align-items:center!important;
+  width:auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  height:auto!important;
+  margin:0!important;
+  padding:0 0 13px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  outline:0!important;
+  color:rgba(255,255,255,.66)!important;
+  font-weight:500!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+  cursor:pointer!important;
+  user-select:none!important;
+}
+.main .panel-tabs-header .panel-tabs>.panel-tab-link:hover,
+.main .panel-tabs-header .panel-tabs>.panel-tab-link:focus-visible{
+  color:#f3ead6!important;
+  border-bottom-color:transparent!important;
+}
+.main .panel-tabs-header .panel-tabs>.panel-tab-link.active,
+.main .panel-tabs-header .panel-tabs>.panel-tab-link[aria-current="page"],
+.main .panel-tabs-header .panel-tabs>.panel-tab-link[aria-selected="true"]{
+  color:#d7b96f!important;
+  border-bottom-color:#d7b96f!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style231=document.getElementById('argos-round231-final-plain-tabs');
+  if(!style231){style231=document.createElement('style');style231.id='argos-round231-final-plain-tabs';document.head.appendChild(style231);}
+  style231.textContent=ARGOS_ROUND231_FINAL_PLAIN_TABS_CSS;
+}
+
+
+const ARGOS_ROUND233_UNIFIED_PANEL_HEADERS_CSS = `
+.main .panel-tabs-header,
+.main .calendar-titlebar,
+.main .docs-topbar,
+.main .team-hub-hero{
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:space-between!important;
+  gap:18px!important;
+  width:100%!important;
+  min-height:52px!important;
+  margin:0 0 18px!important;
+  padding:0!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+  box-sizing:border-box!important;
+}
+.main .panel-tabs-heading{
+  display:grid!important;
+  grid-template-columns:132px minmax(0,1fr)!important;
+  align-items:end!important;
+  gap:0!important;
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+.main .panel-tabs-heading>h1,
+.main .panel-tabs-header>h1,
+.main .calendar-titlebar h1,
+.main .docs-topbar h1,
+.main .team-hub-hero h1{
+  width:132px!important;
+  min-width:132px!important;
+  margin:0!important;
+  padding:0 0 13px!important;
+  font-size:22px!important;
+  line-height:1.15!important;
+  font-weight:750!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+}
+.main .panel-tabs-header .panel-tabs{
+  display:flex!important;
+  align-items:flex-end!important;
+  gap:24px!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.main .panel-tabs-header .panel-tab-link{
+  display:inline-flex!important;
+  align-items:center!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0 0 14px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:rgba(255,255,255,.68)!important;
+  box-shadow:none!important;
+  cursor:pointer!important;
+  white-space:nowrap!important;
+}
+.main .panel-tabs-header .panel-tab-link:hover{color:#f1e6ce!important}
+.main .panel-tabs-header .panel-tab-link.active,
+.main .panel-tabs-header .panel-tab-link[aria-current="page"],
+.main .panel-tabs-header .panel-tab-link[aria-selected="true"]{
+  color:#d7b96f!important;
+  border-bottom-color:#d7b96f!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.main .panel-tabs-actions{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin:0 0 10px auto!important;
+}
+.main .section-header-actions-only{
+  justify-content:flex-end!important;
+  margin:0 0 14px!important;
+}
+.main .section-header-actions-only .settings-toolbar{margin-left:auto!important}
+.main .calendar-embedded-heading{display:none!important}
+@media(max-width:760px){
+  .main .panel-tabs-header{align-items:flex-start!important;flex-wrap:wrap!important;min-height:0!important}
+  .main .panel-tabs-heading{grid-template-columns:1fr!important;width:100%!important}
+  .main .panel-tabs-heading>h1,
+  .main .panel-tabs-header>h1,
+  .main .calendar-titlebar h1,
+  .main .docs-topbar h1,
+  .main .team-hub-hero h1{
+    width:100%!important;
+    min-width:0!important;
+    padding-bottom:10px!important;
+  }
+  .main .panel-tabs-header .panel-tabs{width:100%!important;overflow-x:auto!important;gap:20px!important}
+  .main .panel-tabs-actions{width:100%!important;margin:0 0 10px!important;justify-content:flex-start!important}
+}
+`;
+if(typeof document!=='undefined'){
+  let style233=document.getElementById('argos-round233-unified-panel-headers');
+  if(!style233){style233=document.createElement('style');style233.id='argos-round233-unified-panel-headers';document.head.appendChild(style233)}
+  style233.textContent=ARGOS_ROUND233_UNIFIED_PANEL_HEADERS_CSS;
 }
