@@ -2483,11 +2483,15 @@ function App(){
   const [saveTick,setSaveTick]=useState(0);
   const [saveStatus,setSaveStatus]=useState('');
   const [realtimeConflict,setRealtimeConflict]=useState(null);
+  const [dismissCloudAlert,setDismissCloudAlert]=useState(false);
+  const [dismissRealtimeAlert,setDismissRealtimeAlert]=useState(false);
   const [taskTablesReady,setTaskTablesReady]=useState(false);
   const [notificationTablesReady,setNotificationTablesReady]=useState(false);
   const taskTablesReadyRef=useRef(false);
   const notificationTablesReadyRef=useRef(false);
   const taskSyncBusyRef=useRef(0);
+  useEffect(()=>{ if(cloudError) setDismissCloudAlert(false); },[cloudError]);
+  useEffect(()=>{ if(realtimeConflict) setDismissRealtimeAlert(false); },[realtimeConflict?.taskId,realtimeConflict?.field]);
   const taskSyncQueueRef=useRef(Promise.resolve());
   const notificationSyncQueueRef=useRef(Promise.resolve());
   const notificationAlertBaselineRef=useRef(null);
@@ -2499,41 +2503,151 @@ function App(){
   const saveRetryRef=useRef(null);
   const realtimeRefreshTimerRef=useRef(null);
   const pendingTaskFieldsRef=useRef(new Map());
+  const pendingTaskLogsRef=useRef(new Map());
+  const pendingTaskCreatesRef=useRef(new Map());
+  const pendingTaskDeletesRef=useRef(new Set());
+
+  const sameSyncValue=(a,b)=>JSON.stringify(a??null)===JSON.stringify(b??null);
+
+  function captureTaskMutationProtection(prev=[],next=[]){
+    const previousById=new Map((prev||[]).map(task=>[String(task.id),task]));
+    const nextById=new Map((next||[]).map(task=>[String(task.id),task]));
+    const protection={fields:new Map(),logs:new Map(),created:new Set(),deleted:new Set()};
+
+    for(const [taskId,nextTask] of nextById){
+      const previousTask=previousById.get(taskId);
+      if(!previousTask){
+        pendingTaskCreatesRef.current.set(taskId,nextTask);
+        protection.created.add(taskId);
+        const createdLogs=new Map((nextTask.logs||[]).filter(log=>log?.id).map(log=>[String(log.id),log]));
+        if(createdLogs.size){
+          pendingTaskLogsRef.current.set(taskId,createdLogs);
+          protection.logs.set(taskId,new Set(createdLogs.keys()));
+        }
+        continue;
+      }
+
+      const changedFields=new Map();
+      const keys=new Set([...Object.keys(previousTask||{}),...Object.keys(nextTask||{})]);
+      keys.delete('logs');
+      keys.forEach(field=>{
+        if(!sameSyncValue(previousTask?.[field],nextTask?.[field])) changedFields.set(field,nextTask?.[field]);
+      });
+      if(changedFields.size){
+        let pendingFields=pendingTaskFieldsRef.current.get(taskId);
+        if(!pendingFields){ pendingFields=new Map(); pendingTaskFieldsRef.current.set(taskId,pendingFields); }
+        changedFields.forEach((value,field)=>pendingFields.set(field,value));
+        protection.fields.set(taskId,changedFields);
+      }
+
+      const previousLogsById=new Map((previousTask.logs||[]).filter(log=>log?.id).map(log=>[String(log.id),log]));
+      const changedLogs=(nextTask.logs||[]).filter(log=>log?.id && !sameSyncValue(previousLogsById.get(String(log.id)),log));
+      if(changedLogs.length){
+        let pendingLogs=pendingTaskLogsRef.current.get(taskId);
+        if(!pendingLogs){ pendingLogs=new Map(); pendingTaskLogsRef.current.set(taskId,pendingLogs); }
+        const protectedIds=new Set();
+        changedLogs.forEach(log=>{ const logId=String(log.id); pendingLogs.set(logId,log); protectedIds.add(logId); });
+        protection.logs.set(taskId,protectedIds);
+      }
+    }
+
+    for(const taskId of previousById.keys()){
+      if(nextById.has(taskId)) continue;
+      pendingTaskDeletesRef.current.add(taskId);
+      protection.deleted.add(taskId);
+    }
+    return protection;
+  }
+
+  function releaseTaskMutationProtection(protection){
+    for(const [taskId,fields] of protection.fields){
+      const pendingFields=pendingTaskFieldsRef.current.get(taskId);
+      if(!pendingFields) continue;
+      fields.forEach((value,field)=>{ if(sameSyncValue(pendingFields.get(field),value)) pendingFields.delete(field); });
+      if(!pendingFields.size) pendingTaskFieldsRef.current.delete(taskId);
+    }
+    for(const [taskId,logIds] of protection.logs){
+      const pendingLogs=pendingTaskLogsRef.current.get(taskId);
+      if(!pendingLogs) continue;
+      logIds.forEach(logId=>pendingLogs.delete(logId));
+      if(!pendingLogs.size) pendingTaskLogsRef.current.delete(taskId);
+    }
+    protection.created.forEach(taskId=>pendingTaskCreatesRef.current.delete(taskId));
+    protection.deleted.forEach(taskId=>pendingTaskDeletesRef.current.delete(taskId));
+  }
+
+  async function syncTaskDeltaReliably(organizationId,prev,next){
+    let attempt=0;
+    for(;;){
+      try{
+        await syncTaskListDelta(organizationId,prev,next);
+        if(attempt>0){
+          setCloudError(current=>String(current||'').startsWith('Não foi possível salvar tarefa')?'':current);
+        }
+        return;
+      }catch(err){
+        attempt+=1;
+        console.error(`task table sync failed (tentativa ${attempt})`,err);
+        const waitMs=Math.min(10000,1200*Math.pow(1.7,Math.min(attempt-1,5)));
+        setCloudError(`Não foi possível salvar tarefa(s). A alteração continua protegida e será reenviada automaticamente. Tentativa ${attempt}: ${err.message||err}`);
+        await new Promise(resolve=>setTimeout(resolve,waitMs));
+      }
+    }
+  }
 
   function applyRemoteTasks(latest){
     setTasksState(current=>{
-      if(!pendingTaskFieldsRef.current.size) return latest;
-      const currentById=new Map(current.map(item=>[String(item.id),item]));
+      const currentById=new Map((current||[]).map(item=>[String(item.id),item]));
+      const remoteIds=new Set((latest||[]).map(item=>String(item.id)));
+      const merged=[];
 
-      return latest.map(remoteTask=>{
+      for(const remoteTask of (latest||[])){
         const taskId=String(remoteTask.id);
-        const pendingFields=pendingTaskFieldsRef.current.get(taskId);
-        if(!pendingFields?.size) return remoteTask;
+        if(pendingTaskDeletesRef.current.has(taskId)) continue;
 
         const localTask=currentById.get(taskId);
+        const pendingFields=pendingTaskFieldsRef.current.get(taskId);
+        const pendingLogs=pendingTaskLogsRef.current.get(taskId);
         let mergedTask=remoteTask;
 
-        for(const [field,pendingValue] of pendingFields){
-          const remoteValue=remoteTask[field]??'';
-          const localValue=pendingValue??'';
-
-          if(JSON.stringify(remoteValue)===JSON.stringify(localValue)){
-            pendingFields.delete(field);
-            setRealtimeConflict(currentConflict=>
-              currentConflict?.taskId===taskId && currentConflict?.field===field
-                ? null
-                : currentConflict
-            );
-            continue;
+        if(pendingFields?.size){
+          for(const [field,pendingValue] of [...pendingFields.entries()]){
+            if(sameSyncValue(remoteTask[field],pendingValue)){
+              pendingFields.delete(field);
+              continue;
+            }
+            mergedTask={...mergedTask,[field]:pendingValue};
           }
-
-          mergedTask={...mergedTask,[field]:pendingValue};
-          if(taskSyncBusyRef.current===0) setRealtimeConflict({taskId,field});
+          if(!pendingFields.size) pendingTaskFieldsRef.current.delete(taskId);
         }
 
-        if(!pendingFields.size) pendingTaskFieldsRef.current.delete(taskId);
-        return localTask ? mergedTask : remoteTask;
-      });
+        if(pendingLogs?.size){
+          const remoteLogsById=new Map((remoteTask.logs||[]).filter(log=>log?.id).map(log=>[String(log.id),log]));
+          for(const [logId,pendingLog] of [...pendingLogs.entries()]){
+            if(remoteLogsById.has(logId)){
+              pendingLogs.delete(logId);
+              continue;
+            }
+            remoteLogsById.set(logId,pendingLog);
+          }
+          mergedTask={...mergedTask,logs:[...remoteLogsById.values()].sort((a,b)=>new Date(a.at||0)-new Date(b.at||0))};
+          if(!pendingLogs.size) pendingTaskLogsRef.current.delete(taskId);
+        }
+
+        if(pendingTaskCreatesRef.current.has(taskId)) pendingTaskCreatesRef.current.delete(taskId);
+        merged.push(localTask?mergedTask:remoteTask);
+      }
+
+      for(const [taskId,pendingTask] of [...pendingTaskCreatesRef.current.entries()]){
+        if(remoteIds.has(taskId) || pendingTaskDeletesRef.current.has(taskId)) continue;
+        merged.push(currentById.get(taskId)||pendingTask);
+      }
+
+      for(const taskId of [...pendingTaskDeletesRef.current]){
+        if(!remoteIds.has(taskId)) pendingTaskDeletesRef.current.delete(taskId);
+      }
+
+      return merged;
     });
   }
 
@@ -2938,13 +3052,19 @@ function App(){
     setTasksState(prev=>{
       const next = typeof v === 'function' ? v(prev) : v;
       if(isSupabaseConfigured && taskTablesReadyRef.current && auth?.organizationId){
+        const protection=captureTaskMutationProtection(prev,next);
+        const organizationId=auth.organizationId;
         taskSyncBusyRef.current += 1;
         taskSyncQueueRef.current = taskSyncQueueRef.current
           .catch(()=>{})
-          .then(()=>syncTaskListDelta(auth.organizationId, prev, next))
-          .catch(err=>{
-            console.error('task table sync failed', err);
-            setCloudError(`Não foi possível salvar tarefa(s): ${err.message||err}`);
+          .then(()=>syncTaskDeltaReliably(organizationId,prev,next))
+          .then(async()=>{
+            releaseTaskMutationProtection(protection);
+            setRealtimeConflict(null);
+            try{
+              const latest=await loadTaskRecords(organizationId);
+              applyRemoteTasks(latest);
+            }catch(err){ console.warn('task post-save refresh failed',err); }
           })
           .finally(()=>{ taskSyncBusyRef.current=Math.max(0,taskSyncBusyRef.current-1); });
       } else if(!isSupabaseConfigured){
@@ -2959,6 +3079,7 @@ function App(){
       if(isSupabaseConfigured && notificationTablesReadyRef.current && auth?.organizationId){
         notificationSyncQueueRef.current = notificationSyncQueueRef.current
           .catch(()=>{})
+          .then(()=>taskSyncQueueRef.current)
           .then(()=>syncNotificationListDelta(auth.organizationId,prev,next))
           .catch(err=>{
             console.error('notification table sync failed',err);
@@ -3126,16 +3247,6 @@ function App(){
     }
     const original=tasks.find(t=>t.id===id);
     const transientPatchFields=new Set(['extraLogs','statusLogText','suppressStatusLog']);
-    const taskId=String(id);
-    let pendingFields=pendingTaskFieldsRef.current.get(taskId);
-    if(!pendingFields){
-      pendingFields=new Map();
-      pendingTaskFieldsRef.current.set(taskId,pendingFields);
-    }
-    Object.keys(patch).forEach(field=>{
-      if(!transientPatchFields.has(field)) pendingFields.set(field,patch[field]);
-    });
-    if(!pendingFields.size) pendingTaskFieldsRef.current.delete(taskId);
     const statusChanged=!!(original && patch.status && patch.status!==original.status);
     const nextStatusId=statusChanged ? patch.status : null;
     const extraLogs=Array.isArray(patch.extraLogs)?patch.extraLogs:[];
@@ -3322,9 +3433,9 @@ function App(){
     <div className="app">
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
-      {(cloudError||realtimeConflict)&&<div className="cloud-alert-stack" role="status" aria-live="polite">
-        {cloudError&&<div className="cloud-banner">{cloudError}</div>}
-        {realtimeConflict&&<div className="cloud-banner">Existe uma versão mais recente deste campo. Seu texto em edição foi preservado; revise antes de continuar.</div>}
+      {((cloudError&&!dismissCloudAlert)||(realtimeConflict&&!dismissRealtimeAlert))&&<div className="cloud-alert-stack" role="status" aria-live="polite">
+        {cloudError&&!dismissCloudAlert&&<div className="cloud-banner"><button type="button" className="cloud-banner-close" aria-label="Fechar aviso" onClick={()=>setDismissCloudAlert(true)}>×</button>{cloudError}</div>}
+        {realtimeConflict&&!dismissRealtimeAlert&&<div className="cloud-banner"><button type="button" className="cloud-banner-close" aria-label="Fechar aviso" onClick={()=>setDismissRealtimeAlert(true)}>×</button>Existe uma versão mais recente deste campo. Seu texto em edição foi preservado; revise antes de continuar.</div>}
       </div>}
       {selectedTask && (
         selectedTaskObj && selectedTaskAllowed
