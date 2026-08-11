@@ -1580,8 +1580,11 @@ function mergeProfileWithWorkspaceUser(profile, payload){
     id: profile?.id || existing.id,
     organizationId: profile?.organizationId || existing.organizationId,
     companyIds: existing.companyIds || profile?.companyIds || [],
-    // Round108: campos governados por profiles têm prioridade sobre o workspace_state antigo.
-    visibleStatuses: (profile?.visibleStatuses&&profile.visibleStatuses.length) ? profile.visibleStatuses : (existing.visibleStatuses || []),
+    // Permissões de status personalizadas pertencem ao workspace. Um refresh de profiles
+    // não pode recolocar visible_statuses antigos por cima da configuração individual salva.
+    visibleStatuses: existing?.accessInheritance?.statuses==='custom'
+      ? (existing.visibleStatuses || [])
+      : ((profile?.visibleStatuses&&profile.visibleStatuses.length) ? profile.visibleStatuses : (existing.visibleStatuses || [])),
     notificationPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationPrefs || NOTIFICATION_EVENTS) : (existing.notificationPrefs || profile?.notificationPrefs || NOTIFICATION_EVENTS),
     notificationStatusPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationStatusPrefs || {}) : (existing.notificationStatusPrefs || profile?.notificationStatusPrefs || {}),
     socialInstagram: profile?.socialInstagram ?? existing.socialInstagram ?? '',
@@ -5297,8 +5300,11 @@ function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,acc
       alert(msg.includes('already')||msg.includes('exist')||msg.includes('registered')?'Esse e-mail já existe no Supabase Auth. Nesse caso, faça reset de senha no Supabase Auth ou recrie o usuário no Auth.':msg);
     }
   }
-  function saveClientSettings(nextUser){
-    setUsers(users.map(x=>x.id===nextUser.id?nextUser:x));
+  async function saveClientSettings(nextUser){
+    if(isSupabaseConfigured && nextUser?.accessInheritance?.statuses==='custom'){
+      await updateAuthBackedAppUserProfile(nextUser);
+    }
+    setUsers(prev=>prev.map(x=>x.id===nextUser.id?nextUser:x));
     setConfiguring(null);
     notifySettingsSaved('Configurações do responsável salvas');
   }
@@ -5388,7 +5394,8 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefau
           notificationStatusPrefs: nextUser.notificationStatusPrefs || {}
         });
       }
-      setUsers(users.map(x=>x.id===nextUser.id?nextUser:x));
+      if(nextUser?.accessInheritance?.statuses==='custom') await updateAuthBackedAppUserProfile(nextUser);
+      setUsers(prev=>prev.map(x=>x.id===nextUser.id?nextUser:x));
       setConfiguring(null);
       notifySettingsSaved('Configurações do usuário salvas');
     }catch(err){
@@ -5584,6 +5591,13 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
     set('panelPermissions',{mode:'custom',visible:next,order:Array.isArray(f.panelPermissions?.order)?f.panelPermissions.order:[]});
     if(!checked&&openSection===`panel:${id}`) setOpenSection(null);
   }
+  function toggleTaskViewVisibility(id,checked){
+    if(editingOtherAdmin) return;
+    const current={...resolvedVisible};
+    const next={...current,[id]:checked};
+    if(!Object.values(next).some(Boolean)) return alert('O usuário precisa ter pelo menos um painel visível.');
+    set('panelPermissions',{mode:'custom',visible:next,order:Array.isArray(f.panelPermissions?.order)?f.panelPermissions.order:[]});
+  }
   function toggleStatus(id,checked){
     const current=statusInheritance==='custom'?(f.visibleStatuses||[]):(roleDefault.visibleStatuses||[]);
     set('visibleStatuses',checked?[...new Set([...current,id])]:current.filter(x=>x!==id));
@@ -5715,7 +5729,14 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
       </div>
     </div>;
     if(panel.id==='tasks') return <div className="access-tasks-groups">
-      <h3>Kanban</h3><label>Configuração do Kanban<select value={kanbanInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('kanban',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{KANBAN_PERMISSION_ITEMS.map(item=><label key={`kanban:${item.id}`}><input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      <h3>Visualizações disponíveis</h3>
+      <div className="checks one-col compact-checks-v3 task-view-visibility-checks">
+        <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.kanban===true} onChange={e=>toggleTaskViewVisibility('kanban',e.target.checked)}/>Exibir Kanban</label>
+        <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.calendar===true} onChange={e=>toggleTaskViewVisibility('calendar',e.target.checked)}/>Exibir Calendário</label>
+        <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.tasks===true} onChange={e=>toggleTaskViewVisibility('tasks',e.target.checked)}/>Exibir Listas</label>
+      </div>
+      {panelPermissionMode!=='custom'&&<small className="muted">Para alterar quais visualizações aparecem, mude “Modelo de acesso” para “Personalizar para este usuário”.</small>}
+      <h3 style={{marginTop:18}}>Kanban</h3><label>Configuração do Kanban<select value={kanbanInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('kanban',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{KANBAN_PERMISSION_ITEMS.map(item=><label key={`kanban:${item.id}`}><input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
       <h3 style={{marginTop:18}}>Calendário</h3><label>Configuração do Calendário<select value={calendarInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('calendar',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={calendarInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{CALENDAR_PERMISSION_ITEMS.map(item=><label key={`calendar:${item.id}`}><input type="checkbox" checked={calendarConfig?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
       <h3 style={{marginTop:18}}>Listas</h3><label>Configuração das Listas<select value={tasksListInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('tasksList',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={tasksListInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={`lists:${item.id}`}><input type="checkbox" checked={tasksListConfig?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
     </div>;
@@ -5869,6 +5890,9 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
     setDraft(prev=>({...prev,panels:{...(prev.panels||{}),visible:next}}));
     if(!checked&&openSection===`panel:${id}`)setOpenSection(null);
   }
+  function toggleDefaultTaskViewVisibility(id,checked){
+    setDraft(prev=>({...prev,panels:{...(prev.panels||{}),visible:{...(prev.panels?.visible||{}),[id]:checked}}}));
+  }
   function toggleStatus(id,checked){
     const current=draft.visibleStatuses||[];
     setDraftValue('visibleStatuses',checked?[...new Set([...current,id])]:current.filter(x=>x!==id));
@@ -5958,6 +5982,11 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
     </div>;
     if(panel.id==='dashboard') return <div><h4>Abas, filtros, cards e gráficos</h4><div className="checks one-col compact-checks-v3">{DASHBOARD_WIDGETS.map(item=><label key={item.id}><input type="checkbox" checked={(draft.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
     if(panel.id==='tasks') return <div className="access-tasks-groups">
+      <h4>Visualizações disponíveis</h4><div className="checks one-col compact-checks-v3 task-view-visibility-checks">
+        <label><input type="checkbox" checked={draft.panels?.visible?.kanban===true} onChange={e=>toggleDefaultTaskViewVisibility('kanban',e.target.checked)}/>Exibir Kanban</label>
+        <label><input type="checkbox" checked={draft.panels?.visible?.calendar===true} onChange={e=>toggleDefaultTaskViewVisibility('calendar',e.target.checked)}/>Exibir Calendário</label>
+        <label><input type="checkbox" checked={draft.panels?.visible?.tasks===true} onChange={e=>toggleDefaultTaskViewVisibility('tasks',e.target.checked)}/>Exibir Listas</label>
+      </div>
       <h4>Kanban</h4><div className="checks one-col compact-checks-v3">{KANBAN_PERMISSION_ITEMS.map(item=><label key={`kanban:${item.id}`}><input type="checkbox" checked={draft.kanban?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
       <h4>Calendário</h4><div className="checks one-col compact-checks-v3">{CALENDAR_PERMISSION_ITEMS.map(item=><label key={`calendar:${item.id}`}><input type="checkbox" checked={draft.calendar?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
       <h4>Listas</h4><div className="checks one-col compact-checks-v3">{TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={`lists:${item.id}`}><input type="checkbox" checked={draft.tasksList?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
