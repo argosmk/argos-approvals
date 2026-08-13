@@ -2577,6 +2577,9 @@ function App(){
   useEffect(()=>{ if(cloudError) setDismissCloudAlert(false); },[cloudError]);
   useEffect(()=>{ if(realtimeConflict) setDismissRealtimeAlert(false); },[realtimeConflict?.taskId,realtimeConflict?.field]);
   const taskSyncQueueRef=useRef(Promise.resolve());
+  const taskSyncBaseRef=useRef(null);
+  const taskSyncDesiredRef=useRef(null);
+  const taskSyncRunningRef=useRef(false);
   const notificationSyncQueueRef=useRef(Promise.resolve());
   const notificationAlertBaselineRef=useRef(null);
   const notificationAudioContextRef=useRef(null);
@@ -2592,6 +2595,17 @@ function App(){
   const pendingTaskDeletesRef=useRef(new Set());
 
   const sameSyncValue=(a,b)=>JSON.stringify(a??null)===JSON.stringify(b??null);
+
+  useEffect(()=>{
+    const warnBeforeUnload=(event)=>{
+      const hasPending=taskSyncBusyRef.current>0 || !!taskSyncBaseRef.current || !!taskSyncDesiredRef.current || pendingTaskFieldsRef.current.size>0 || pendingTaskLogsRef.current.size>0 || pendingTaskCreatesRef.current.size>0 || pendingTaskDeletesRef.current.size>0;
+      if(!hasPending) return;
+      event.preventDefault();
+      event.returnValue='';
+    };
+    window.addEventListener('beforeunload',warnBeforeUnload);
+    return()=>window.removeEventListener('beforeunload',warnBeforeUnload);
+  },[]);
 
   function captureTaskMutationProtection(prev=[],next=[]){
     const previousById=new Map((prev||[]).map(task=>[String(task.id),task]));
@@ -2677,6 +2691,62 @@ function App(){
         await new Promise(resolve=>setTimeout(resolve,waitMs));
       }
     }
+  }
+
+  async function drainTaskSync(organizationId){
+    if(taskSyncRunningRef.current) return taskSyncQueueRef.current;
+    taskSyncRunningRef.current=true;
+    taskSyncBusyRef.current=1;
+
+    const run=(async()=>{
+      try{
+        while(taskSyncBaseRef.current && taskSyncDesiredRef.current){
+          const base=taskSyncBaseRef.current;
+          const desired=taskSyncDesiredRef.current;
+
+          if(sameSyncValue(base,desired)){
+            if(taskSyncDesiredRef.current===desired){
+              taskSyncBaseRef.current=null;
+              taskSyncDesiredRef.current=null;
+              break;
+            }
+            continue;
+          }
+
+          await syncTaskDeltaReliably(organizationId,base,desired);
+          taskSyncBaseRef.current=desired;
+
+          // Se houve novas digitações enquanto a gravação estava em andamento,
+          // não reproduzimos versões intermediárias: partimos da versão confirmada
+          // diretamente para o snapshot local mais recente.
+          if(taskSyncDesiredRef.current!==desired) continue;
+
+          try{
+            const latest=await loadTaskRecords(organizationId);
+            applyRemoteTasks(latest);
+          }catch(err){
+            console.warn('task post-save confirmation refresh failed',err);
+          }
+
+          // Uma alteração pode chegar durante a leitura de confirmação.
+          // Nesse caso, preservamos a base confirmada e continuamos o ciclo.
+          if(taskSyncDesiredRef.current!==desired) continue;
+
+          taskSyncBaseRef.current=null;
+          taskSyncDesiredRef.current=null;
+          setRealtimeConflict(null);
+          break;
+        }
+      }finally{
+        taskSyncRunningRef.current=false;
+        taskSyncBusyRef.current=0;
+      }
+    })();
+
+    taskSyncQueueRef.current=run.catch(err=>{
+      console.error('task sync drain failed',err);
+    });
+    return run;
   }
 
   function applyRemoteTasks(latest){
@@ -3006,6 +3076,7 @@ function App(){
 
     async function refreshChangedTasks(){
       if(!alive){ return; }
+      if(taskSyncBusyRef.current>0){ refreshAgain=true; return; }
       if(refreshInFlight){ refreshAgain=true; return; }
       refreshInFlight=true;
       try{
@@ -3017,7 +3088,7 @@ function App(){
         console.warn('task realtime refresh failed',err);
       }finally{
         refreshInFlight=false;
-        if(refreshAgain){ refreshAgain=false; refreshChangedTasks(); }
+        if(refreshAgain && taskSyncBusyRef.current===0){ refreshAgain=false; refreshChangedTasks(); }
       }
     }
 
@@ -3136,21 +3207,16 @@ function App(){
     setTasksState(prev=>{
       const next = typeof v === 'function' ? v(prev) : v;
       if(isSupabaseConfigured && taskTablesReadyRef.current && auth?.organizationId){
-        const protection=captureTaskMutationProtection(prev,next);
-        const organizationId=auth.organizationId;
-        taskSyncBusyRef.current += 1;
-        taskSyncQueueRef.current = taskSyncQueueRef.current
-          .catch(()=>{})
-          .then(()=>syncTaskDeltaReliably(organizationId,prev,next))
-          .then(async()=>{
-            releaseTaskMutationProtection(protection);
-            setRealtimeConflict(null);
-            try{
-              const latest=await loadTaskRecords(organizationId);
-              applyRemoteTasks(latest);
-            }catch(err){ console.warn('task post-save refresh failed',err); }
-          })
-          .finally(()=>{ taskSyncBusyRef.current=Math.max(0,taskSyncBusyRef.current-1); });
+        // Proteção permanece até o próprio banco devolver o valor gravado.
+        // Não liberamos mais uma alteração apenas porque a chamada HTTP terminou.
+        captureTaskMutationProtection(prev,next);
+
+        if(!taskSyncBaseRef.current) taskSyncBaseRef.current=prev;
+        taskSyncDesiredRef.current=next;
+
+        if(!taskSyncRunningRef.current){
+          drainTaskSync(auth.organizationId).catch(err=>console.error('task sync start failed',err));
+        }
       } else if(!isSupabaseConfigured){
         save('argos_tasks_r8', next);
       }
@@ -4591,6 +4657,31 @@ function specialDatesFor(ds){
   const variable = variableSpecialDates(year).filter(x=>x.date===ds);
   return [...fixed, ...variable];
 }
+const MAJOR_SPECIAL_DATE_NAMES = new Set([
+  'Carnaval',
+  'Páscoa',
+  'Dia da Mulher',
+  'Dia do Consumidor',
+  'Dia das Mães',
+  'Dia dos Namorados',
+  'Father’s Day',
+  'Dia dos Pais',
+  'Dia das Crianças',
+  'Valentine’s Day',
+  'Halloween',
+  'Thanksgiving',
+  'Black Friday',
+  'Cyber Monday',
+  'Véspera de Natal',
+  'Natal',
+  'Réveillon'
+]);
+function isMajorSpecialDate(item){
+  if(!item) return false;
+  const type=String(item.type||'').toLowerCase();
+  if(type.includes('feriado')) return true;
+  return MAJOR_SPECIAL_DATE_NAMES.has(String(item.name||''));
+}
 function SpecialDateMarks({items=[]}){
   if(!items.length) return null;
   return <div className="special-date-marks" title={items.map(i=>`${i.name} (${i.type})${i.market==='us'?' • EUA':''}`).join(' • ')}>{items.slice(0,2).map((item,idx)=><span className={'special-date-chip type-'+String(item.type||'').replace(/[^a-z0-9]/gi,'-').toLowerCase()+(item.market==='us'?' market-us':'')} key={item.name+idx}><i>{item.icon||'✦'}</i><em>{item.name}</em>{item.market==='us'&&<strong>EUA</strong>}</span>)}{items.length>2&&<span className="special-date-more">+{items.length-2}</span>}</div>
@@ -4633,7 +4724,7 @@ function CalendarHeaderControls({view,selectedDay,setSelectedDay,countLabel,titl
     {trailing&&<div className="calendar-header-trailing">{trailing}</div>}
   </div>;
 }
-function MonthView({selectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); return <div className="month"><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className="day-headline"><button className="day-num" onClick={()=>setDay(ds)}>{d.getDate()}</button>{specials.length>0&&<button className={'special-date-dot'+(hasUsSpecial?' market-us':'')} onClick={()=>setDay(ds)} title={specials.map(i=>i.name).join(' • ')}>✦</button>}</div><SpecialDateMarks items={specials}/>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
+function MonthView({selectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); return <div className="month"><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); const hasMajorSpecial=specials.some(isMajorSpecialDate); const specialTitle=specials.map(i=>`${i.name}${i.market==='us'?' • EUA':''}`).join(' • '); return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date':'')} key={ds}><div className={'day-headline month-day-headline'+(specials.length?' has-month-special':'')+(hasMajorSpecial?' has-major-month-special':'')} title={specialTitle||undefined} role="button" tabIndex={0} onClick={()=>setDay(ds)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setDay(ds)}}}>{hasMajorSpecial?<span className="month-special-star-mark" aria-label={`Data importante: ${specialTitle}`}>✦</span>:<span className="month-special-star-space" aria-hidden="true"/>}<span className="day-num month-day-num">{d.getDate()}</span></div>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
 function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div className="calendar-period-content"><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
 function DayView({day,tasks,companies,users,statusById,open,permissions={}}){ 
   const list=tasks.filter(t=>t.postDate===day); 
@@ -4988,6 +5079,10 @@ function RichTextField({label,value,onChange,placeholder='Escreva aqui...',class
     const editor=editorRef.current;
     const incoming=String(value||'');
     if(!editor || incoming===lastValueRef.current) return;
+    // Uma atualização remota nunca pode reescrever o conteúdo enquanto a pessoa
+    // está digitando neste editor. O texto visível local continua sendo a fonte
+    // de verdade até o blur/emit confirmar a versão completa.
+    if(document.activeElement===editor) return;
     editor.innerHTML=sanitizeRichText(richTextHtml(incoming));
     lastValueRef.current=incoming;
   },[value]);
@@ -8941,6 +9036,343 @@ if (typeof document !== 'undefined') {
   style274.textContent = ARGOS_ROUND274_DOCS_CHARTS_CSS;
 }
 
+
+const ARGOS_ROUND276_MONTH_SPECIAL_DATES_CSS = `
+/* Mês: referência forte sem ocupar linhas de conteúdo. */
+.main .calendar-main .month-day-headline,
+.main .calendar-embedded-view .month-day-headline{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 24px!important;
+  align-items:center!important;
+  gap:6px!important;
+  min-height:26px!important;
+  margin:0 0 3px!important;
+}
+.main .calendar-main .month-day-num,
+.main .calendar-embedded-view .month-day-num{
+  grid-column:2!important;
+  justify-self:end!important;
+  display:grid!important;
+  place-items:center!important;
+  width:24px!important;
+  min-width:24px!important;
+  height:24px!important;
+  min-height:24px!important;
+  margin:0!important;
+  padding:0!important;
+  border:1px solid transparent!important;
+  border-radius:999px!important;
+  box-sizing:border-box!important;
+}
+.main .calendar-main .month-day-num.special-day-number,
+.main .calendar-embedded-view .month-day-num.special-day-number{
+  border-color:rgba(var(--accent-rgb),.72)!important;
+  background:rgba(var(--accent-rgb),.10)!important;
+  color:var(--accent-pale)!important;
+}
+.main .calendar-main .month-special-indicator,
+.main .calendar-embedded-view .month-special-indicator{
+  grid-column:1!important;
+  justify-self:start!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:3px!important;
+  width:auto!important;
+  min-width:28px!important;
+  height:22px!important;
+  min-height:22px!important;
+  margin:0!important;
+  padding:0 7px!important;
+  border:1px solid rgba(var(--accent-rgb),.62)!important;
+  border-radius:999px!important;
+  background:rgba(var(--accent-rgb),.11)!important;
+  color:var(--gold-2)!important;
+  box-shadow:none!important;
+  line-height:1!important;
+}
+.main .calendar-main .month-special-indicator:hover,
+.main .calendar-embedded-view .month-special-indicator:hover{
+  border-color:rgba(var(--accent-rgb),.92)!important;
+  background:rgba(var(--accent-rgb),.17)!important;
+  color:var(--accent-pale)!important;
+}
+.main .calendar-main .month-special-star,
+.main .calendar-embedded-view .month-special-star{
+  font-size:12px!important;
+  line-height:1!important;
+}
+.main .calendar-main .month-special-count,
+.main .calendar-embedded-view .month-special-count{
+  font-size:9px!important;
+  font-weight:700!important;
+  line-height:1!important;
+}
+.main .calendar-main .month-special-spacer,
+.main .calendar-embedded-view .month-special-spacer{
+  grid-column:1!important;
+  min-width:28px!important;
+  height:22px!important;
+}
+/* Na visão mensal, os nomes completos deixam de ocupar espaço. Semana/Dia preservados. */
+.main .calendar-main .month .special-date-marks,
+.main .calendar-embedded-view .month .special-date-marks{
+  display:none!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style276 = document.getElementById('argos-round276-month-special-dates');
+  if (!style276) {
+    style276 = document.createElement('style');
+    style276.id = 'argos-round276-month-special-dates';
+    document.head.appendChild(style276);
+  }
+  style276.textContent = ARGOS_ROUND276_MONTH_SPECIAL_DATES_CSS;
+}
+
+
+
+const ARGOS_ROUND277_MONTH_SPECIAL_STRIP_CSS = `
+/* Round277: faixa superior fixa para datas especiais na visão Mês. */
+.main .calendar-main .month-day-headline,
+.main .calendar-embedded-view .month-day-headline{
+  display:grid!important;
+  grid-template-columns:22px minmax(0,1fr) 24px!important;
+  align-items:center!important;
+  gap:0!important;
+  min-height:28px!important;
+  margin:-4px -6px 5px!important;
+  padding:0 6px!important;
+  border-bottom:1px solid rgba(255,255,255,.065)!important;
+  background:transparent!important;
+  border-radius:0!important;
+  box-sizing:border-box!important;
+}
+.main .calendar-main .month-day-headline.has-month-special,
+.main .calendar-embedded-view .month-day-headline.has-month-special{
+  background:rgba(var(--accent-rgb),.085)!important;
+  border-bottom-color:rgba(var(--accent-rgb),.28)!important;
+}
+.main .calendar-main .month-day-headline.has-major-month-special,
+.main .calendar-embedded-view .month-day-headline.has-major-month-special{
+  background:rgba(var(--accent-rgb),.13)!important;
+  border-bottom-color:rgba(var(--accent-rgb),.42)!important;
+}
+.main .calendar-main .month-day-num,
+.main .calendar-embedded-view .month-day-num{
+  grid-column:3!important;
+  justify-self:end!important;
+  display:block!important;
+  width:24px!important;
+  min-width:24px!important;
+  height:24px!important;
+  min-height:24px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  box-shadow:none!important;
+  line-height:24px!important;
+  text-align:right!important;
+}
+.main .calendar-main .month-day-headline.has-month-special .month-day-num,
+.main .calendar-embedded-view .month-day-headline.has-month-special .month-day-num{
+  color:var(--accent-pale)!important;
+}
+.main .calendar-main .month-special-star-button,
+.main .calendar-embedded-view .month-special-star-button{
+  grid-column:1!important;
+  justify-self:start!important;
+  display:grid!important;
+  place-items:center!important;
+  width:18px!important;
+  min-width:18px!important;
+  height:22px!important;
+  min-height:22px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:var(--accent-pale)!important;
+  box-shadow:none!important;
+  font-size:12px!important;
+  line-height:1!important;
+}
+.main .calendar-main .month-special-star-button:hover,
+.main .calendar-embedded-view .month-special-star-button:hover{
+  background:transparent!important;
+  color:var(--accent-pale)!important;
+  transform:scale(1.08)!important;
+}
+.main .calendar-main .month-special-star-space,
+.main .calendar-embedded-view .month-special-star-space{
+  grid-column:1!important;
+  width:18px!important;
+  height:22px!important;
+}
+/* Desativa por completo os círculos/pílulas da Round276 na visão mensal. */
+.main .calendar-main .month-special-indicator,
+.main .calendar-embedded-view .month-special-indicator,
+.main .calendar-main .month-special-count,
+.main .calendar-embedded-view .month-special-count,
+.main .calendar-main .month-special-spacer,
+.main .calendar-embedded-view .month-special-spacer{
+  display:none!important;
+}
+.main .calendar-main .month-day-num.special-day-number,
+.main .calendar-embedded-view .month-day-num.special-day-number{
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style277 = document.getElementById('argos-round277-month-special-strip');
+  if (!style277) {
+    style277 = document.createElement('style');
+    style277.id = 'argos-round277-month-special-strip';
+    document.head.appendChild(style277);
+  }
+  style277.textContent = ARGOS_ROUND277_MONTH_SPECIAL_STRIP_CSS;
+}
+
+
+
+const ARGOS_ROUND278_MAJOR_DATE_STAR_CSS = `
+/* Round278: estrela somente para datas realmente relevantes, integrada à faixa. */
+.main .calendar-main .month-special-star-mark,
+.main .calendar-embedded-view .month-special-star-mark{
+  grid-column:1!important;
+  justify-self:start!important;
+  align-self:center!important;
+  display:inline-block!important;
+  width:auto!important;
+  height:auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:var(--accent-pale)!important;
+  font-size:12px!important;
+  line-height:1!important;
+  pointer-events:none!important;
+}
+.main .calendar-main .month-special-star-space,
+.main .calendar-embedded-view .month-special-star-space{
+  grid-column:1!important;
+  width:12px!important;
+  min-width:12px!important;
+  height:1px!important;
+  min-height:1px!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style278 = document.getElementById('argos-round278-major-date-star');
+  if (!style278) {
+    style278 = document.createElement('style');
+    style278.id = 'argos-round278-major-date-star';
+    document.head.appendChild(style278);
+  }
+  style278.textContent = ARGOS_ROUND278_MAJOR_DATE_STAR_CSS;
+}
+
+
+const ARGOS_ROUND279_MONTH_DAY_STRIP_CLICK_CSS = `
+.main .calendar-main .month-day-headline,
+.main .calendar-embedded-view .month-day-headline{
+  cursor:pointer!important;
+}
+.main .calendar-main .month-day-headline:hover,
+.main .calendar-embedded-view .month-day-headline:hover{
+  background:rgba(var(--accent-rgb),.055)!important;
+}
+.main .calendar-main .month-day-headline.has-month-special:hover,
+.main .calendar-embedded-view .month-day-headline.has-month-special:hover{
+  background:rgba(var(--accent-rgb),.12)!important;
+}
+.main .calendar-main .month-day-headline.has-major-month-special:hover,
+.main .calendar-embedded-view .month-day-headline.has-major-month-special:hover{
+  background:rgba(var(--accent-rgb),.17)!important;
+}
+.main .calendar-main .month-day-headline:focus-visible,
+.main .calendar-embedded-view .month-day-headline:focus-visible{
+  outline:1px solid rgba(var(--accent-rgb),.55)!important;
+  outline-offset:-1px!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style279 = document.getElementById('argos-round279-month-day-strip-click');
+  if (!style279) {
+    style279 = document.createElement('style');
+    style279.id = 'argos-round279-month-day-strip-click';
+    document.head.appendChild(style279);
+  }
+  style279.textContent = ARGOS_ROUND279_MONTH_DAY_STRIP_CLICK_CSS;
+}
+
+
+
+const ARGOS_ROUND280_MONTH_TOP_TIGHTER_CSS = `
+/* Round280: aproxima a primeira linha de datas do cabeçalho do calendário */
+.main .calendar-main .day,
+.main .calendar-embedded-view .day{
+  padding-top:0!important;
+}
+.main .calendar-main .month-day-headline,
+.main .calendar-embedded-view .month-day-headline{
+  min-height:26px!important;
+  margin:0 -6px 4px!important;
+}
+.main .calendar-main .weeknames,
+.main .calendar-embedded-view .weeknames{
+  margin-bottom:0!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style280 = document.getElementById('argos-round280-month-top-tighter');
+  if (!style280) {
+    style280 = document.createElement('style');
+    style280.id = 'argos-round280-month-top-tighter';
+    document.head.appendChild(style280);
+  }
+  style280.textContent = ARGOS_ROUND280_MONTH_TOP_TIGHTER_CSS;
+}
+
+
+
+const ARGOS_ROUND281_MONTH_HEADER_ATTACHED_CSS = `
+/* Round281: cola visualmente a primeira faixa do mês ao cabeçalho */
+.main .calendar-main .days,
+.main .calendar-embedded-view .days{
+  margin-top:-1px!important;
+}
+.main .calendar-main .day,
+.main .calendar-embedded-view .day{
+  padding:0 6px 6px!important;
+}
+.main .calendar-main .month-day-headline,
+.main .calendar-embedded-view .month-day-headline{
+  min-height:26px!important;
+  margin:-1px -6px 4px!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style281 = document.getElementById('argos-round281-month-header-attached');
+  if (!style281) {
+    style281 = document.createElement('style');
+    style281.id = 'argos-round281-month-header-attached';
+    document.head.appendChild(style281);
+  }
+  style281.textContent = ARGOS_ROUND281_MONTH_HEADER_ATTACHED_CSS;
+}
+
 createRoot(document.getElementById('root')).render(<RootApp/>);
 
 const ARGOS_ROUND45_CALENDAR_TITLE_MOBILE_CSS = `
@@ -12594,4 +13026,31 @@ if(typeof document!=='undefined'){
   let style233=document.getElementById('argos-round233-unified-panel-headers');
   if(!style233){style233=document.createElement('style');style233.id='argos-round233-unified-panel-headers';document.head.appendChild(style233)}
   style233.textContent=ARGOS_ROUND233_UNIFIED_PANEL_HEADERS_CSS;
+}
+
+const ARGOS_ROUND282_MONTH_GAP_ROOT_CAUSE_CSS = `
+/* Round282: remove a causa real do vão entre cabeçalho e primeira linha do mês.
+   Round224 aplica gap:12px em todo filho direto de .calendar-main; no Mês isso
+   separava .weeknames de .days. Semana/Dia permanecem intactos. */
+.main .calendar-main > .month,
+.main .calendar-embedded-view .calendar-main > .month{
+  gap:0!important;
+  row-gap:0!important;
+}
+.main .calendar-main > .month > .weeknames,
+.main .calendar-main > .month > .days,
+.main .calendar-embedded-view .calendar-main > .month > .weeknames,
+.main .calendar-embedded-view .calendar-main > .month > .days{
+  margin-top:0!important;
+  margin-bottom:0!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style282 = document.getElementById('argos-round282-month-gap-root-cause');
+  if (!style282) {
+    style282 = document.createElement('style');
+    style282.id = 'argos-round282-month-gap-root-cause';
+    document.head.appendChild(style282);
+  }
+  style282.textContent = ARGOS_ROUND282_MONTH_GAP_ROOT_CAUSE_CSS;
 }
