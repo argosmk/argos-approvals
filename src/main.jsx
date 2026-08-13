@@ -554,7 +554,8 @@ function builtInAccessDefaultForRole(role){
       order:panelIds,
     },
     visibleStatuses:normalizedRole==='admin'?[]:(normalizedRole==='team'?[...TEAM_DEFAULT]:[...CLIENT_DEFAULT]),
-    notificationPrefs:normalizedRole==='client'?[]:[...NOTIFICATION_VISIBLE_EVENTS],
+    visibleTypes:normalizedRole==='admin'?[]:[...TASK_TYPES],
+    notificationPrefs:defaultNotificationPrefsForRole(normalizedRole),
     notificationStatusPrefs:{},
     notificationPanel:builtInNotificationPanelPermissionsForRole(normalizedRole),
     dashboard:{visible:fullDashboardVisibility()},
@@ -578,7 +579,8 @@ function accessDefaultForRole(system,role){
       order:Array.isArray(saved.panels?.order)?saved.panels.order:builtIn.panels.order,
     },
     visibleStatuses:Array.isArray(saved.visibleStatuses)?saved.visibleStatuses:builtIn.visibleStatuses,
-    notificationPrefs:Array.isArray(saved.notificationPrefs)?saved.notificationPrefs:builtIn.notificationPrefs,
+    visibleTypes:Array.isArray(saved.visibleTypes)?saved.visibleTypes:builtIn.visibleTypes,
+    notificationPrefs:Array.isArray(saved.notificationPrefs)?((role==='admin'&&saved.notificationPrefs.length===BASE_NOTIFICATION_VISIBLE_EVENTS.length&&BASE_NOTIFICATION_VISIBLE_EVENTS.every(ev=>saved.notificationPrefs.includes(ev)))?[...saved.notificationPrefs,CLIENT_REQUEST_NOTIFICATION_EVENT]:saved.notificationPrefs):builtIn.notificationPrefs,
     notificationStatusPrefs:saved.notificationStatusPrefs&&typeof saved.notificationStatusPrefs==='object'?saved.notificationStatusPrefs:builtIn.notificationStatusPrefs,
     notificationPanel:{...builtIn.notificationPanel,...(saved.notificationPanel||{})},
     dashboard:{
@@ -609,6 +611,7 @@ function resolveUserAccess(user,system){
   return {
     ...user,
     visibleStatuses:inheritance.statuses==='custom'?(user.visibleStatuses||[]):defaults.visibleStatuses,
+    visibleTypes:inheritance.types==='custom'?(user.visibleTypes||[]):defaults.visibleTypes,
     notificationPrefs:inheritance.notifications==='custom'?(user.notificationPrefs||[]):defaults.notificationPrefs,
     notificationStatusPrefs:inheritance.notifications==='custom'?(user.notificationStatusPrefs||{}):defaults.notificationStatusPrefs,
     notificationPanelPermissions:inheritance.notifications==='custom'
@@ -874,7 +877,7 @@ const ARGOS_UI_POLISH_CSS = `
 .docs-folder-row{display:grid;grid-template-columns:24px minmax(0,1fr) 22px 22px 26px 26px;align-items:center;gap:1px;padding:2px 0;}
 .docs-folder-row button{border:0!important;background:transparent!important;color:var(--text)!important;box-shadow:none!important;padding:5px!important;min-height:0!important;}
 .docs-folder-name{text-align:left!important;font-weight:700!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.docs-folder-add{color:#e1b12c!important;font-size:18px!important;}
+.docs-folder-add{color:var(--gold)!important;font-size:18px!important;}
 .docs-folder-delete{color:var(--muted)!important;font-size:15px!important;}
 .docs-folder-delete:hover{color:#ff6b6b!important;}
 .docs-folder-move,.docs-doc-move{color:var(--muted)!important;font-size:11px!important;}
@@ -1028,7 +1031,7 @@ const ARGOS_UI_POLISH_CSS = `
 .argos-status-pick-dot{width:8px!important;height:8px!important;min-width:8px!important;border-radius:50%!important;display:inline-block!important;flex:0 0 8px!important;margin:0!important;}
 .argos-status-pick-name{font-size:13px!important;font-weight:500!important;line-height:1.2!important;white-space:nowrap!important;margin:0!important;padding:0!important;}
 .task-title-input{width:100%!important;max-width:100%!important;font-size:28px!important;font-weight:800!important;line-height:1.15!important;background:transparent!important;color:inherit!important;border:1px solid transparent!important;border-radius:10px!important;padding:6px 8px!important;margin:0!important;box-sizing:border-box!important;}
-.task-title-input:focus{border-color:rgba(225,177,44,.55)!important;background:rgba(255,255,255,.03)!important;outline:none!important;}
+.task-title-input:focus{border-color:rgba(var(--accent-rgb),.55)!important;background:rgba(255,255,255,.03)!important;outline:none!important;}
 .task-title{display:flex!important;align-items:center!important;gap:12px!important;}
 .task-title h1{margin:0!important;}
 .panel-config label{display:block!important;width:100%!important;box-sizing:border-box!important;margin-bottom:10px!important;}
@@ -1488,9 +1491,16 @@ const DEFAULT_STATUS = [
 ];
 const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
-const NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
+const CLIENT_REQUEST_NOTIFICATION_EVENT = 'Solicitações de clientes';
+const BASE_NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
+const NOTIFICATION_VISIBLE_EVENTS = [...BASE_NOTIFICATION_VISIBLE_EVENTS,CLIENT_REQUEST_NOTIFICATION_EVENT];
 const NOTIFICATION_EVENTS = NOTIFICATION_VISIBLE_EVENTS;
 const BLOCKED_NOTIFICATION_EVENTS = new Set(['Nova tarefa atribuída','Mudança de responsável','Alteração de status','Aprovação do cliente','Solicitação de alteração','Tarefa reaberta']);
+function defaultNotificationPrefsForRole(role){
+  if(role==='client') return [];
+  if(role==='admin') return [...NOTIFICATION_VISIBLE_EVENTS];
+  return [...BASE_NOTIFICATION_VISIBLE_EVENTS];
+}
 const SYSTEM_NOISE_PATTERNS = [/timer/i,/tarefa acessada/i,/inatividade/i,/fechar a tela/i,/sair da tarefa/i,/trocar de tarefa/i];
 function isSystemNoise(text=''){ return SYSTEM_NOISE_PATTERNS.some(rx=>rx.test(String(text||''))); }
 const LOG_NOISE_PATTERNS = [/timer/i,/tarefa acessada/i,/inatividade/i,/fechar a tela/i,/sair da tarefa/i,/trocar de tarefa/i,/campo/i,/copy/i,/legenda/i,/links? de visualiza/i,/instruções/i,/instrucoes/i];
@@ -1503,7 +1513,7 @@ function wantsNotification(user, event, statusId){
   }
   if(BLOCKED_NOTIFICATION_EVENTS.has(event)) return false;
   if(!NOTIFICATION_VISIBLE_EVENTS.includes(event)) return false;
-  const prefs=user.notificationPrefs||NOTIFICATION_VISIBLE_EVENTS;
+  const prefs=Array.isArray(user.notificationPrefs)?user.notificationPrefs:defaultNotificationPrefsForRole(user.role);
   return prefs.includes(event);
 }
 
@@ -1585,7 +1595,7 @@ function mergeProfileWithWorkspaceUser(profile, payload){
     visibleStatuses: existing?.accessInheritance?.statuses==='custom'
       ? (existing.visibleStatuses || [])
       : ((profile?.visibleStatuses&&profile.visibleStatuses.length) ? profile.visibleStatuses : (existing.visibleStatuses || [])),
-    notificationPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationPrefs || NOTIFICATION_EVENTS) : (existing.notificationPrefs || profile?.notificationPrefs || NOTIFICATION_EVENTS),
+    notificationPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationPrefs || defaultNotificationPrefsForRole(profile?.role)) : (existing.notificationPrefs || profile?.notificationPrefs || defaultNotificationPrefsForRole(profile?.role)),
     notificationStatusPrefs: profile?.notificationPrefsFromProfile ? (profile.notificationStatusPrefs || {}) : (existing.notificationStatusPrefs || profile?.notificationStatusPrefs || {}),
     socialInstagram: profile?.socialInstagram ?? existing.socialInstagram ?? '',
     socialStatus: profile?.socialStatus ?? existing.socialStatus ?? '',
@@ -2006,13 +2016,26 @@ function readyFolderLink(task){
 function excelXmlEscape(value){
   return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
 }
-function exportMonthTasksToExcel(tasks,selectedDay){
+function exportCalendarTasksToExcel(tasks,selectedDay,view='month'){
   const current=dObj(selectedDay)||dObj(todayStr());
-  const year=current.getFullYear(), month=current.getMonth();
+  const start=new Date(current), end=new Date(current);
+  if(view==='month'){
+    start.setDate(1); start.setHours(0,0,0,0);
+    end.setFullYear(current.getFullYear(), current.getMonth()+1, 0); end.setHours(23,59,59,999);
+  }else if(view==='week'){
+    const day=current.getDay();
+    const diffToMonday=day===0?-6:1-day;
+    start.setDate(current.getDate()+diffToMonday); start.setHours(0,0,0,0);
+    end.setTime(start.getTime()); end.setDate(start.getDate()+6); end.setHours(23,59,59,999);
+  }else{
+    start.setHours(0,0,0,0);
+    end.setHours(23,59,59,999);
+  }
   const rows=(tasks||[])
-    .filter(task=>{const date=dObj(task?.postDate); return date&&date.getFullYear()===year&&date.getMonth()===month;})
+    .filter(task=>{const date=dObj(task?.postDate); return date&&date>=start&&date<=end;})
     .sort((a,b)=>String(a.postDate||'').localeCompare(String(b.postDate||''))||String(a.title||'').localeCompare(String(b.title||''),'pt-BR'));
-  if(!rows.length){ alert('Não há tarefas neste mês para exportar.'); return; }
+  const periodLabel=view==='month'?'neste mês':view==='week'?'nesta semana':'neste dia';
+  if(!rows.length){ alert(`Não há tarefas ${periodLabel} para exportar.`); return; }
   const cell=(value,style='Text',href='')=>`<Cell ss:StyleID="${style}"${href?` ss:HRef="${excelXmlEscape(href)}"`:''}><Data ss:Type="String">${excelXmlEscape(value)}</Data></Cell>`;
   const tableRows=rows.map(task=>{
     const link=readyFolderLink(task);
@@ -2030,12 +2053,18 @@ function exportMonthTasksToExcel(tasks,selectedDay){
 </Styles>
 <Worksheet ss:Name="Posts"><Table ss:ExpandedColumnCount="5" ss:ExpandedRowCount="${rows.length+1}" x:FullColumns="1" x:FullRows="1"><Column ss:Width="82"/><Column ss:Width="190"/><Column ss:Width="330"/><Column ss:Width="330"/><Column ss:Width="260"/><Row ss:Height="24">${cell('Data do post','Header')}${cell('Título','Header')}${cell('Copy','Header')}${cell('Legenda','Header')}${cell('Pasta Pronto','Header')}</Row>${tableRows}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><Selected/><FreezePanes/><FrozenNoSplit/><SplitHorizontal>1</SplitHorizontal><TopRowBottomPane>1</TopRowBottomPane><ActivePane>2</ActivePane><ProtectObjects>False</ProtectObjects><ProtectScenarios>False</ProtectScenarios></WorksheetOptions><AutoFilter x:Range="R1C1:R${rows.length+1}C5" xmlns="urn:schemas-microsoft-com:office:excel"/></Worksheet>
 </Workbook>`;
-  const blob=new Blob(['\ufeff',xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const blob=new Blob(['﻿',xml],{type:'application/vnd.ms-excel;charset=utf-8'});
   const url=URL.createObjectURL(blob), anchor=document.createElement('a');
-  const safeMonth=monthLabel(selectedDay).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'_').replace(/^_|_$/g,'').toLowerCase();
-  anchor.href=url; anchor.download=`posts_${safeMonth}.xls`; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+  const safeStamp=(view==='month'
+    ? monthLabel(selectedDay)
+    : view==='week'
+      ? `semana_${fmtDate(dateKeyLocal(start)).replace(/\//g,'-')}_a_${fmtDate(dateKeyLocal(end)).replace(/\//g,'-')}`
+      : fmtDate(selectedDay).replace(/\//g,'-')
+    ).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9_-]+/gi,'_').replace(/^_|_$/g,'').toLowerCase();
+  anchor.href=url; anchor.download=`posts_${safeStamp}.xls`; document.body.appendChild(anchor); anchor.click(); anchor.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+
 function RichTextDisplay({value,className=''}){
   if(!isRichTextValue(value)) return <span className={className}>{linkify(value)}</span>;
   return <div className={'rich-text-display '+className} dangerouslySetInnerHTML={{__html:sanitizeRichText(richTextHtml(value))}}/>;
@@ -2062,6 +2091,8 @@ function canUserAccessTask(task, user, statuses){
   if(user.role === 'admin') return true;
   const allowedStatuses = user.visibleStatuses || [];
   if(!allowedStatuses.includes(task.status)) return false;
+  const allowedTypes = Array.isArray(user.visibleTypes) ? user.visibleTypes : TASK_TYPES;
+  if(!allowedTypes.includes(task.type)) return false;
   if(user.role === 'team') return task.responsibleId === user.id;
   if(user.role === 'client') return (user.companyIds || []).includes(task.companyId);
   return false;
@@ -2130,7 +2161,7 @@ function taskPriorityGroup(task,statuses){
   return priorityText(task?.internalDate);
 }
 function taskDeadlineColor(task,statuses,statusById){
-  if(isScheduledTask(task,statuses) || isFinishedTask(task,statuses)) return statusById?.[task?.status]?.color || '#22c55e';
+  if(isFinishedTask(task,statuses)) return statusById?.[task?.status]?.color || '#22c55e';
   const cls=priorityClass(task?.internalDate);
   if(cls==='late') return '#ef4444';
   if(cls==='hot') return '#f97316';
@@ -2211,6 +2242,15 @@ function StatusVisibilityChecks({statuses,selected=[],onToggle}){
     </label>)}
   </div>
 }
+function TaskTypeVisibilityChecks({types=TASK_TYPES,selected=[],onToggle}){
+  return <div className="arg-vs-list-v2">
+    {types.map(type=><label className="arg-vs-row-v2" key={type}>
+      <input type="checkbox" checked={selected.includes(type)} onChange={e=>onToggle(type,e.target.checked)}/>
+      <span className="arg-vs-dot-v2" style={{background:'var(--accent)'}}></span>
+      <span className="arg-vs-name-v2">{type}</span>
+    </label>)}
+  </div>
+}
 
 function PublicSocialIcon({type}){
   const common={viewBox:'0 0 24 24',width:20,height:20,fill:'none','aria-hidden':true};
@@ -2280,6 +2320,8 @@ function PublicPortfolioTile({item,onReady,onUnavailable}){
     <div className="public-portfolio-mobile-actions" aria-hidden="true"><InstagramIcons/></div>
   </article>;
 }
+
+function BackToTopGlyph(){ return <svg className="back-top-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 15.5 12 8.5l7 7" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 
 function PublicPortfolioPage({slug='argos'}){
   const [data,setData]=useState(null);
@@ -2421,7 +2463,7 @@ function PublicPortfolioPage({slug='argos'}){
           </>
         : <section className="public-portfolio-empty"><h2>Novos trabalhos em breve</h2><p>O portfólio está sendo atualizado.</p></section>}
     </section>
-    {showBackToTop&&<button type="button" className="public-portfolio-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo">↑</button>}
+    {showBackToTop&&<button type="button" className="public-portfolio-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo"><BackToTopGlyph/></button>}
   </main>;
 }
 
@@ -2468,6 +2510,44 @@ if(typeof document!=='undefined'){
   style156C1.textContent=ARGOS_ROUND156C1_NOTIFICATION_BADGE_CSS;
 }
 
+function normalizeAccentColor(value){
+  const raw=String(value||'').trim();
+  return /^#[0-9a-f]{6}$/i.test(raw)?raw.toLowerCase():'#cbae6c';
+}
+function accentRgb(value){
+  const hex=normalizeAccentColor(value).slice(1);
+  return [parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)];
+}
+function accentVariant(value,amount=.14){
+  const rgb=accentRgb(value);
+  const mixed=rgb.map(channel=>Math.round(channel+(255-channel)*amount));
+  return '#'+mixed.map(channel=>channel.toString(16).padStart(2,'0')).join('');
+}
+function accentDarkVariant(value,amount=.34){
+  const rgb=accentRgb(value);
+  const mixed=rgb.map(channel=>Math.round(channel*(1-amount)));
+  return '#'+mixed.map(channel=>channel.toString(16).padStart(2,'0')).join('');
+}
+function accentContrast(value){
+  const [r,g,b]=accentRgb(value).map(v=>v/255);
+  const linear=[r,g,b].map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));
+  const luminance=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];
+  return luminance>.48?'#080808':'#ffffff';
+}
+function applySystemAccent(value){
+  if(typeof document==='undefined') return;
+  const accent=normalizeAccentColor(value);
+  const [r,g,b]=accentRgb(accent);
+  const root=document.documentElement;
+  root.style.setProperty('--accent',accent);
+  root.style.setProperty('--accent-rgb',`${r},${g},${b}`);
+  root.style.setProperty('--gold',accent);
+  root.style.setProperty('--gold-2',accentVariant(accent));
+  root.style.setProperty('--accent-dark',accentDarkVariant(accent));
+  root.style.setProperty('--accent-pale',accentVariant(accent,.52));
+  root.style.setProperty('--accent-contrast',accentContrast(accent));
+}
+
 function App(){
   const [users,setUsersState]=useState(()=>load('argos_users_r8', seedUsers));
   const [companies,setCompaniesState]=useState(()=>load('argos_companies_r8', seedCompanies));
@@ -2479,7 +2559,8 @@ function App(){
   const [auth,setAuth]=useState(null); const [viewAs,setViewAs]=useState(null); const [screen,setScreen]=useState(initialRoute.screen || 'dashboard');
   const [selectedTask,setSelectedTask]=useState(initialRoute.taskId || null); const [createOpen,setCreateOpen]=useState(false); const [form,setForm]=useState(null);
   const [globalSearch,setGlobalSearch]=useState('');
-  const [system,setSystemState]=useState(()=>load('argos_system_r18', { logo:'', title:'Painel de Aprovação' }));
+  const [system,setSystemState]=useState(()=>load('argos_system_r18', { logo:'', title:'Painel de Aprovação', accentColor:'#cbae6c' }));
+  useEffect(()=>{applySystemAccent(system?.accentColor);},[system?.accentColor]);
   const [cloudLoading,setCloudLoading]=useState(isSupabaseConfigured);
   const [cloudReady,setCloudReady]=useState(!isSupabaseConfigured);
   const [cloudError,setCloudError]=useState('');
@@ -3138,6 +3219,7 @@ function App(){
   const realAdmin=authUser.role==='admin'; const isAdmin=effectiveUser.role==='admin';
   const statusById=Object.fromEntries(statuses.map(s=>[s.id,s]));
   const visibleTasks=baseVisibleTasks(tasks,effectiveUser,statuses);
+  const effectiveTaskTypes=effectiveUser.role==='admin'?TASK_TYPES:(Array.isArray(effectiveUser.visibleTypes)?effectiveUser.visibleTypes:TASK_TYPES);
   async function reset(){
     const code = prompt('ATENÇÃO: esta ação pode apagar dados locais/reais do sistema. Use apenas se tiver certeza absoluta. Digite RESETAR para confirmar.');
     if(code !== 'RESETAR') return;
@@ -3442,7 +3524,7 @@ function App(){
       </div>}
       {selectedTask && (
         selectedTaskObj && selectedTaskAllowed
-          ? <TaskPage task={selectedTaskObj} tasks={tasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
+          ? <TaskPage task={selectedTaskObj} tasks={tasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} types={effectiveTaskTypes} statusById={statusById} updateTask={updateTask} addLog={addLog} back={closeTaskRoute} open={openTaskRoute} effectiveUser={effectiveUser} isAdmin={isAdmin}/>
           : <TaskAccessDenied back={closeTaskRoute}/>
       )}
       <div style={selectedTask ? {display:'none'} : undefined}>
@@ -3460,7 +3542,7 @@ function App(){
         {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} companies={companies} users={users} statuses={statuses} user={effectiveUser} auth={auth} alertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableAlerts={enableNotificationAlerts}/>} 
       </div>
     </main>
-    {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={TASK_TYPES} createTask={createTask} close={()=>setCreateOpen(false)} user={effectiveUser} permissions={effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role)}/>} 
+    {createOpen && <CreateModal form={form} setForm={setForm} companies={companies} users={users} statuses={statuses} types={effectiveTaskTypes} createTask={createTask} close={()=>setCreateOpen(false)} user={effectiveUser} permissions={effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role)}/>} 
   </div>
   </>
 }
@@ -3745,11 +3827,11 @@ function PanelTabsHeader({title,tabs=[],active,onChange,actions=null,className='
   return <div className={`panel-header-block ${className}`.trim()}><div className="panel-tabs-header"><div className="panel-tabs-heading"><h1>{title}</h1>{tabs.length>0&&<div className="panel-tabs" role="tablist">{tabs.map(([id,label])=>{const selected=active===id;return <span key={id} role="tab" tabIndex={0} aria-selected={selected} aria-current={selected?'page':undefined} className={`panel-tab-link ${selected?'active':''}`.trim()} onClick={()=>onChange(id)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onChange(id)}}}>{label}</span>})}</div>}</div></div>{actions&&<div className="panel-header-tools">{actions}</div>}</div>;
 }
 const ARGOS_ROUND218_ANALYTICS_CSS=`
-.panel-tabs-header{display:flex;align-items:center;gap:10px;min-width:0;margin:0 0 18px}.panel-tabs-header>h1{flex:0 0 210px;margin:0}.panel-tabs{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}.panel-tabs>button{min-height:38px;padding:9px 13px;border:1px solid rgba(225,177,44,.13);border-radius:8px;background:rgba(255,255,255,.025);color:rgba(255,255,255,.62);box-shadow:none}.panel-tabs>button:hover{color:#fff;border-color:rgba(225,177,44,.32);background:rgba(225,177,44,.055)}.panel-tabs-header .panel-tabs>button.active,.panel-tabs-header .panel-tabs>button[aria-current="page"],.panel-tabs-header .panel-tabs>button[aria-selected="true"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important;background-image:none!important;box-shadow:0 0 14px rgba(215,185,111,.16)!important}.panel-tabs-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.panel-tabs-header{display:flex;align-items:center;gap:10px;min-width:0;margin:0 0 18px}.panel-tabs-header>h1{flex:0 0 210px;margin:0}.panel-tabs{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}.panel-tabs>button{min-height:38px;padding:9px 13px;border:1px solid rgba(var(--accent-rgb),.13);border-radius:8px;background:rgba(255,255,255,.025);color:rgba(255,255,255,.62);box-shadow:none}.panel-tabs>button:hover{color:#fff;border-color:rgba(var(--accent-rgb),.32);background:rgba(var(--accent-rgb),.055)}.panel-tabs-header .panel-tabs>button.active,.panel-tabs-header .panel-tabs>button[aria-current="page"],.panel-tabs-header .panel-tabs>button[aria-selected="true"]{color:rgba(var(--accent-rgb),.08)!important;border-color:var(--gold-2)!important;background:var(--gold-2)!important;background-image:none!important;box-shadow:0 0 14px rgba(var(--accent-rgb),.16)!important}.panel-tabs-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
 .tasks-workspace>.panel-tabs-header{margin-bottom:18px}.embedded-task-view{margin:0!important}.embedded-subtabs{margin:0 0 16px!important}.embedded-subtabs>h1{display:none!important}.embedded-subtabs>.panel-tabs{width:auto!important}
-section>h1+.settings-tabs{display:inline-flex!important;vertical-align:middle!important;width:calc(100% - 220px)!important;margin:-52px 0 20px 220px!important;border-bottom:0!important}.settings-tabs>button.active,.settings-tabs>button[aria-current="page"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important}
+section>h1+.settings-tabs{display:inline-flex!important;vertical-align:middle!important;width:calc(100% - 220px)!important;margin:-52px 0 20px 220px!important;border-bottom:0!important}.settings-tabs>button.active,.settings-tabs>button[aria-current="page"]{color:rgba(var(--accent-rgb),.08)!important;border-color:var(--gold-2)!important;background:var(--gold-2)!important}
 .calendar-main .calendar-period-toolbar{display:grid!important;grid-template-columns:auto auto auto minmax(0,1fr)!important;align-items:center!important;gap:10px!important}.calendar-period-toolbar .nav-actions{grid-column:1!important;grid-row:1!important}.calendar-period-toolbar>small{grid-column:2!important;grid-row:1!important;white-space:nowrap}.calendar-period-toolbar .month-export-btn{grid-column:3!important;grid-row:1!important}.calendar-period-toolbar>h2{grid-column:4!important;grid-row:1!important;margin:0!important;text-align:right!important;justify-self:end!important}
-.dashboard-entity-list{overflow:hidden;padding:0;--dashboard-columns:minmax(230px,1.65fr) minmax(120px,.82fr) minmax(105px,.72fr) repeat(4,minmax(96px,.68fr))}.dashboard-entity-head,.dashboard-entity-summary,.dashboard-task-detail-row{display:grid;grid-template-columns:var(--dashboard-columns);align-items:center;gap:12px}.dashboard-entity-head{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)}.dashboard-sort-heading{display:flex;align-items:center;gap:5px;width:100%;padding:0!important;border:0!important;background:transparent!important;color:#d8bd78!important;font-size:10px!important;text-transform:uppercase;text-align:left;box-shadow:none!important}.dashboard-sort-heading:hover{color:#f2d78f!important}.dashboard-sort-arrow{font-size:10px;line-height:1}.dashboard-entity-group+.dashboard-entity-group{border-top:1px solid rgba(255,255,255,.08)}.dashboard-entity-summary{width:100%;min-height:58px;padding:10px 14px;border:0!important;border-radius:0!important;background:transparent!important;text-align:left;color:#eee}.dashboard-entity-summary:hover,.dashboard-entity-summary.active{background:rgba(216,189,120,.06)!important}.dashboard-entity-name{display:flex;align-items:center;gap:9px;min-width:0}.dashboard-entity-name strong,.dashboard-task-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dashboard-chevron{flex:0 0 15px;width:15px;color:#d8bd78}.dashboard-stat{text-align:left;white-space:nowrap}.dashboard-task-detail{padding:0 0 8px;background:rgba(255,255,255,.012)}.dashboard-task-detail-row{width:100%;padding:10px 14px;border:0!important;border-radius:0!important;border-top:1px solid rgba(255,255,255,.055)!important;background:transparent!important;color:#ddd;text-align:left}.dashboard-task-detail-row:hover{background:rgba(216,189,120,.045)!important}.dashboard-task-identity{display:flex;align-items:center;gap:8px;min-width:0;padding-left:26px}.dashboard-task-marks{display:inline-flex;align-items:center;gap:6px;min-width:0}.dashboard-task-marks .avatar-mini{flex:0 0 auto}.dashboard-status{display:inline-flex;padding:4px 7px;border:1px solid;border-radius:999px;font-size:11px;white-space:nowrap}.dashboard-task-empty-column{min-height:1px}.dashboard-empty-detail{padding:14px 8px;color:var(--muted)}
+.dashboard-entity-list{overflow:hidden;padding:0;--dashboard-columns:minmax(230px,1.65fr) minmax(120px,.82fr) minmax(105px,.72fr) repeat(4,minmax(96px,.68fr))}.dashboard-entity-head,.dashboard-entity-summary,.dashboard-task-detail-row{display:grid;grid-template-columns:var(--dashboard-columns);align-items:center;gap:12px}.dashboard-entity-head{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)}.dashboard-sort-heading{display:flex;align-items:center;gap:5px;width:100%;padding:0!important;border:0!important;background:transparent!important;color:var(--gold-2)!important;font-size:10px!important;text-transform:uppercase;text-align:left;box-shadow:none!important}.dashboard-sort-heading:hover{color:var(--accent-pale)!important}.dashboard-sort-arrow{font-size:10px;line-height:1}.dashboard-entity-group+.dashboard-entity-group{border-top:1px solid rgba(255,255,255,.08)}.dashboard-entity-summary{width:100%;min-height:58px;padding:10px 14px;border:0!important;border-radius:0!important;background:transparent!important;text-align:left;color:#eee}.dashboard-entity-summary:hover,.dashboard-entity-summary.active{background:rgba(var(--accent-rgb),.06)!important}.dashboard-entity-name{display:flex;align-items:center;gap:9px;min-width:0}.dashboard-entity-name strong,.dashboard-task-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dashboard-chevron{flex:0 0 15px;width:15px;color:var(--gold-2)}.dashboard-stat{text-align:left;white-space:nowrap}.dashboard-task-detail{padding:0 0 8px;background:rgba(255,255,255,.012)}.dashboard-task-detail-row{width:100%;padding:10px 14px;border:0!important;border-radius:0!important;border-top:1px solid rgba(255,255,255,.055)!important;background:transparent!important;color:#ddd;text-align:left}.dashboard-task-detail-row:hover{background:rgba(var(--accent-rgb),.045)!important}.dashboard-task-identity{display:flex;align-items:center;gap:8px;min-width:0;padding-left:26px}.dashboard-task-marks{display:inline-flex;align-items:center;gap:6px;min-width:0}.dashboard-task-marks .avatar-mini{flex:0 0 auto}.dashboard-status{display:inline-flex;padding:4px 7px;border:1px solid;border-radius:999px;font-size:11px;white-space:nowrap}.dashboard-task-empty-column{min-height:1px}.dashboard-empty-detail{padding:14px 8px;color:var(--muted)}
 @media(max-width:980px){.dashboard-entity-list{overflow-x:auto}.dashboard-entity-head,.dashboard-entity-summary,.dashboard-task-detail{min-width:960px}}
 @media(max-width:760px){.panel-tabs-header{align-items:flex-start;flex-wrap:wrap}.panel-tabs-header>h1{flex:0 0 100%;width:100%}.panel-tabs{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:3px}.panel-tabs-actions{margin-left:0;width:100%}section>h1+.settings-tabs{display:flex!important;width:100%!important;margin:0 0 20px!important}.calendar-main .calendar-period-toolbar{grid-template-columns:auto auto minmax(0,1fr)!important}.calendar-period-toolbar .month-export-btn{grid-column:3!important}.calendar-period-toolbar>h2{grid-column:1 / -1!important;grid-row:2!important;justify-self:start!important;text-align:left!important}.dashboard-entity-head,.dashboard-entity-summary,.dashboard-task-detail{min-width:920px}}
 `;
@@ -3789,9 +3871,9 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,open,search='
   const sortChartRows=rows=>[...rows].sort((a,b)=>b[1]-a[1] || String(a[0]).localeCompare(String(b[0]),'pt-BR',{sensitivity:'base'}));
   const charts=[
     visible.statusChart&&<Bar key="statusChart" title="Post por Status" rows={statuses.map(s=>[s.name,filtered.filter(t=>t.status===s.id).length,s.color])}/>,
-    visible.typeChart&&<Bar key="typeChart" title="Por tipo" tone="gold" rows={sortChartRows(TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'#e1b12c']))}/>,
-    visible.companyChart&&<Bar key="companyChart" title="Por cliente" tone="gold" rows={sortChartRows(activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'#e1b12c',c.logo]))}/>,
-    isAdmin&&visible.memberChart&&<Bar key="memberChart" title="Por membro" tone="gold" rows={sortChartRows(activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'#e1b12c',u.avatar]))}/>
+    visible.typeChart&&<Bar key="typeChart" title="Por tipo" tone="gold" rows={sortChartRows(TASK_TYPES.map(tp=>[tp,filtered.filter(t=>t.type===tp).length,'var(--gold)']))}/>,
+    visible.companyChart&&<Bar key="companyChart" title="Por cliente" tone="gold" rows={sortChartRows(activeCompanies.map(c=>[c.name,filtered.filter(t=>t.companyId===c.id).length,'var(--gold)',c.logo]))}/>,
+    isAdmin&&visible.memberChart&&<Bar key="memberChart" title="Por membro" tone="gold" rows={sortChartRows(activeUsers.map(u=>[u.name,filtered.filter(t=>t.responsibleId===u.id).length,'var(--gold)',u.avatar]))}/>
   ].filter(Boolean);
   const detailTabs=[
     visible.showSummaryTab!==false&&['summary','Resumo'],
@@ -4253,7 +4335,7 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
   const calendarViewTabs=permissions.showViewTabs
     ? <CalendarViewTabs active={view} onChange={setView}/>
     : null;
-  const calendarHeaderControls=<CalendarHeaderControls view={view} selectedDay={selectedDay} setSelectedDay={setSelectedDay} countLabel={calendarHeaderMeta.countLabel} title={calendarHeaderMeta.title} permissions={permissions} onExportMonth={()=>exportMonthTasksToExcel(filtered,selectedDay)} trailing={embedded?calendarViewTabs:null}/>;
+  const calendarHeaderControls=<CalendarHeaderControls view={view} selectedDay={selectedDay} setSelectedDay={setSelectedDay} countLabel={calendarHeaderMeta.countLabel} title={calendarHeaderMeta.title} permissions={permissions} onExportMonth={()=>exportCalendarTasksToExcel(filtered,selectedDay,view)} trailing={embedded?calendarViewTabs:null}/>;
   return <section className={embedded?'embedded-task-view calendar-embedded-view':''}>
     {!embedded&&<PanelTabsHeader title="Calendário" tabs={permissions.showViewTabs?[['month','Mês'],['week','Semana'],['day','Dia']]:[]} active={view} onChange={setView} actions={calendarHeaderControls} className={`calendar-panel-titlebar view-${view}`}/>} 
     <div className="calendar-layout">
@@ -4280,39 +4362,166 @@ function EntityLabel({value,label}){ return <span className="entity-label"><Avat
 function TaskButton({t,companies,users,statusById,open,permissions={}}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const meta=[permissions.showCompany?company?.name:null,permissions.showResponsible?resp?.name:null].filter(Boolean).join(' • '); return <button className="mini-task" disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{meta&&<small>{meta}</small>}</button> }
 
 const FIXED_SPECIAL_DATES = [
+  // Janeiro
   { md:'01-01', name:'Ano Novo', type:'feriado', icon:'✦' },
+  { md:'01-04', name:'Dia Mundial do Braille', type:'inclusão', icon:'•' },
   { md:'01-06', name:'Dia de Reis', type:'comemorativa', icon:'✦' },
-  { md:'01-20', name:'Dia do Farmacêutico', type:'nicho', icon:'•' },
+  { md:'01-07', name:'Dia do Leitor', type:'educação/conteúdo', icon:'•' },
+  { md:'01-08', name:'Dia do Fotógrafo', type:'profissional', icon:'•' },
+  { md:'01-20', name:'Dia do Farmacêutico', type:'profissional/saúde', icon:'•' },
+  { md:'01-24', name:'Dia Internacional da Educação', type:'educação', icon:'•' },
+  { md:'01-24', name:'Dia do Aposentado', type:'conteúdo', icon:'•' },
+  { md:'01-25', name:'Dia do Carteiro', type:'profissional', icon:'•' },
   { md:'01-30', name:'Dia da Saudade', type:'conteúdo', icon:'•' },
+
+  // Fevereiro
+  { md:'02-01', name:'Dia do Publicitário', type:'profissional/marketing', icon:'•' },
+  { md:'02-04', name:'Dia Mundial do Câncer', type:'saúde', icon:'•' },
+  { md:'02-11', name:'Dia Internacional das Mulheres e Meninas na Ciência', type:'educação/ciência', icon:'•' },
+  { md:'02-13', name:'Dia Mundial do Rádio', type:'comunicação', icon:'•' },
   { md:'02-14', name:'Valentine’s Day', type:'comercial global', icon:'♡', market:'us' },
+  { md:'02-20', name:'Dia Mundial da Justiça Social', type:'cidadania', icon:'•' },
+  { md:'02-27', name:'Dia Nacional do Livro Didático', type:'educação', icon:'•' },
+
+  // Março
   { md:'03-08', name:'Dia da Mulher', type:'comercial', icon:'✦' },
+  { md:'03-12', name:'Dia do Bibliotecário', type:'profissional/educação', icon:'•' },
+  { md:'03-14', name:'Dia dos Animais', type:'conteúdo', icon:'•' },
   { md:'03-15', name:'Dia do Consumidor', type:'comercial', icon:'✦' },
+  { md:'03-15', name:'Dia da Escola', type:'educação', icon:'•' },
+  { md:'03-20', name:'Dia Internacional da Felicidade', type:'conteúdo', icon:'•' },
   { md:'03-20', name:'Início do outono', type:'estação', icon:'◐' },
+  { md:'03-21', name:'Dia Internacional da Síndrome de Down', type:'inclusão/saúde', icon:'•' },
+  { md:'03-21', name:'Dia Internacional das Florestas', type:'meio ambiente', icon:'•' },
+  { md:'03-22', name:'Dia Mundial da Água', type:'meio ambiente', icon:'•' },
+  { md:'03-27', name:'Dia Mundial do Teatro', type:'cultura', icon:'•' },
+
+  // Abril
   { md:'04-01', name:'Dia da Mentira', type:'conteúdo', icon:'•' },
+  { md:'04-02', name:'Dia Mundial de Conscientização do Autismo', type:'inclusão/saúde', icon:'•' },
+  { md:'04-07', name:'Dia Mundial da Saúde', type:'saúde', icon:'•' },
+  { md:'04-13', name:'Dia do Beijo', type:'conteúdo/comercial', icon:'♡' },
+  { md:'04-18', name:'Dia Nacional do Livro Infantil', type:'educação', icon:'•' },
+  { md:'04-19', name:'Dia dos Povos Indígenas', type:'cultura/cidadania', icon:'•' },
   { md:'04-21', name:'Tiradentes', type:'feriado', icon:'✦' },
-  { md:'04-23', name:'Dia Mundial do Livro', type:'conteúdo', icon:'•' },
+  { md:'04-22', name:'Dia da Terra', type:'meio ambiente', icon:'•' },
+  { md:'04-23', name:'Dia Mundial do Livro', type:'conteúdo/educação', icon:'•' },
+  { md:'04-26', name:'Dia Nacional de Prevenção e Combate à Hipertensão', type:'saúde', icon:'•' },
+  { md:'04-28', name:'Dia da Educação', type:'educação', icon:'•' },
+  { md:'04-29', name:'Dia Internacional da Dança', type:'cultura', icon:'•' },
+
+  // Maio
   { md:'05-01', name:'Dia do Trabalho', type:'feriado', icon:'✦' },
-  { md:'05-25', name:'Dia do Orgulho Nerd', type:'conteúdo', icon:'•' },
-  { md:'06-05', name:'Dia do Meio Ambiente', type:'conteúdo', icon:'•' },
+  { md:'05-03', name:'Dia Mundial da Liberdade de Imprensa', type:'comunicação', icon:'•' },
+  { md:'05-05', name:'Dia Nacional das Comunicações', type:'comunicação', icon:'•' },
+  { md:'05-08', name:'Dia do Profissional de Marketing', type:'profissional/marketing', icon:'•' },
+  { md:'05-12', name:'Dia Internacional da Enfermagem', type:'profissional/saúde', icon:'•' },
+  { md:'05-15', name:'Dia Internacional da Família', type:'família/conteúdo', icon:'♡' },
+  { md:'05-17', name:'Dia Mundial da Internet', type:'tecnologia', icon:'•' },
+  { md:'05-18', name:'Dia Internacional dos Museus', type:'cultura', icon:'•' },
+  { md:'05-20', name:'Dia do Pedagogo', type:'profissional/educação', icon:'•' },
+  { md:'05-22', name:'Dia Internacional da Biodiversidade', type:'meio ambiente', icon:'•' },
+  { md:'05-25', name:'Dia do Orgulho Nerd', type:'conteúdo/tecnologia', icon:'•' },
+  { md:'05-31', name:'Dia Mundial sem Tabaco', type:'saúde', icon:'•' },
+
+  // Junho
+  { md:'06-05', name:'Dia do Meio Ambiente', type:'meio ambiente', icon:'•' },
+  { md:'06-08', name:'Dia Mundial dos Oceanos', type:'meio ambiente', icon:'•' },
+  { md:'06-09', name:'Dia da Imunização', type:'saúde', icon:'•' },
   { md:'06-12', name:'Dia dos Namorados', type:'comercial', icon:'♡' },
-  { md:'06-20', name:'Início do inverno', type:'estação', icon:'◐' },
+  { md:'06-12', name:'Dia Mundial de Combate ao Trabalho Infantil', type:'cidadania', icon:'•' },
+  { md:'06-14', name:'Dia Mundial do Doador de Sangue', type:'saúde', icon:'•' },
   { md:'06-14', name:'Flag Day', type:'comemorativa', icon:'✦', market:'us' },
   { md:'06-19', name:'Juneteenth', type:'feriado federal', icon:'✦', market:'us' },
+  { md:'06-20', name:'Início do inverno', type:'estação', icon:'◐' },
+  { md:'06-21', name:'Dia Internacional do Yoga', type:'saúde/bem-estar', icon:'•' },
   { md:'06-24', name:'São João', type:'sazonal', icon:'✦' },
+  { md:'06-26', name:'Dia Internacional de Combate às Drogas', type:'saúde/cidadania', icon:'•' },
+  { md:'06-28', name:'Dia Internacional do Orgulho LGBTQIA+', type:'cidadania', icon:'•' },
+
+  // Julho
   { md:'07-04', name:'Independence Day', type:'feriado federal', icon:'✦', market:'us' },
-  { md:'07-13', name:'Dia do Rock', type:'conteúdo', icon:'•' },
+  { md:'07-07', name:'Dia Mundial do Chocolate', type:'conteúdo/comercial', icon:'•' },
+  { md:'07-10', name:'Dia da Pizza', type:'conteúdo/comercial', icon:'•' },
+  { md:'07-13', name:'Dia do Rock', type:'conteúdo/cultura', icon:'•' },
+  { md:'07-15', name:'Dia do Homem', type:'conteúdo', icon:'•' },
   { md:'07-20', name:'Dia do Amigo', type:'conteúdo', icon:'•' },
-  { md:'08-15', name:'Dia dos Solteiros', type:'conteúdo', icon:'•' },
+  { md:'07-25', name:'Dia Nacional do Escritor', type:'profissional/cultura', icon:'•' },
+  { md:'07-26', name:'Dia dos Avós', type:'família/conteúdo', icon:'♡' },
+  { md:'07-27', name:'Dia do Pediatra', type:'profissional/saúde', icon:'•' },
+  { md:'07-28', name:'Dia do Agricultor', type:'profissional', icon:'•' },
+
+  // Agosto
+  { md:'08-01', name:'Dia Mundial de Combate ao Câncer de Pulmão', type:'saúde', icon:'•' },
+  { md:'08-05', name:'Dia Nacional da Saúde', type:'saúde', icon:'•' },
+  { md:'08-08', name:'Dia Nacional de Prevenção e Controle do Colesterol', type:'saúde', icon:'•' },
+  { md:'08-09', name:'Dia Internacional dos Povos Indígenas', type:'cultura/cidadania', icon:'•' },
+  { md:'08-11', name:'Dia do Estudante', type:'educação', icon:'✦' },
+  { md:'08-11', name:'Dia do Advogado', type:'profissional', icon:'•' },
+  { md:'08-11', name:'Dia da Televisão', type:'comunicação', icon:'•' },
+  { md:'08-11', name:'Dia do Garçom', type:'profissional', icon:'•' },
+  { md:'08-12', name:'Dia Internacional da Juventude', type:'educação/conteúdo', icon:'•' },
+  { md:'08-12', name:'Dia Nacional das Artes', type:'cultura', icon:'•' },
+  { md:'08-15', name:'Dia da Informática', type:'tecnologia', icon:'•' },
+  { md:'08-15', name:'Dia dos Solteiros', type:'conteúdo/comercial', icon:'•' },
+  { md:'08-17', name:'Dia Nacional do Patrimônio Histórico', type:'cultura', icon:'•' },
+  { md:'08-19', name:'Dia Mundial da Fotografia', type:'conteúdo/cultura', icon:'•' },
+  { md:'08-22', name:'Dia do Folclore', type:'cultura/educação', icon:'•' },
+  { md:'08-25', name:'Dia do Soldado', type:'comemorativa', icon:'•' },
+  { md:'08-27', name:'Dia do Psicólogo', type:'profissional/saúde', icon:'•' },
+  { md:'08-29', name:'Dia Nacional de Combate ao Fumo', type:'saúde', icon:'•' },
+  { md:'08-31', name:'Dia do Nutricionista', type:'profissional/saúde', icon:'•' },
+
+  // Setembro
+  { md:'09-01', name:'Dia do Profissional de Educação Física', type:'profissional/saúde', icon:'•' },
+  { md:'09-05', name:'Dia da Amazônia', type:'meio ambiente', icon:'•' },
   { md:'09-07', name:'Independência do Brasil', type:'feriado', icon:'✦' },
+  { md:'09-08', name:'Dia Mundial da Alfabetização', type:'educação', icon:'•' },
+  { md:'09-09', name:'Dia do Administrador', type:'profissional', icon:'•' },
+  { md:'09-09', name:'Dia do Médico Veterinário', type:'profissional/saúde', icon:'•' },
+  { md:'09-10', name:'Dia Mundial de Prevenção ao Suicídio', type:'saúde', icon:'•' },
   { md:'09-15', name:'Dia do Cliente', type:'comercial', icon:'✦' },
+  { md:'09-21', name:'Dia da Árvore', type:'meio ambiente', icon:'•' },
+  { md:'09-21', name:'Dia Mundial de Conscientização sobre Alzheimer', type:'saúde', icon:'•' },
   { md:'09-22', name:'Início da primavera', type:'estação', icon:'◐' },
+  { md:'09-25', name:'Dia Nacional do Trânsito', type:'cidadania', icon:'•' },
+  { md:'09-27', name:'Dia Mundial do Turismo', type:'conteúdo/turismo', icon:'•' },
+  { md:'09-30', name:'Dia da Secretária', type:'profissional', icon:'•' },
+
+  // Outubro
+  { md:'10-01', name:'Dia Internacional da Pessoa Idosa', type:'saúde/cidadania', icon:'•' },
+  { md:'10-04', name:'Dia Mundial dos Animais', type:'conteúdo', icon:'•' },
+  { md:'10-05', name:'Dia Nacional da Micro e Pequena Empresa', type:'negócios', icon:'•' },
+  { md:'10-10', name:'Dia Mundial da Saúde Mental', type:'saúde', icon:'•' },
   { md:'10-12', name:'Dia das Crianças', type:'comercial', icon:'✦' },
-  { md:'10-15', name:'Dia dos Professores', type:'conteúdo', icon:'•' },
+  { md:'10-15', name:'Dia dos Professores', type:'educação/profissional', icon:'•' },
+  { md:'10-16', name:'Dia Mundial da Alimentação', type:'saúde', icon:'•' },
+  { md:'10-18', name:'Dia do Médico', type:'profissional/saúde', icon:'•' },
+  { md:'10-25', name:'Dia do Dentista', type:'profissional/saúde', icon:'•' },
+  { md:'10-28', name:'Dia do Servidor Público', type:'profissional', icon:'•' },
+  { md:'10-29', name:'Dia Nacional do Livro', type:'cultura/educação', icon:'•' },
   { md:'10-31', name:'Halloween', type:'sazonal', icon:'✦', market:'us' },
-  { md:'11-02', name:'Finados', type:'feriado', icon:'•' },
-  { md:'11-11', name:'Veterans Day', type:'feriado federal', icon:'✦', market:'us' },
+
+  // Novembro
+  { md:'11-01', name:'Dia Mundial do Veganismo', type:'conteúdo', icon:'•' },
+  { md:'11-05', name:'Dia do Designer Gráfico', type:'profissional/criatividade', icon:'•' },
+  { md:'11-08', name:'Dia do Radiologista', type:'profissional/saúde', icon:'•' },
+  { md:'11-14', name:'Dia Mundial do Diabetes', type:'saúde', icon:'•' },
+  { md:'11-14', name:'Dia Nacional da Alfabetização', type:'educação', icon:'•' },
   { md:'11-15', name:'Proclamação da República', type:'feriado', icon:'✦' },
+  { md:'11-19', name:'Dia Internacional do Homem', type:'conteúdo', icon:'•' },
   { md:'11-20', name:'Consciência Negra', type:'feriado/conteúdo', icon:'✦' },
+  { md:'11-25', name:'Dia Nacional do Doador de Sangue', type:'saúde', icon:'•' },
+
+  // Dezembro
+  { md:'12-01', name:'Dia Mundial de Luta contra a AIDS', type:'saúde', icon:'•' },
+  { md:'12-03', name:'Dia Internacional da Pessoa com Deficiência', type:'inclusão/cidadania', icon:'•' },
+  { md:'12-05', name:'Dia Internacional do Voluntário', type:'cidadania', icon:'•' },
+  { md:'12-09', name:'Dia do Fonoaudiólogo', type:'profissional/saúde', icon:'•' },
+  { md:'12-10', name:'Dia Internacional dos Direitos Humanos', type:'cidadania', icon:'•' },
+  { md:'12-11', name:'Dia do Engenheiro', type:'profissional', icon:'•' },
+  { md:'12-13', name:'Dia Nacional da Pessoa com Deficiência Visual', type:'inclusão', icon:'•' },
+  { md:'12-15', name:'Dia do Arquiteto e Urbanista', type:'profissional', icon:'•' },
   { md:'12-21', name:'Início do verão', type:'estação', icon:'◐' },
   { md:'12-24', name:'Véspera de Natal', type:'sazonal', icon:'✦' },
   { md:'12-25', name:'Natal', type:'comercial', icon:'✦' },
@@ -4413,14 +4622,14 @@ function getCalendarHeaderMeta(view,selectedDay,tasks){
   return {countLabel:`${taskCount} tarefa(s)`,title:monthLabel(selectedDay)};
 }
 function CalendarViewTabs({active,onChange}){
-  return <div className="calendar-inline-view-tabs panel-tabs" role="tablist">{[['month','Mês'],['week','Semana'],['day','Dia']].map(([id,label])=>{const selected=active===id;return <button key={id} type="button" role="tab" aria-selected={selected} aria-current={selected?'page':undefined} className={selected?'active':''} onClick={()=>onChange(id)} style={{position:'relative',overflow:'hidden'}}>{selected&&<span aria-hidden="true" style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'none',background:'#17150f',border:'1px solid #806821',borderRadius:8,boxSizing:'border-box'}}/>}<span style={{position:'relative',zIndex:1,color:selected?'#d7b96f':undefined,fontWeight:400}}>{label}</span></button>})}</div>;
+  return <div className="calendar-inline-view-tabs panel-tabs" role="tablist">{[['month','Mês'],['week','Semana'],['day','Dia']].map(([id,label])=>{const selected=active===id;return <button key={id} type="button" role="tab" aria-selected={selected} aria-current={selected?'page':undefined} className={selected?'active':''} onClick={()=>onChange(id)} style={{position:'relative',overflow:'hidden'}}>{selected&&<span aria-hidden="true" style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'none',background:'rgba(var(--accent-rgb),.08)',border:'1px solid rgba(var(--accent-rgb),.55)',borderRadius:8,boxSizing:'border-box'}}/>}<span style={{position:'relative',zIndex:1,color:selected?'var(--gold-2)':undefined,fontWeight:400}}>{label}</span></button>})}</div>;
 }
 function CalendarHeaderControls({view,selectedDay,setSelectedDay,countLabel,title,permissions={},onExportMonth,trailing=null}){
   return <div className="calendar-header-controls">
     {permissions.canNavigateDates!==false&&<div className="calendar-topbar-nav nav-actions"><button type="button" onClick={()=>setSelectedDay(shiftCalendarDate(view,selectedDay,-1))}>‹</button><button type="button" onClick={()=>setSelectedDay(todayStr())}>Atual</button><button type="button" onClick={()=>setSelectedDay(shiftCalendarDate(view,selectedDay,1))}>›</button></div>}
     <small className="calendar-header-count">{countLabel}</small>
     <h2 className="calendar-header-title">{title}</h2>
-    {view==='month'&&permissions.canExportExcel!==false&&<button type="button" className="calendar-export-btn" onClick={onExportMonth}>Exportar Excel</button>}
+    {permissions.canExportExcel!==false&&<button type="button" className="calendar-export-btn" onClick={onExportMonth}>Exportar Excel</button>}
     {trailing&&<div className="calendar-header-trailing">{trailing}</div>}
   </div>;
 }
@@ -4554,7 +4763,7 @@ function CopyTextButton({text}){
       alignItems:'center',
       justifyContent:'center',
       borderRadius:7,
-      border:'1px solid rgba(225,177,44,.2)',
+      border:'1px solid rgba(var(--accent-rgb),.2)',
       background:'rgba(7,7,7,.74)',
       color:copied?'#d9ad38':'rgba(255,255,255,.62)',
       opacity:String(text||'').trim()?0.82:0.28,
@@ -4603,9 +4812,9 @@ function ReadOnlyReadyLinks({title='Links de material pronto',text}){
               width:'fit-content',
               minHeight:32,
               padding:'6px 10px',
-              border:'1px solid rgba(225,177,44,.28)',
+              border:'1px solid rgba(var(--accent-rgb),.28)',
               borderRadius:8,
-              background:'rgba(225,177,44,.04)',
+              background:'rgba(var(--accent-rgb),.04)',
               color:'#d9ad38',
               textDecoration:'none',
               fontWeight:700
@@ -4949,9 +5158,9 @@ function TaskLinksEditor({task,updateTask,field,title,placeholder='Cole um link'
         const isTrailingEmpty=index===items.length-1&&!filled;
         return <div key={`${field}-${index}`} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto auto auto',gap:8,alignItems:'center'}}>
           <input type="url" value={value} data-task-id={task.id} data-task-field={field} onChange={e=>change(index,e.target.value)} placeholder={isTrailingEmpty?placeholder:`Link ${index+1}`}/>
-          <a href={filled||undefined} target="_blank" rel="noreferrer" aria-disabled={!filled} onClick={e=>{if(!filled)e.preventDefault();}} style={{pointerEvents:filled?'auto':'none',opacity:filled?1:.45,display:'inline-flex',alignItems:'center',justifyContent:'center',minHeight:36,padding:'0 12px',border:'1px solid rgba(225,177,44,.35)',borderRadius:10,background:'rgba(225,177,44,.04)',color:'#f3e6b2',textDecoration:'none',fontWeight:700,boxSizing:'border-box'}}>Abrir</a>
-          <button type="button" onClick={()=>move(index,-1)} disabled={!filled||index===0}>↑</button>
-          <button type="button" onClick={()=>move(index,1)} disabled={!filled||index>=items.length-2}>↓</button>
+          <a href={filled||undefined} target="_blank" rel="noreferrer" aria-disabled={!filled} onClick={e=>{if(!filled)e.preventDefault();}} style={{pointerEvents:filled?'auto':'none',opacity:filled?1:.45,display:'inline-flex',alignItems:'center',justifyContent:'center',minHeight:36,padding:'0 12px',border:'1px solid rgba(var(--accent-rgb),.35)',borderRadius:10,background:'rgba(var(--accent-rgb),.04)',color:'var(--accent-pale)',textDecoration:'none',fontWeight:700,boxSizing:'border-box'}}>Abrir</a>
+          <button type="button" className="material-link-move" onClick={()=>move(index,-1)} disabled={!filled||index===0}><span aria-hidden="true">↑</span></button>
+          <button type="button" className="material-link-move" onClick={()=>move(index,1)} disabled={!filled||index>=items.length-2}><span aria-hidden="true">↓</span></button>
           <button type="button" onClick={()=>remove(index)} disabled={isTrailingEmpty}>Remover</button>
         </div>;
       })}
@@ -4974,6 +5183,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   const [slide,setSlide]=useState(0); 
   const [comment,setComment]=useState(''); 
   const [clientForm,setClientForm]=useState(null); 
+  const [showBackToTop,setShowBackToTop]=useState(false);
   const isClient=effectiveUser.role==='client';
   const isTeam=effectiveUser.role==='team';
   const taskPermissionSet=effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role);
@@ -5002,6 +5212,12 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   }
   const taskRef=useRef(task);
   useEffect(()=>{ taskRef.current=task; });
+  useEffect(()=>{
+    const updateBackToTop=()=>setShowBackToTop(window.scrollY>420);
+    updateBackToTop();
+    window.addEventListener('scroll',updateBackToTop,{passive:true});
+    return ()=>window.removeEventListener('scroll',updateBackToTop);
+  },[]);
   function pauseTimer(logText='Timer pausado automaticamente ao sair da tarefa.'){
     const current=taskRef.current;
     if(!current?.startedAt || !isTeam || current.startedById!==effectiveUser.id) return;
@@ -5022,7 +5238,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   function goToClientTask(target){ if(!target) return; pauseTimer('Timer pausado ao trocar de tarefa.'); open(target.id); setSlide(0); }
   const hiddenTeam=isTeam&&!canAccess; 
   const showTeamProtected=!hiddenTeam && !isClient;
-  const actionStyle=(statusId,solid=true)=>{ const color=statusById[statusId]?.color||'#e1b12c'; return solid?{background:color,borderColor:color,color:'#050505'}:{borderColor:color,color}; };
+  const actionStyle=(statusId,solid=true)=>{ const color=statusById[statusId]?.color||'var(--gold)'; return solid?{background:color,borderColor:color,color:'#050505'}:{borderColor:color,color}; };
   function start(){
     const patch={startedAt:now(), startedById:effectiveUser.id, timerHeartbeatAt:now()};
     if(task.status==='aguardando'){
@@ -5093,7 +5309,26 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
     updateTask(task.id,patch,reason?'Marcado como aguardando com comentário.':'Marcado como aguardando.');
   } 
   function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); updateTask(task.id,{status:'agendamento',statusLogText:`${effectiveUser.name} aprovou a tarefa`}); setClientForm(null); } 
-  function requestChange(){ const items=[]; if(clientForm?.artChange) items.push('Alterar arte/vídeo'); if(clientForm?.text) items.push('Alterar texto na arte/vídeo'); if(clientForm?.captionChange) items.push('Alterar legenda'); if(clientForm?.redo) items.push('Refazer o post'); if(!items.length) return alert('Selecione pelo menos uma opção de alteração.'); const desc=String(clientForm?.description||'').trim(); if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.'); const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`; const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:now(),text,resolved:false}; updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]}); setClientForm(null); }
+  function requestChange(){
+    const items=[];
+    if(clientForm?.artChange) items.push('Alterar arte/vídeo');
+    if(clientForm?.text) items.push('Alterar texto na arte/vídeo');
+    if(clientForm?.captionChange) items.push('Alterar legenda');
+    if(clientForm?.redo) items.push('Refazer o post');
+    if(!items.length) return alert('Selecione pelo menos uma opção de alteração.');
+    const desc=String(clientForm?.description||'').trim();
+    if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.');
+    const text=`Solicitação de alteração
+Itens marcados: ${items.join(', ')}
+Descrição: ${desc}`;
+    const eventAt=now();
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false};
+    updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]});
+    if(isClient){
+      notifyTask(task,text,CLIENT_REQUEST_NOTIFICATION_EVENT,'alteracao',effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});
+    }
+    setClientForm(null);
+  }
   function reopenFromApproval(){ const nextStatus=task.previousWorkStatus||'edicao'; updateTask(task.id,{status:nextStatus,startedAt:now(),startedById:effectiveUser.id,timerHeartbeatAt:now()},`Tarefa reaberta para ${statusById[nextStatus]?.name||nextStatus}.`); }
   function reviewAgain(){ updateTask(task.id,{status:'aprovacao'},'Cliente voltou para revisão.'); } 
   async function copyTaskLink(){
@@ -5153,7 +5388,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined,'--status-color':statusById[task.status]?.color||'var(--line)'}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label>}
   {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
   {canViewDetail('postDate')&&<label>Data do post<input disabled={!canEditDetail('postDate')} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label>}
-</div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2>{canEditDetail('comments')&&<div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{canViewDetail('history')&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div></section> 
+</div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2>{canEditDetail('comments')&&<div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{canViewDetail('history')&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div>{showBackToTop&&<button type="button" className="app-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo"><BackToTopGlyph/></button>}</section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6c-1.7-1.9-4.4-2-6.2-.3L12 6.7 9.4 4.3C7.6 2.6 4.9 2.7 3.2 4.6c-1.8 2-1.6 5.1.4 7l8.4 7.8 8.4-7.8c2-1.9 2.2-5 .4-7Z"/></svg>
@@ -5165,7 +5400,7 @@ function ClientApprovalForm({form,setForm,approve,requestChange,statusById}){
   const f=form||{}; 
   const F=(k,v)=>setForm({...f,[k]:v}); 
   const hasChange=!!(f.artChange||f.text||f.captionChange||f.redo);
-  const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'#e1b12c'; return {background:color,borderColor:color,color:'#050505'}; };
+  const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {background:color,borderColor:color,color:'#050505'}; };
   const canRequest=hasChange && String(f.description||'').trim().length>0;
   function toggleRedo(checked){
     if(checked){
@@ -5416,13 +5651,13 @@ function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
 
 function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleActive=null,onToggleOpen=null,children,accent=false}){
   const hasToggle=typeof active==='boolean';
-  return <div className="panel" style={{padding:0,overflow:'hidden',borderColor:open?'rgba(225,177,44,.48)':'var(--line)'}}>
+  return <div className="panel" style={{padding:0,overflow:'hidden',borderColor:open?'rgba(var(--accent-rgb),.48)':'var(--line)'}}>
     <div
       role="button"
       tabIndex={0}
       onClick={()=>onToggleOpen?.()}
       onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onToggleOpen?.();}}}
-      style={{display:'flex',alignItems:'center',gap:10,minHeight:52,padding:'0 14px',cursor:'pointer',background:open?'rgba(225,177,44,.045)':'transparent'}}
+      style={{display:'flex',alignItems:'center',gap:10,minHeight:52,padding:'0 14px',cursor:'pointer',background:open?'rgba(var(--accent-rgb),.045)':'transparent'}}
     >
       {hasToggle&&<input
         type="checkbox"
@@ -5432,9 +5667,9 @@ function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleA
         onChange={e=>onToggleActive?.(e.target.checked)}
         style={{width:16,height:16,minWidth:16,margin:0}}
       />}
-      <span className="status-dot" style={{background:hasToggle?(active?'#e1b12c':'#5b6472'):(accent?'#e1b12c':'#747d8c')}}></span>
+      <span className="status-dot" style={{background:hasToggle?(active?'var(--gold)':'#5b6472'):(accent?'var(--gold)':'#747d8c')}}></span>
       <b style={{flex:1,color:'var(--text)',fontSize:14}}>{title}</b>
-      <span aria-hidden="true" style={{fontSize:18,color:open?'#e1b12c':'var(--muted)',transform:open?'rotate(90deg)':'none',transition:'transform .16s ease'}}>›</span>
+      <span aria-hidden="true" style={{fontSize:18,color:open?'var(--gold)':'var(--muted)',transform:open?'rotate(90deg)':'none',transition:'transform .16s ease'}}>›</span>
     </div>
     {open&&<div style={{padding:'14px',borderTop:'1px solid var(--line)'}}>{children}</div>}
   </div>;
@@ -5512,6 +5747,7 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   const roleDefault=accessDefaultForRole({accessDefaults},f.role);
   const defaultIds=PANEL_CATALOG.filter(panel=>roleDefault.panels.visible?.[panel.id]===true).map(panel=>panel.id);
   const statusInheritance=f.accessInheritance?.statuses==='custom'?'custom':'default';
+  const typeInheritance=f.accessInheritance?.types==='custom'?'custom':'default';
   const notificationInheritance=f.accessInheritance?.notifications==='custom'?'custom':'default';
   const dashboardInheritance=f.accessInheritance?.dashboard==='custom'?'custom':'default';
   const actionsInheritance=(f.accessInheritance?.actions==='custom'||f.accessInheritance?.tasks==='custom')?'custom':'default';
@@ -5534,6 +5770,7 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
       ...prev,
       accessInheritance:{...(prev.accessInheritance||{}),[section]:mode},
       ...(section==='statuses'&&mode==='custom'?{visibleStatuses:[...(roleDefault.visibleStatuses||[])]}:{}),
+      ...(section==='types'&&mode==='custom'?{visibleTypes:[...(roleDefault.visibleTypes||TASK_TYPES)]}:{}),
       ...(section==='notifications'&&mode==='custom'?{
         notificationPrefs:[...(roleDefault.notificationPrefs||[])],
         notificationStatusPrefs:{...(roleDefault.notificationStatusPrefs||{})}
@@ -5601,6 +5838,10 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   function toggleStatus(id,checked){
     const current=statusInheritance==='custom'?(f.visibleStatuses||[]):(roleDefault.visibleStatuses||[]);
     set('visibleStatuses',checked?[...new Set([...current,id])]:current.filter(x=>x!==id));
+  }
+  function toggleType(type,checked){
+    const current=typeInheritance==='custom'?(f.visibleTypes||[]):(roleDefault.visibleTypes||TASK_TYPES);
+    set('visibleTypes',checked?[...new Set([...current,type])]:current.filter(x=>x!==type));
   }
   function toggleEvent(ev,checked){
     const current=notificationInheritance==='custom'?(f.notificationPrefs||[]):(roleDefault.notificationPrefs||events);
@@ -5776,6 +6017,13 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
         </div>
       </AccessConfigCard>}
 
+      {f.role!=='admin'&&<AccessConfigCard title="Tipos de tarefas disponíveis" open={openSection==='rule:types'} onToggleOpen={()=>toggleSection('rule:types')} accent>
+        <label>Configuração dos tipos<select value={typeInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('types',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+        <div style={typeInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+          <TaskTypeVisibilityChecks selected={typeInheritance==='custom'?(f.visibleTypes||[]):(roleDefault.visibleTypes||TASK_TYPES)} onToggle={toggleType}/>
+        </div>
+      </AccessConfigCard>}
+
       <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent>
         <label>Configuração da tarefa aberta<select value={taskDetailInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('taskDetail',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
         <div style={taskDetailInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
@@ -5897,6 +6145,10 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
     const current=draft.visibleStatuses||[];
     setDraftValue('visibleStatuses',checked?[...new Set([...current,id])]:current.filter(x=>x!==id));
   }
+  function toggleType(type,checked){
+    const current=draft.visibleTypes||TASK_TYPES;
+    setDraftValue('visibleTypes',checked?[...new Set([...current,type])]:current.filter(x=>x!==type));
+  }
   function toggleEvent(ev,checked){
     const current=draft.notificationPrefs||[];
     setDraftValue('notificationPrefs',checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev));
@@ -6006,6 +6258,10 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
           <StatusVisibilityChecks statuses={statuses} selected={draft.visibleStatuses||[]} onToggle={toggleStatus}/>
         </AccessConfigCard>}
 
+        {role!=='admin'&&<AccessConfigCard title="Tipos de tarefas disponíveis" open={openSection==='rule:types'} onToggleOpen={()=>toggleSection('rule:types')} accent>
+          <TaskTypeVisibilityChecks selected={draft.visibleTypes||TASK_TYPES} onToggle={toggleType}/>
+        </AccessConfigCard>}
+
         <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent>
           <TaskOpenPermissionList
             config={{canApprovePosts:draft.tasks?.canApprovePosts===true,visible:draft.tasks?.detailFields?.visible||{},editable:draft.tasks?.detailFields?.editable||{}}}
@@ -6061,7 +6317,7 @@ const ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS = `
   gap:6px!important;
   margin:0 0 20px!important;
   padding:0 0 1px!important;
-  border-bottom:1px solid rgba(225,177,44,.18)!important;
+  border-bottom:1px solid rgba(var(--accent-rgb),.18)!important;
 }
 
 .settings-tabs > button{
@@ -6069,8 +6325,8 @@ const ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS = `
   min-height:38px!important;
   margin:0!important;
   padding:9px 13px!important;
-  border:1px solid rgba(225,177,44,.13)!important;
-  border-bottom-color:rgba(225,177,44,.22)!important;
+  border:1px solid rgba(var(--accent-rgb),.13)!important;
+  border-bottom-color:rgba(var(--accent-rgb),.22)!important;
   border-radius:8px 8px 0 0!important;
   background:rgba(255,255,255,.025)!important;
   color:rgba(255,255,255,.62)!important;
@@ -6084,17 +6340,17 @@ const ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS = `
 
 .settings-tabs > button:hover{
   color:rgba(255,255,255,.9)!important;
-  border-color:rgba(225,177,44,.32)!important;
-  background:rgba(225,177,44,.055)!important;
+  border-color:rgba(var(--accent-rgb),.32)!important;
+  background:rgba(var(--accent-rgb),.055)!important;
   opacity:1!important;
 }
 
 .settings-tabs > button.active,
 .settings-tabs > button[aria-current="page"]{
-  color:#d7b96f!important;
-  border-color:#806821!important;
-  border-bottom-color:#806821!important;
-  background:#17150f!important;
+  color:var(--gold-2)!important;
+  border-color:rgba(var(--accent-rgb),.55)!important;
+  border-bottom-color:rgba(var(--accent-rgb),.55)!important;
+  background:rgba(var(--accent-rgb),.08)!important;
   box-shadow:inset 0 0 0 1px rgba(240,213,138,.08)!important;
   font-weight:500!important;
   opacity:1!important;
@@ -6125,7 +6381,7 @@ const ARGOS_ROUND155S_SETTINGS_ACTIVE_TAB_CSS = `
 
   .settings-tabs > button.active,
   .settings-tabs > button[aria-current="page"]{
-    border-bottom-color:rgba(225,177,44,.58)!important;
+    border-bottom-color:rgba(var(--accent-rgb),.58)!important;
   }
 }
 `;
@@ -6152,11 +6408,11 @@ if(typeof document!=='undefined'){
   style206A.textContent=`
     .settings-tabs > button.active,
     .settings-tabs > button[aria-current="page"]{
-      color:#d7b96f!important;
-      border:1px solid #806821!important;
+      color:var(--gold-2)!important;
+      border:1px solid rgba(var(--accent-rgb),.55)!important;
       border-radius:8px!important;
-      background:#17150f!important;
-      box-shadow:inset 0 0 0 1px rgba(215,185,111,.035)!important;
+      background:rgba(var(--accent-rgb),.08)!important;
+      box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.035)!important;
       font-weight:400!important;
       opacity:1!important;
     }
@@ -6177,11 +6433,11 @@ if(typeof document!=='undefined'){
       gap:9px;
       max-width:min(360px,calc(100vw - 28px));
       padding:11px 14px;
-      border:1px solid rgba(212,181,109,.68);
+      border:1px solid rgba(var(--accent-rgb),.68);
       border-radius:9px;
-      background:#17150f;
+      background:rgba(var(--accent-rgb),.08);
       color:#ead08a;
-      box-shadow:0 14px 34px rgba(0,0,0,.38),inset 0 0 0 1px rgba(215,185,111,.04);
+      box-shadow:0 14px 34px rgba(0,0,0,.38),inset 0 0 0 1px rgba(var(--accent-rgb),.04);
       font-size:13px;
       font-weight:400;
       opacity:0;
@@ -6194,9 +6450,9 @@ if(typeof document!=='undefined'){
     @media (max-width:760px){
       .settings-tabs > button.active,
       .settings-tabs > button[aria-current="page"]{
-        color:#d7b96f!important;
-        border-color:#806821!important;
-        background:#17150f!important;
+        color:var(--gold-2)!important;
+        border-color:rgba(var(--accent-rgb),.55)!important;
+        background:rgba(var(--accent-rgb),.08)!important;
       }
       .settings-save-notice{left:14px;right:14px;bottom:14px;max-width:none;}
     }
@@ -6231,13 +6487,13 @@ const FINANCIAL_LAB_KEY='argos_financial_lab_v1';
 const FINANCIAL_SETTINGS_TABLE='app_financial_settings';
 const FINANCIAL_LAB_CSS=`
 .financial-lab .financial-tabs{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.financial-lab .financial-tabs button{position:relative;overflow:hidden}.financial-lab .financial-tabs button>span{position:relative;z-index:1}.financial-lab .financial-tabs button.active{background:#17150f;color:#d7b96f;border-color:#806821}
+.financial-lab .financial-tabs button{position:relative;overflow:hidden}.financial-lab .financial-tabs button>span{position:relative;z-index:1}.financial-lab .financial-tabs button.active{background:rgba(var(--accent-rgb),.08);color:var(--gold-2);border-color:rgba(var(--accent-rgb),.55)}
 .financial-lab .financial-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
-.financial-lab .financial-card{padding:16px}.financial-lab .financial-card small{display:block;color:var(--muted);margin-bottom:7px}.financial-lab .financial-card strong{display:block;font-size:23px;color:#e0bf68}.financial-lab .financial-card em{display:block;margin-top:5px;font-size:11px;font-style:normal;color:var(--muted)}
+.financial-lab .financial-card{padding:16px}.financial-lab .financial-card small{display:block;color:var(--muted);margin-bottom:7px}.financial-lab .financial-card strong{display:block;font-size:23px;color:var(--gold)}.financial-lab .financial-card em{display:block;margin-top:5px;font-size:11px;font-style:normal;color:var(--muted)}
 .financial-lab .financial-toolbar{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}.financial-lab .financial-toolbar-main{display:flex;align-items:end;gap:8px;flex-wrap:wrap}.financial-lab .financial-toolbar label{min-width:180px;margin:0}.financial-lab .financial-toolbar .financial-tabs{margin:0}.financial-lab .financial-toolbar .financial-reset{margin-left:auto;white-space:nowrap}.financial-lab .financial-month-help{display:block;margin:0 0 16px}
-.financial-lab .financial-table-wrap{overflow:auto}.financial-lab .financial-summary-panel+.financial-summary-panel{margin-top:18px}.financial-lab table{width:100%;border-collapse:collapse;min-width:680px}.financial-lab th,.financial-lab td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}.financial-lab th{color:#d8bd78;font-size:11px;text-transform:uppercase;letter-spacing:.04em}.financial-lab tfoot td{border-top:1px solid rgba(216,189,120,.38);border-bottom:0;background:rgba(216,189,120,.055);font-weight:700}.financial-lab td input{min-width:120px}.financial-lab .financial-negative{color:#ff8b8b}.financial-lab .financial-positive{color:#75d69a}
+.financial-lab .financial-table-wrap{overflow:auto}.financial-lab .financial-summary-panel+.financial-summary-panel{margin-top:18px}.financial-lab table{width:100%;border-collapse:collapse;min-width:680px}.financial-lab th,.financial-lab td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}.financial-lab th{color:var(--gold-2);font-size:11px;text-transform:uppercase;letter-spacing:.04em}.financial-lab tfoot td{border-top:1px solid rgba(var(--accent-rgb),.38);border-bottom:0;background:rgba(var(--accent-rgb),.055);font-weight:700}.financial-lab td input{min-width:120px}.financial-lab .financial-negative{color:#ff8b8b}.financial-lab .financial-positive{color:#75d69a}
 .financial-lab .financial-editor{display:grid;grid-template-columns:minmax(230px,.7fr) minmax(0,1.3fr);gap:14px}.financial-lab .financial-type-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.financial-lab .financial-type-row{display:grid;grid-template-columns:1fr 145px;align-items:center;gap:10px}.financial-lab .financial-help{color:var(--muted);font-size:12px;line-height:1.5}.financial-lab .financial-empty{padding:28px;text-align:center;color:var(--muted)}
-.financial-lab .financial-overview{margin-bottom:18px}.financial-lab .financial-overview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.financial-lab .financial-overview-head h2{margin:0}.financial-lab .financial-sort-button{flex:0 0 auto}.financial-lab .financial-overview tbody tr{cursor:pointer}.financial-lab .financial-overview tbody tr:hover,.financial-lab .financial-overview tbody tr.selected{background:rgba(216,189,120,.07)}.financial-lab .financial-overview tbody tr.selected td:first-child{color:#d7b96f}
+.financial-lab .financial-overview{margin-bottom:18px}.financial-lab .financial-overview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.financial-lab .financial-overview-head h2{margin:0}.financial-lab .financial-sort-button{flex:0 0 auto}.financial-lab .financial-overview tbody tr{cursor:pointer}.financial-lab .financial-overview tbody tr:hover,.financial-lab .financial-overview tbody tr.selected{background:rgba(var(--accent-rgb),.07)}.financial-lab .financial-overview tbody tr.selected td:first-child{color:var(--gold-2)}
 @media(max-width:1000px){.financial-lab .financial-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.financial-lab .financial-editor{grid-template-columns:1fr}.financial-lab .financial-type-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.financial-lab .financial-cards{grid-template-columns:1fr}.financial-lab .financial-toolbar,.financial-lab .financial-toolbar-main{align-items:stretch}.financial-lab .financial-toolbar-main{width:100%}.financial-lab .financial-toolbar label{width:100%}.financial-lab .financial-toolbar .financial-reset{margin-left:0}}
 `;
@@ -6401,9 +6657,9 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
   function saveStatus(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); notifySettingsSaved('Status salvo'); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
-  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Geral']];
+  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Aparência']];
   if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
-  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(225,177,44,.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<GeneralSettings system={system} setSystem={setSystem} reset={reset}/>}</section> 
+  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(var(--accent-rgb),.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<AppearanceSettings system={system} setSystem={setSystem}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -6423,7 +6679,7 @@ function NotificationSettings({users,setUsers,statuses,currentUser=null}){
       {isOpen&&<>
         {!canEdit&&<p className="muted admin-lock-note">Notificações de outro admin não podem ser alteradas.</p>}
         <div className="notification-prefs-grid" style={{display:'grid',gridTemplateColumns:'minmax(280px,1fr) minmax(280px,1fr)',gap:28,alignItems:'start'}}>
-          <div><h3>Eventos</h3><div className="checks one-col">{events.map(ev=><label key={ev}><input type="checkbox" disabled={!canEdit} checked={(u.notificationPrefs||events).includes(ev)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; setUsers(prev=>prev.map(x=>{ if(x.id!==u.id) return x; const cur=x.notificationPrefs||events; const next=checked?[...new Set([...cur,ev])]:cur.filter(item=>item!==ev); return {...x,notificationPrefs:next}; }));}}/>{ev}</label>)}</div></div>
+          <div><h3>Eventos</h3><div className="checks one-col">{events.map(ev=><label key={ev}><input type="checkbox" disabled={!canEdit} checked={(Array.isArray(u.notificationPrefs)?u.notificationPrefs:defaultNotificationPrefsForRole(u.role)).includes(ev)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; setUsers(prev=>prev.map(x=>{ if(x.id!==u.id) return x; const cur=Array.isArray(x.notificationPrefs)?x.notificationPrefs:defaultNotificationPrefsForRole(x.role); const next=checked?[...new Set([...cur,ev])]:cur.filter(item=>item!==ev); return {...x,notificationPrefs:next}; }));}}/>{ev}</label>)}</div></div>
           <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list">{statuses.map(st=><label key={st.id}><input type="checkbox" disabled={!canEdit} checked={(u.notificationStatusPrefs?.[st.id]??true)} onChange={e=>{if(!canEdit) return; const checked=e.target.checked; setUsers(prev=>prev.map(x=>x.id===u.id?{...x,notificationStatusPrefs:{...(x.notificationStatusPrefs||{}),[st.id]:checked}}:x));}}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
         </div>
       </>}
@@ -6601,12 +6857,20 @@ function PublicPortfolioSettings({currentUser}){
   </div></div>
 }
 
-function GeneralSettings({system,setSystem,reset}){
-  const [f,setF]=useState(system||{logo:'',title:'Painel de Aprovação'});
+function AppearanceSettings({system,setSystem}){
+  const [f,setF]=useState({...system,accentColor:normalizeAccentColor(system?.accentColor)});
+  useEffect(()=>{setF({...system,accentColor:normalizeAccentColor(system?.accentColor)});},[system]);
   const set=(k,v)=>setF({...f,[k]:v});
-  const saveGeneral=()=>{setSystem(f);notifySettingsSaved('Configurações gerais salvas');};
-  return <div className="settings-section"><div className="panel general-panel">
-    <h3>Painel interno</h3>
+  const saveAppearance=()=>{
+    const next={...f,accentColor:normalizeAccentColor(f.accentColor)};
+    setF(next);
+    setSystem(next);
+    applySystemAccent(next.accentColor);
+    notifySettingsSaved('Aparência salva');
+  };
+  return <div className="settings-section"><div className="panel general-panel appearance-panel">
+    <h3>Identidade visual</h3>
+    <label>Cor de destaque<div className="appearance-accent-control"><input className="appearance-color-input" type="color" value={normalizeAccentColor(f.accentColor)} onChange={e=>set('accentColor',e.target.value)}/><input className="appearance-color-text" value={f.accentColor||''} onChange={e=>set('accentColor',e.target.value)} onBlur={()=>set('accentColor',normalizeAccentColor(f.accentColor))} placeholder="#cbae6c"/></div><small>Usada em abas ativas, botões principais, gráficos e outros destaques institucionais. Cores funcionais de status e urgência não são alteradas.</small></label>
     <label>Texto do painel<input value={f.title||''} onChange={e=>set('title',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Logo do sistema<input value={f.logo||''} onChange={e=>set('logo',e.target.value)} placeholder="URL, link do Drive ou upload"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),'system/logo')}/></label>
     <label>Favicon do navegador<input value={f.favicon||''} onChange={e=>set('favicon',e.target.value)} placeholder="URL, link do Drive ou upload"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('favicon',v),'system/favicon')}/><small>Ícone pequeno que aparece na aba do navegador.</small></label>
@@ -6614,8 +6878,7 @@ function GeneralSettings({system,setSystem,reset}){
     <label>Título da tela de login<input value={f.loginTitle||''} onChange={e=>set('loginTitle',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Texto de apoio da tela de login<input value={f.loginSubtitle||''} onChange={e=>set('loginSubtitle',e.target.value)} placeholder="Entre com seu acesso."/></label>
     <label>Logo da tela de login<input value={f.loginLogo||''} onChange={e=>set('loginLogo',e.target.value)} placeholder="URL, link do Drive ou upload. Se vazio, usa a logo do sistema."/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('loginLogo',v),'system/login')}/></label>
-    <div className="row-actions"><button onClick={()=>setF(system)}>Cancelar</button><button className="primary" onClick={saveGeneral}>Salvar configurações</button></div>
-    <div className="danger-zone"><h3>Zona de risco</h3><p>Use esta opção apenas em ambiente de teste ou com certeza absoluta.</p><button onClick={reset}>Resetar demo</button></div>
+    <div className="row-actions"><button onClick={()=>{setF({...system,accentColor:normalizeAccentColor(system?.accentColor)});applySystemAccent(system?.accentColor);}}>Cancelar</button><button className="primary" onClick={saveAppearance}>Salvar aparência</button></div>
   </div></div>
 }
 
@@ -6913,11 +7176,14 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
     const actorId=n.actorId||n.payload?.actorId||sourceLog?.userId||null;
     const actor=(users||[]).find(u=>u.id===actorId);
     const actorName=n.actorName||n.payload?.actorName||actor?.name||sourceLog?.user||'';
+    const actorRole=n.actorRole||n.payload?.actorRole||actor?.role||sourceLog?.role||'';
     return {
       task,
       content:stripEmbeddedMeta(withoutTitle,actorName),
       actor,
       actorName,
+      actorRole,
+      originIsClient: actorRole==='client',
       company:(companies||[]).find(c=>c.id===task.companyId),
       responsible:(users||[]).find(u=>u.id===task.responsibleId),
       status:(statuses||[]).find(s=>s.id===task.status),
@@ -6948,7 +7214,7 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
       {effectiveTab==='done'&&permissions.canDeleteCompleted&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}
     </div>
     <div className="notifications-list">{list.length?notificationGroups.map((group,groupIndex)=><div className="panel notification-company-group" key={`${group.companyKey}-${groupIndex}`}>
-      {group.items.map(({n,info})=>{const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';const canOpenRow=!!(permissions.canOpenTasks&&info.task);return <div className={'notification-item notification-list-row'+(canOpenRow?' is-clickable':'')} key={n.id} role={canOpenRow?'button':undefined} tabIndex={canOpenRow?0:undefined} onClick={canOpenRow?()=>open(n.taskId):undefined} onKeyDown={canOpenRow?(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open(n.taskId);}}:undefined}>
+      {group.items.map(({n,info})=>{const deadlineTone=deadlineColor(info.deadline);const statusTone=info.status?.color||'#8b8b8b';const canOpenRow=!!(permissions.canOpenTasks&&info.task);return <div className={'notification-item notification-list-row'+(canOpenRow?' is-clickable':'')+(info.originIsClient?' is-client-origin':'')} key={n.id} role={canOpenRow?'button':undefined} tabIndex={canOpenRow?0:undefined} onClick={canOpenRow?()=>open(n.taskId):undefined} onKeyDown={canOpenRow?(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open(n.taskId);}}:undefined}>
       <span className="notification-leading-action">
         {!n.done&&permissions.canComplete&&<button type="button" className="notification-complete-x" aria-label="Concluir notificação" title="Concluir notificação" onClick={event=>{event.stopPropagation();done(n.id);}}>×</button>}
       </span>
@@ -7197,9 +7463,9 @@ const ARGOS_ROUND224_CALENDAR_STANDARD_CSS = `
 .calendar-export-btn{min-height:32px!important;height:32px!important;padding:0 12px!important;font-size:12px!important;white-space:nowrap!important;width:auto!important;flex:0 0 auto}
 .calendar-header-trailing{justify-self:end;display:flex;align-items:center;min-width:0;margin-left:auto}
 .calendar-inline-view-tabs{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;min-width:0}
-.calendar-inline-view-tabs>button{min-height:38px;padding:9px 13px;border:1px solid rgba(225,177,44,.13);border-radius:8px;background:rgba(255,255,255,.025);color:rgba(255,255,255,.62);box-shadow:none}
-.calendar-inline-view-tabs>button:hover{color:#fff;border-color:rgba(225,177,44,.32);background:rgba(225,177,44,.055)}
-.calendar-inline-view-tabs>button.active,.calendar-inline-view-tabs>button[aria-current="page"],.calendar-inline-view-tabs>button[aria-selected="true"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important;background-image:none!important;box-shadow:0 0 14px rgba(215,185,111,.16)!important}
+.calendar-inline-view-tabs>button{min-height:38px;padding:9px 13px;border:1px solid rgba(var(--accent-rgb),.13);border-radius:8px;background:rgba(255,255,255,.025);color:rgba(255,255,255,.62);box-shadow:none}
+.calendar-inline-view-tabs>button:hover{color:#fff;border-color:rgba(var(--accent-rgb),.32);background:rgba(var(--accent-rgb),.055)}
+.calendar-inline-view-tabs>button.active,.calendar-inline-view-tabs>button[aria-current="page"],.calendar-inline-view-tabs>button[aria-selected="true"]{color:rgba(var(--accent-rgb),.08)!important;border-color:var(--gold-2)!important;background:var(--gold-2)!important;background-image:none!important;box-shadow:0 0 14px rgba(var(--accent-rgb),.16)!important}
 .calendar-main{width:100%;min-width:0}.calendar-main .month{padding:0!important;overflow:auto;width:100%}
 .calendar-main .week-grid{margin-top:0!important;width:100%;box-sizing:border-box}
 .calendar-main .day-list{margin-top:0!important;width:100%;box-sizing:border-box}
@@ -7253,15 +7519,15 @@ const ARGOS_ROUND230_PLAIN_PANEL_TABS_CSS = `
 }
 .panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button:hover{
   color:#f2e6c9!important;
-  border-bottom-color:rgba(215,185,111,.32)!important;
+  border-bottom-color:rgba(var(--accent-rgb),.32)!important;
   background:transparent!important;
   box-shadow:none!important;
 }
 .panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button.active,
 .panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button[aria-current="page"],
 .panel-tabs-header .panel-tabs:not(.calendar-inline-view-tabs)>button[aria-selected="true"]{
-  color:#d7b96f!important;
-  border-color:transparent transparent #d7b96f transparent!important;
+  color:var(--gold-2)!important;
+  border-color:transparent transparent var(--gold-2) transparent!important;
   background:transparent!important;
   box-shadow:none!important;
 }
@@ -8149,6 +8415,532 @@ const ARGOS_ROUND249_ACCESS_STRUCTURE_CSS = `
 `;
 if(typeof document!=='undefined'){let style249=document.getElementById('argos-round249-access-structure');if(!style249){style249=document.createElement('style');style249.id='argos-round249-access-structure';document.head.appendChild(style249)}style249.textContent=ARGOS_ROUND249_ACCESS_STRUCTURE_CSS;}
 
+
+const ARGOS_ROUND262_CALENDAR_HEADER_ALIGNMENT_CSS = `
+/* Mês, Semana e Dia usam exatamente a mesma malha no cabeçalho. */
+.main .calendar-main-header .calendar-header-controls,
+.main .calendar-panel-titlebar .calendar-header-controls{
+  display:grid!important;
+  grid-template-columns:132px 112px minmax(220px,1fr) 102px 206px!important;
+  align-items:center!important;
+  column-gap:10px!important;
+  width:100%!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+}
+.main .calendar-header-controls .calendar-topbar-nav{
+  grid-column:1!important;
+  justify-self:start!important;
+  width:132px!important;
+  margin:0!important;
+}
+.main .calendar-header-controls .calendar-header-count{
+  grid-column:2!important;
+  justify-self:start!important;
+  width:112px!important;
+  margin:0!important;
+}
+.main .calendar-header-controls .calendar-header-title{
+  grid-column:3!important;
+  justify-self:center!important;
+  width:100%!important;
+  margin:0!important;
+  text-align:center!important;
+}
+.main .calendar-header-controls .calendar-export-btn{
+  grid-column:4!important;
+  justify-self:end!important;
+  width:102px!important;
+  margin:0!important;
+}
+.main .calendar-header-controls .calendar-header-trailing{
+  grid-column:5!important;
+  justify-self:end!important;
+  width:206px!important;
+  margin:0!important;
+}
+.main .calendar-main-header.view-week .calendar-header-trailing,
+.main .calendar-main-header.view-day .calendar-header-trailing,
+.main .calendar-panel-titlebar.view-week .calendar-header-trailing,
+.main .calendar-panel-titlebar.view-day .calendar-header-trailing{
+  margin-right:0!important;
+}
+@media(max-width:980px){
+  .main .calendar-main-header .calendar-header-controls,
+  .main .calendar-panel-titlebar .calendar-header-controls{
+    grid-template-columns:132px 112px minmax(170px,1fr) 102px 206px!important;
+  }
+}
+@media(max-width:760px){
+  .main .calendar-main-header .calendar-header-controls,
+  .main .calendar-panel-titlebar .calendar-header-controls{
+    grid-template-columns:1fr!important;
+    row-gap:8px!important;
+  }
+  .main .calendar-header-controls .calendar-topbar-nav,
+  .main .calendar-header-controls .calendar-header-count,
+  .main .calendar-header-controls .calendar-header-title,
+  .main .calendar-header-controls .calendar-export-btn,
+  .main .calendar-header-controls .calendar-header-trailing{
+    grid-column:1!important;
+    width:auto!important;
+    justify-self:start!important;
+    text-align:left!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style262 = document.getElementById('argos-round262-calendar-header-alignment');
+  if (!style262) {
+    style262 = document.createElement('style');
+    style262.id = 'argos-round262-calendar-header-alignment';
+    document.head.appendChild(style262);
+  }
+  style262.textContent = ARGOS_ROUND262_CALENDAR_HEADER_ALIGNMENT_CSS;
+}
+
+
+
+const ARGOS_ROUND265_CALENDAR_MINIMAL_CSS = `
+/* Round 265: calendário mensal com visual contínuo e minimalista */
+.main .calendar-main .month,
+.main .calendar-embedded-view .month{
+  padding:0!important;
+  margin:0!important;
+  width:100%!important;
+  background:transparent!important;
+}
+.main .calendar-main .weeknames,
+.main .calendar-main .days,
+.main .calendar-embedded-view .weeknames,
+.main .calendar-embedded-view .days{
+  display:grid!important;
+  grid-template-columns:repeat(7,minmax(0,1fr))!important;
+  gap:0!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+}
+.main .calendar-main .weeknames,
+.main .calendar-embedded-view .weeknames{
+  margin-top:2px!important;
+}
+.main .calendar-main .weeknames b,
+.main .calendar-embedded-view .weeknames b{
+  border:0!important;
+  border-right:1px solid var(--line)!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  padding:6px 0 7px!important;
+  min-height:30px!important;
+  background:transparent!important;
+  box-sizing:border-box!important;
+}
+.main .calendar-main .weeknames b:last-child,
+.main .calendar-embedded-view .weeknames b:last-child{
+  border-right:0!important;
+}
+.main .calendar-main .days,
+.main .calendar-embedded-view .days{
+  grid-auto-rows:minmax(88px,auto)!important;
+}
+.main .calendar-main .day,
+.main .calendar-embedded-view .day{
+  min-height:0!important;
+  height:auto!important;
+  border:0!important;
+  border-right:1px solid var(--line)!important;
+  border-bottom:1px solid var(--line)!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  margin:0!important;
+  padding:4px 6px 6px!important;
+  background:transparent!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+}
+.main .calendar-main .day:nth-child(7n),
+.main .calendar-embedded-view .day:nth-child(7n){
+  border-right:0!important;
+}
+.main .calendar-main .day-headline,
+.main .calendar-embedded-view .day-headline{
+  min-height:16px!important;
+  margin:0 0 2px!important;
+}
+.main .calendar-main .day-num,
+.main .calendar-embedded-view .day-num{
+  line-height:1!important;
+}
+.main .calendar-main .special-date-marks,
+.main .calendar-embedded-view .special-date-marks{
+  margin-top:2px!important;
+}
+.main .calendar-main .mini-task,
+.main .calendar-embedded-view .mini-task,
+.main .calendar-main .more,
+.main .calendar-embedded-view .more{
+  margin-top:4px!important;
+}
+@media(max-width:760px){
+  .main .calendar-main .days,
+  .main .calendar-embedded-view .days{
+    grid-auto-rows:minmax(82px,auto)!important;
+  }
+}
+`;
+if (typeof document !== 'undefined') {
+  let style265 = document.getElementById('argos-round265-calendar-minimal');
+  if (!style265) {
+    style265 = document.createElement('style');
+    style265.id = 'argos-round265-calendar-minimal';
+    document.head.appendChild(style265);
+  }
+  style265.textContent = ARGOS_ROUND265_CALENDAR_MINIMAL_CSS;
+}
+
+
+
+const ARGOS_ROUND270_CLIENT_NOTIFICATION_ACCENT_CSS = `
+/* Round 270: o destaque faz parte da própria borda externa da notificação. */
+.notifications-list .notification-list-row.is-client-origin{
+  position:relative!important;
+}
+.notifications-list .notification-list-row.is-client-origin::before{
+  content:"";
+  position:absolute!important;
+  left:0!important;
+  top:0!important;
+  bottom:0!important;
+  width:4px!important;
+  height:auto!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:var(--gold)!important;
+  box-shadow:none!important;
+  pointer-events:none!important;
+  opacity:1!important;
+}
+/* O painel agrupador já tem overflow:hidden e cantos arredondados. Assim, no primeiro e
+   último item, a própria curva externa recorta o dourado como acontece nos cards de status. */
+.notifications-list .notification-company-group{
+  overflow:hidden!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  ['argos-round268-client-notification-accent','argos-round269-client-notification-accent'].forEach(id=>{
+    const oldStyle=document.getElementById(id);
+    if(oldStyle) oldStyle.remove();
+  });
+  let style270 = document.getElementById('argos-round270-client-notification-accent');
+  if (!style270) {
+    style270 = document.createElement('style');
+    style270.id = 'argos-round270-client-notification-accent';
+    document.head.appendChild(style270);
+  }
+  style270.textContent = ARGOS_ROUND270_CLIENT_NOTIFICATION_ACCENT_CSS;
+}
+
+
+const ARGOS_ROUND271_APPEARANCE_CSS = `
+:root{
+  --accent:#cbae6c;
+  --accent-rgb:203,174,108;
+  --accent-dark:#867247;
+  --accent-pale:#e6d7b7;
+  --accent-contrast:#080808;
+}
+.appearance-panel .appearance-accent-control{
+  display:grid!important;
+  grid-template-columns:54px minmax(0,180px)!important;
+  gap:10px!important;
+  align-items:center!important;
+}
+.appearance-panel .appearance-color-input{
+  width:54px!important;
+  min-width:54px!important;
+  height:40px!important;
+  padding:3px!important;
+  cursor:pointer!important;
+}
+.appearance-panel .appearance-color-text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;}
+.panel-tabs-header .panel-tabs>button.active,
+.panel-tabs-header .panel-tabs>button[aria-current="page"],
+.panel-tabs-header .panel-tabs>button[aria-selected="true"]{
+  color:var(--gold)!important;
+  border-color:transparent!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.panel-tabs-header .panel-tabs>button.active::after,
+.panel-tabs-header .panel-tabs>button[aria-current="page"]::after,
+.panel-tabs-header .panel-tabs>button[aria-selected="true"]::after{
+  background:var(--gold)!important;
+}
+.dashboard-chart--gold .bar em{background:var(--gold)!important;}
+button.primary,.primary{color:var(--accent-contrast,#080808)!important;}
+/* Todos os destaques institucionais devem derivar da mesma cor global. */
+.modal-actions button.primary,
+.row-actions button.primary,
+.settings-toolbar button.primary,
+.financial-lab .financial-card strong,
+.financial-lab th,
+.financial-lab .financial-overview tbody tr.selected td:first-child,
+.admin-lock-note,
+.docs-folder-add{
+  color:var(--gold)!important;
+}
+.modal-actions button.primary,
+.row-actions button.primary,
+.settings-toolbar button.primary{
+  background:var(--gold)!important;
+  border-color:var(--gold)!important;
+  color:var(--accent-contrast,#080808)!important;
+}
+.financial-lab tfoot td,
+.financial-lab .financial-overview tbody tr:hover,
+.financial-lab .financial-overview tbody tr.selected{
+  background:rgba(var(--accent-rgb),.07)!important;
+}
+`;
+
+if(typeof document!=='undefined'){
+  let style271=document.getElementById('argos-round271-appearance');
+  if(!style271){style271=document.createElement('style');style271.id='argos-round271-appearance';document.head.appendChild(style271);}
+  style271.textContent=ARGOS_ROUND271_APPEARANCE_CSS;
+}
+
+
+const ARGOS_ROUND273_ACCENT_VISUAL_ROLES_CSS = `
+/* Round273: uma cor global, preservando os papéis visuais já aprovados. */
+
+/* AÇÕES: continuam vazadas/translúcidas, nunca viram blocos sólidos. */
+button.primary,
+.modal-actions button.primary,
+.top-actions button.primary,
+.panel-actions button.primary,
+.row-actions button.primary,
+.section-header button.primary,
+.settings-toolbar button.primary,
+.main .filters > button.primary,
+.main .planning-generate-all-inline,
+.main .template-save-actions button.primary,
+.main .status-editor-actions button.primary{
+  background:rgba(var(--accent-rgb),.075)!important;
+  background-image:none!important;
+  border-color:rgba(var(--accent-rgb),.68)!important;
+  color:var(--gold-2)!important;
+  text-shadow:none!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.025)!important;
+  filter:none!important;
+  font-weight:500!important;
+}
+
+button.primary:hover,
+button.primary:focus-visible,
+.modal-actions button.primary:hover,
+.modal-actions button.primary:focus-visible,
+.top-actions button.primary:hover,
+.panel-actions button.primary:hover,
+.row-actions button.primary:hover,
+.section-header button.primary:hover,
+.settings-toolbar button.primary:hover,
+.main .filters > button.primary:hover,
+.main .planning-generate-all-inline:hover,
+.main .template-save-actions button.primary:hover,
+.main .status-editor-actions button.primary:hover{
+  background:rgba(var(--accent-rgb),.135)!important;
+  background-image:none!important;
+  border-color:rgba(var(--accent-rgb),.92)!important;
+  color:var(--accent-pale)!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.04)!important;
+}
+
+/* ESTADOS SELECIONADOS: preenchimento suave, não sólido. */
+.side nav .nav-btn.active,
+.main .settings-tabs > button.active,
+.main .settings-tabs > button[aria-current="page"],
+.main .access-role-tabs > button.active,
+.main .access-role-tabs > button[aria-pressed="true"],
+.main .view-tabs > button.primary,
+.main .calendar-inline-view-tabs > button.active,
+.main .calendar-inline-view-tabs > button[aria-current="page"],
+.main .calendar-inline-view-tabs > button[aria-selected="true"],
+.main .legend-row.selected{
+  background:rgba(var(--accent-rgb),.085)!important;
+  background-image:none!important;
+  border-color:rgba(var(--accent-rgb),.62)!important;
+  color:var(--gold-2)!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.025)!important;
+}
+
+.side nav .nav-btn.active:hover,
+.main .settings-tabs > button.active:hover,
+.main .settings-tabs > button[aria-current="page"]:hover,
+.main .access-role-tabs > button.active:hover,
+.main .access-role-tabs > button[aria-pressed="true"]:hover,
+.main .view-tabs > button.primary:hover,
+.main .calendar-inline-view-tabs > button.active:hover,
+.main .legend-row.selected:hover{
+  background:rgba(var(--accent-rgb),.135)!important;
+  border-color:rgba(var(--accent-rgb),.86)!important;
+  color:var(--accent-pale)!important;
+}
+
+/* ABAS DE PAINEL: continuam somente texto + underline. */
+.main .panel-tabs-header .panel-tab-link.active,
+.main .panel-tabs-header .panel-tab-link[aria-current="page"],
+.main .panel-tabs-header .panel-tab-link[aria-selected="true"]{
+  background:transparent!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-top:0!important;
+  border-bottom-color:var(--accent)!important;
+  color:var(--gold-2)!important;
+  box-shadow:none!important;
+}
+.main .panel-tabs-header .panel-tab-link:hover{
+  color:var(--accent-pale)!important;
+}
+
+/* CONTORNOS, FOCO E ELEMENTOS INSTITUCIONAIS. */
+input:hover,
+select:hover,
+textarea:hover,
+.status-select:hover,
+.rich-text-editor:hover{
+  border-color:rgba(var(--accent-rgb),.30)!important;
+}
+input:focus,
+select:focus,
+textarea:focus,
+.status-select:focus-within,
+.rich-text-editor:focus{
+  border-color:rgba(var(--accent-rgb),.58)!important;
+  box-shadow:0 0 0 2px rgba(var(--accent-rgb),.06)!important;
+}
+.comment-log{
+  border-color:rgba(var(--accent-rgb),.24)!important;
+}
+.comment-log:hover{
+  border-color:rgba(var(--accent-rgb),.38)!important;
+}
+.side-user-view-card{
+  border-color:rgba(var(--accent-rgb),.18)!important;
+}
+.notification-list-row.is-client-origin::before{
+  background:var(--accent)!important;
+}
+.app-back-top,
+.public-portfolio-back-top{
+  border-color:rgba(var(--accent-rgb),.62)!important;
+  color:var(--accent-pale)!important;
+}
+.app-back-top:hover,
+.public-portfolio-back-top:hover{
+  border-color:rgba(var(--accent-rgb),.90)!important;
+}
+
+/* GRÁFICOS E DESTAQUES INSTITUCIONAIS. */
+.dashboard-chart--gold .bar em,
+.bar[style*="var(--gold)"] em{
+  background:var(--accent)!important;
+}
+.financial-lab .financial-card strong,
+.financial-lab th,
+.admin-lock-note,
+.docs-folder-add{
+  color:var(--gold-2)!important;
+}
+.financial-lab tfoot td,
+.financial-lab .financial-overview tbody tr:hover,
+.financial-lab .financial-overview tbody tr.selected{
+  background:rgba(var(--accent-rgb),.07)!important;
+}
+
+/* Mantém cores funcionais fora do tema institucional. */
+input[type="checkbox"],
+.status-editor-modal .status-editor-checks input[type="checkbox"],
+.public-portfolio-active input[type="checkbox"]{
+  accent-color:#ff174f!important;
+}
+.status-pill,
+.priority-pill,
+.date-field input,
+.status-dot,
+.task-row[class*="priority-"],
+.kcard[class*="priority-"]{
+  filter:none!important;
+}
+`;
+
+if (typeof document !== 'undefined') {
+  let style273 = document.getElementById('argos-round273-accent-visual-roles');
+  if (!style273) {
+    style273 = document.createElement('style');
+    style273.id = 'argos-round273-accent-visual-roles';
+    document.head.appendChild(style273);
+  }
+  style273.textContent = ARGOS_ROUND273_ACCENT_VISUAL_ROLES_CSS;
+}
+
+
+
+const ARGOS_ROUND274_DOCS_CHARTS_CSS = `
+/* Round274: navegação de Documentos chapada + gráficos institucionais na cor global. */
+
+/* Documentos: sem gradiente na árvore/navegação lateral. */
+.docs-folder-row,
+.docs-page-row,
+.docs-folder-row:hover,
+.docs-page-row:hover{
+  background-image:none!important;
+}
+.docs-folder-row,
+.docs-page-row{
+  background:transparent!important;
+}
+.docs-folder-row:hover,
+.docs-page-row:hover{
+  background:rgba(255,255,255,.025)!important;
+}
+
+/* Gráficos institucionais seguem a cor de destaque escolhida. */
+.main > div > section > .grid2 > .dashboard-chart--gold .bar em,
+.dashboard-chart--gold .bar em{
+  background:linear-gradient(
+    90deg,
+    rgba(var(--accent-rgb),.58) 0%,
+    rgba(var(--accent-rgb),.82) 38%,
+    var(--accent) 58%,
+    rgba(var(--accent-rgb),.78) 82%,
+    rgba(var(--accent-rgb),.52) 100%
+  )!important;
+  filter:none!important;
+  box-shadow:
+    0 0 4px rgba(var(--accent-rgb),.55),
+    0 0 10px rgba(var(--accent-rgb),.32),
+    0 0 18px rgba(var(--accent-rgb),.16)!important;
+}
+
+/* O gráfico por Status continua usando exclusivamente a cor de cada status. */
+.main > div > section > .grid2 > .dashboard-chart:not(.dashboard-chart--gold) .bar em,
+.dashboard-chart:not(.dashboard-chart--gold) .bar em{
+  background-color:currentColor;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style274 = document.getElementById('argos-round274-docs-charts');
+  if (!style274) {
+    style274 = document.createElement('style');
+    style274.id = 'argos-round274-docs-charts';
+    document.head.appendChild(style274);
+  }
+  style274.textContent = ARGOS_ROUND274_DOCS_CHARTS_CSS;
+}
+
 createRoot(document.getElementById('root')).render(<RootApp/>);
 
 const ARGOS_ROUND45_CALENDAR_TITLE_MOBILE_CSS = `
@@ -8331,7 +9123,7 @@ const ARGOS_ROUND49_USERS_PERMISSIONS_CSS = `
 .notification-user-head{display:flex;align-items:center;justify-content:space-between;gap:14px;}
 .notification-user-head .mini-title{margin:0!important;}
 .notification-user-panel{padding:20px!important;}
-.admin-lock-note{margin:14px 0 0!important;color:#e1b12c!important;}
+.admin-lock-note{margin:14px 0 0!important;color:var(--gold)!important;}
 .notification-prefs-grid input[disabled]{opacity:.45;cursor:not-allowed;}
 @media(max-width:700px){
   .notification-user-head{align-items:flex-start;}
@@ -10197,9 +10989,9 @@ const ARGOS_ROUND74_SPECIAL_DATES_CSS = `
   min-height:22px!important;
   padding:0!important;
   border-radius:999px!important;
-  border:1px solid rgba(225,177,44,.55)!important;
-  color:#e1b12c!important;
-  background:rgba(225,177,44,.08)!important;
+  border:1px solid rgba(var(--accent-rgb),.55)!important;
+  color:var(--gold)!important;
+  background:rgba(var(--accent-rgb),.08)!important;
   display:grid!important;
   place-items:center!important;
   font-size:12px!important;
@@ -10207,7 +10999,7 @@ const ARGOS_ROUND74_SPECIAL_DATES_CSS = `
 }
 
 .has-special-date{
-  box-shadow:inset 0 0 0 1px rgba(225,177,44,.10)!important;
+  box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.10)!important;
 }
 
 .special-date-marks{
@@ -10225,16 +11017,16 @@ const ARGOS_ROUND74_SPECIAL_DATES_CSS = `
   max-width:100%!important;
   padding:3px 7px!important;
   border-radius:999px!important;
-  border:1px solid rgba(225,177,44,.28)!important;
-  background:rgba(225,177,44,.08)!important;
-  color:#e8d9a6!important;
+  border:1px solid rgba(var(--accent-rgb),.28)!important;
+  background:rgba(var(--accent-rgb),.08)!important;
+  color:var(--accent-pale)!important;
   font-size:10px!important;
   line-height:1.1!important;
 }
 
 .special-date-chip i{
   font-style:normal!important;
-  color:#e1b12c!important;
+  color:var(--gold)!important;
   font-size:10px!important;
 }
 
@@ -10309,9 +11101,9 @@ const ARGOS_ROUND74_SPECIAL_DATES_CSS = `
 .special-date-panel{
   margin:0 0 14px!important;
   padding:14px!important;
-  border:1px solid rgba(225,177,44,.25)!important;
+  border:1px solid rgba(var(--accent-rgb),.25)!important;
   border-radius:16px!important;
-  background:rgba(225,177,44,.06)!important;
+  background:rgba(var(--accent-rgb),.06)!important;
 }
 
 .special-date-panel h3{
@@ -10332,7 +11124,7 @@ const ARGOS_ROUND74_SPECIAL_DATES_CSS = `
 }
 
 .special-date-line b{
-  color:#e1b12c!important;
+  color:var(--gold)!important;
 }
 
 .special-date-line small{
@@ -10943,8 +11735,8 @@ const ARGOS_ROUND81_REPAIR_AUTH_ACCESS_CSS = `
   margin:18px 0!important;
   padding:16px!important;
   border-radius:16px!important;
-  border:1px solid rgba(225,177,44,.32)!important;
-  background:rgba(225,177,44,.06)!important;
+  border:1px solid rgba(var(--accent-rgb),.32)!important;
+  background:rgba(var(--accent-rgb),.06)!important;
 }
 .auth-repair-box h3{ margin:0 0 6px!important; }
 .auth-repair-box p{ margin:0 0 10px!important; opacity:.74!important; line-height:1.45!important; }
@@ -10983,7 +11775,7 @@ const ARGOS_ROUND84_USERS_AUTH_STABLE_CSS = `
 .auth-secondary-action{
   align-self:flex-start!important;
   margin:-4px 0 10px!important;
-  border-color:rgba(225,177,44,.45)!important;
+  border-color:rgba(var(--accent-rgb),.45)!important;
 }
 .modal input:disabled{
   opacity:.68!important;
@@ -11195,7 +11987,7 @@ button.primary,
   text-align:center!important;
 }
 .task-group-toggle:hover > small {
-  color:#d7b96f!important;
+  color:var(--gold-2)!important;
 }
 
 @media(min-width:761px) {
@@ -11366,7 +12158,7 @@ button.primary,
   right:14px;
   top:50%;
   transform:translateY(-50%);
-  color:#d7b96f;
+  color:var(--gold-2);
   font-size:11px;
   pointer-events:none;
 }
@@ -11442,7 +12234,7 @@ if(typeof document!=='undefined'){
   if(!style218Final){style218Final=document.createElement('style');style218Final.id='argos-round218-final-tabs';document.head.appendChild(style218Final);}
   style218Final.textContent=`
     section>h1+.settings-tabs{display:inline-flex!important;vertical-align:middle!important;width:calc(100% - 220px)!important;margin:-52px 0 20px 220px!important;border-bottom:0!important}
-    section>h1+.settings-tabs>button.active,section>h1+.settings-tabs>button[aria-current="page"]{color:#17150f!important;border-color:#d7b96f!important;background:#d7b96f!important;box-shadow:0 0 14px rgba(215,185,111,.16)!important}
+    section>h1+.settings-tabs>button.active,section>h1+.settings-tabs>button[aria-current="page"]{color:rgba(var(--accent-rgb),.08)!important;border-color:var(--gold-2)!important;background:var(--gold-2)!important;box-shadow:0 0 14px rgba(var(--accent-rgb),.16)!important}
     @media(max-width:760px){section>h1+.settings-tabs{display:flex!important;width:100%!important;margin:0 0 20px!important}}
   `;
 }
@@ -11509,14 +12301,14 @@ const ARGOS_ROUND229_HEADER_SYSTEM_CSS = `
 }
 .panel-tabs-header .panel-tabs>button:hover{
   color:#f3ead6!important;
-  border-bottom-color:rgba(215,185,111,.38)!important;
+  border-bottom-color:rgba(var(--accent-rgb),.38)!important;
   background:transparent!important;
 }
 .panel-tabs-header .panel-tabs>button.active,
 .panel-tabs-header .panel-tabs>button[aria-current="page"],
 .panel-tabs-header .panel-tabs>button[aria-selected="true"]{
-  color:#d7b96f!important;
-  border-bottom-color:#d7b96f!important;
+  color:var(--gold-2)!important;
+  border-bottom-color:var(--gold-2)!important;
   background:transparent!important;
   background-image:none!important;
   box-shadow:none!important;
@@ -11540,7 +12332,7 @@ const ARGOS_ROUND229_HEADER_SYSTEM_CSS = `
   min-height:38px!important;
   height:38px!important;
   padding:9px 13px!important;
-  border:1px solid rgba(225,177,44,.13)!important;
+  border:1px solid rgba(var(--accent-rgb),.13)!important;
   border-radius:8px!important;
   background:rgba(255,255,255,.025)!important;
   color:rgba(255,255,255,.72)!important;
@@ -11548,16 +12340,16 @@ const ARGOS_ROUND229_HEADER_SYSTEM_CSS = `
 }
 .calendar-inline-view-tabs.panel-tabs>button:hover{
   color:#fff!important;
-  border-color:rgba(225,177,44,.32)!important;
-  background:rgba(225,177,44,.055)!important;
+  border-color:rgba(var(--accent-rgb),.32)!important;
+  background:rgba(var(--accent-rgb),.055)!important;
 }
 .calendar-inline-view-tabs.panel-tabs>button.active,
 .calendar-inline-view-tabs.panel-tabs>button[aria-current="page"],
 .calendar-inline-view-tabs.panel-tabs>button[aria-selected="true"]{
-  color:#d7b96f!important;
-  border-color:#806821!important;
-  background:#17150f!important;
-  box-shadow:0 0 12px rgba(215,185,111,.12)!important;
+  color:var(--gold-2)!important;
+  border-color:rgba(var(--accent-rgb),.55)!important;
+  background:rgba(var(--accent-rgb),.08)!important;
+  box-shadow:0 0 12px rgba(var(--accent-rgb),.12)!important;
 }
 /* Identificação e visão em um único elemento compacto */
 .side-user-view-card{
@@ -11569,7 +12361,7 @@ const ARGOS_ROUND229_HEADER_SYSTEM_CSS = `
   margin:0 0 12px!important;
   padding:8px 11px!important;
   min-height:52px!important;
-  border:1px solid rgba(225,177,44,.16)!important;
+  border:1px solid rgba(var(--accent-rgb),.16)!important;
   border-radius:12px!important;
   background:rgba(255,255,255,.022)!important;
 }
@@ -11686,8 +12478,8 @@ const ARGOS_ROUND231_FINAL_PLAIN_TABS_CSS = `
 .main .panel-tabs-header .panel-tabs>.panel-tab-link.active,
 .main .panel-tabs-header .panel-tabs>.panel-tab-link[aria-current="page"],
 .main .panel-tabs-header .panel-tabs>.panel-tab-link[aria-selected="true"]{
-  color:#d7b96f!important;
-  border-bottom-color:#d7b96f!important;
+  color:var(--gold-2)!important;
+  border-bottom-color:var(--gold-2)!important;
 }
 `;
 if (typeof document !== 'undefined') {
@@ -11761,12 +12553,12 @@ const ARGOS_ROUND233_UNIFIED_PANEL_HEADERS_CSS = `
   cursor:pointer!important;
   white-space:nowrap!important;
 }
-.main .panel-tabs-header .panel-tab-link:hover{color:#f1e6ce!important}
+.main .panel-tabs-header .panel-tab-link:hover{color:var(--accent-pale)!important}
 .main .panel-tabs-header .panel-tab-link.active,
 .main .panel-tabs-header .panel-tab-link[aria-current="page"],
 .main .panel-tabs-header .panel-tab-link[aria-selected="true"]{
-  color:#d7b96f!important;
-  border-bottom-color:#d7b96f!important;
+  color:var(--gold-2)!important;
+  border-bottom-color:var(--gold-2)!important;
   background:transparent!important;
   box-shadow:none!important;
 }
