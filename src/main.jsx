@@ -1892,6 +1892,19 @@ function driveThumb(url){ if(String(url||'').startsWith('data:')) return url; co
 function argosLogoSrc(value){ return value ? driveDirect(value) : ''; }
 function priorityClass(date){ if(!date) return 'neutral'; const diff=Math.ceil((dObj(date)-dObj(todayStr()))/86400000); if(diff < 0) return 'late'; if(diff <= 1) return 'hot'; if(diff <= 3) return 'warn'; return 'ok'; }
 function priorityText(date){ const c=priorityClass(date); return c==='late'?'Atrasada':c==='hot'?'Urgente':c==='warn'?'Alta':c==='ok'?'Baixa':'Sem prazo'; }
+function imageFileToDataUrl(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+function isMissingStorageBucketError(error){
+  const message=String(error?.message||error||'').toLowerCase();
+  const status=Number(error?.statusCode||error?.status||0);
+  return message.includes('bucket not found') || message.includes('bucket does not exist') || (status===404 && message.includes('bucket'));
+}
 async function uploadImageToSupabase(file, folder='uploads'){
   if(!file) return '';
 
@@ -1906,7 +1919,15 @@ async function uploadImageToSupabase(file, folder='uploads'){
         contentType: file.type
       });
 
-    if(error) throw error;
+    if(error){
+      // Local/Dev pode estar conectado ao Supabase sem possuir o bucket de imagens.
+      // Nesse único caso usamos data URL para permitir testar a aparência sem tocar no Alfa.
+      if(isMissingStorageBucketError(error)){
+        console.warn('Storage bucket "avatars" ausente; usando imagem local para teste.', error);
+        return imageFileToDataUrl(file);
+      }
+      throw error;
+    }
 
     const { data } = supabase.storage
       .from('avatars')
@@ -1915,12 +1936,7 @@ async function uploadImageToSupabase(file, folder='uploads'){
     return data.publicUrl;
   }
 
-  return new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+  return imageFileToDataUrl(file);
 }
 
 async function handleImageUpload(e, cb, folder='uploads'){
@@ -3645,7 +3661,7 @@ function CloudLogin({setAuth,setUsersState,setCompaniesState,setStatusesState,se
     catch(err){ setCloudError(err.message||'Login inválido.'); }
     finally{ setBusy(false); }
   }
-  return <div className="login"><div className="login-card login-card-brand-fixed" style={{padding:'30px 32px 34px'}}><div className="login-logo-big" style={{width:260,height:150,display:'grid',placeItems:'center',border:'none',borderRadius:0,margin:'-44px auto 34px',overflow:'visible',background:'transparent',boxShadow:'none'}}>{loginLogo?<img src={driveDirect(loginLogo)} onError={e=>{ e.currentTarget.style.display='none'; }} style={{width:'100%',height:'100%',objectFit:'contain',objectPosition:'center',display:'block'}}/>:null}</div><h1>{loginTitle}</h1><p>{loginSubtitle}</p>{cloudError&&<div className="cloud-error">{cloudError}</div>}<input value={email} onChange={e=>setEmail(e.target.value)} placeholder="e-mail"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password" onKeyDown={e=>{if(e.key==='Enter')login()}}/><button onClick={login} disabled={busy}>{busy?'Entrando...':'Entrar'}</button></div></div>
+  return <div className="login"><div className="login-card login-card-brand-fixed"><div className="login-logo-big">{loginLogo?<img src={driveDirect(loginLogo)} onError={e=>{ e.currentTarget.style.display='none'; }}/>:null}</div><h1>{loginTitle}</h1><p>{loginSubtitle}</p>{cloudError&&<div className="cloud-error">{cloudError}</div>}<input value={email} onChange={e=>setEmail(e.target.value)} placeholder="e-mail"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password" onKeyDown={e=>{if(e.key==='Enter')login()}}/><button onClick={login} disabled={busy}>{busy?'Entrando...':'Entrar'}</button></div></div>
 }
 
 function SetupRequired(){
@@ -9987,179 +10003,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND56_LOGIN_CENTERED_BRAND_CSS = `
-/* Round 56: melhora o painel de login.
-   Centraliza tudo, dá respiro entre logo e título e deixa a logo mais elegante. */
-.login-card,
-.auth-card,
-.login-panel,
-[class*="login"] .card,
-[class*="auth"] .card {
-  text-align:center!important;
-}
-
-.login-card form,
-.auth-card form,
-.login-panel form,
-[class*="login"] form,
-[class*="auth"] form {
-  text-align:left!important;
-}
-
-.login-card h1,
-.auth-card h1,
-.login-panel h1,
-[class*="login"] h1,
-[class*="auth"] h1 {
-  text-align:center!important;
-  margin-top:16px!important;
-  margin-bottom:14px!important;
-  line-height:1.05!important;
-}
-
-.login-card p,
-.auth-card p,
-.login-panel p,
-[class*="login"] p,
-[class*="auth"] p {
-  text-align:center!important;
-  margin-bottom:26px!important;
-}
-
-.login-card input,
-.auth-card input,
-.login-panel input,
-[class*="login"] input,
-[class*="auth"] input {
-  text-align:left!important;
-}
-
-.login-card button,
-.auth-card button,
-.login-panel button,
-[class*="login"] button,
-[class*="auth"] button {
-  text-align:center!important;
-}
-
-.login-logo,
-.auth-logo,
-.login-brand-logo,
-[class*="login"] img,
-[class*="auth"] img {
-  display:block!important;
-  margin-left:auto!important;
-  margin-right:auto!important;
-  object-fit:contain!important;
-}
-
-/* Logo no topo do card de login */
-.login-card .brand-logo,
-.auth-card .brand-logo,
-.login-panel .brand-logo,
-[class*="login"] .brand-logo,
-[class*="auth"] .brand-logo {
-  margin:0 auto 18px!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  width:150px!important;
-  max-width:70%!important;
-  height:auto!important;
-  min-height:72px!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  overflow:visible!important;
-}
-
-.login-card .brand-logo img,
-.auth-card .brand-logo img,
-.login-panel .brand-logo img,
-[class*="login"] .brand-logo img,
-[class*="auth"] .brand-logo img {
-  width:150px!important;
-  max-width:100%!important;
-  height:auto!important;
-  max-height:92px!important;
-  object-fit:contain!important;
-  object-position:center!important;
-}
-
-/* Quando a logo vier como img direta dentro do painel */
-.login-card > img:first-child,
-.auth-card > img:first-child,
-.login-panel > img:first-child,
-[class*="login"] > img:first-child,
-[class*="auth"] > img:first-child {
-  width:150px!important;
-  max-width:70%!important;
-  height:auto!important;
-  max-height:92px!important;
-  margin:0 auto 18px!important;
-}
-
-/* Fallback com letra quando não existe logo */
-.login-card .brand-logo span,
-.auth-card .brand-logo span,
-.login-panel .brand-logo span,
-[class*="login"] .brand-logo span,
-[class*="auth"] .brand-logo span {
-  font-size:30px!important;
-  font-weight:900!important;
-}
-
-/* Mobile: mantém centralizado e com logo confortável */
-@media (max-width:760px){
-  .login-card,
-  .auth-card,
-  .login-panel,
-  [class*="login"] .card,
-  [class*="auth"] .card {
-    text-align:center!important;
-  }
-
-  .login-card .brand-logo,
-  .auth-card .brand-logo,
-  .login-panel .brand-logo,
-  [class*="login"] .brand-logo,
-  [class*="auth"] .brand-logo {
-    width:138px!important;
-    max-width:76%!important;
-    min-height:68px!important;
-    margin-bottom:16px!important;
-  }
-
-  .login-card .brand-logo img,
-  .auth-card .brand-logo img,
-  .login-panel .brand-logo img,
-  [class*="login"] .brand-logo img,
-  [class*="auth"] .brand-logo img {
-    width:138px!important;
-    max-height:84px!important;
-  }
-
-  .login-card h1,
-  .auth-card h1,
-  .login-panel h1,
-  [class*="login"] h1,
-  [class*="auth"] h1 {
-    text-align:center!important;
-    margin-top:14px!important;
-    margin-bottom:12px!important;
-  }
-
-  .login-card p,
-  .auth-card p,
-  .login-panel p,
-  [class*="login"] p,
-  [class*="auth"] p {
-    text-align:center!important;
-    margin-bottom:24px!important;
-  }
-}
-`;
+const ARGOS_ROUND56_LOGIN_CENTERED_BRAND_CSS = ``;
 if (typeof document !== 'undefined') {
   let style56 = document.getElementById('argos-round56-login-centered-brand');
   if (!style56) {
@@ -10171,75 +10015,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND57_LOGIN_LOGO_BIGGER_CSS = `
-/* Round 57: aumenta a logo do login sem bagunçar o resto */
-.login-card .brand-logo,
-.auth-card .brand-logo,
-.login-panel .brand-logo,
-[class*="login"] .brand-logo,
-[class*="auth"] .brand-logo {
-  width:220px!important;
-  max-width:82%!important;
-  min-height:110px!important;
-  margin:0 auto 20px!important;
-}
-
-.login-card .brand-logo img,
-.auth-card .brand-logo img,
-.login-panel .brand-logo img,
-[class*="login"] .brand-logo img,
-[class*="auth"] .brand-logo img {
-  width:220px!important;
-  max-width:100%!important;
-  max-height:120px!important;
-  object-fit:contain!important;
-  object-position:center!important;
-}
-
-.login-card > img:first-child,
-.auth-card > img:first-child,
-.login-panel > img:first-child,
-[class*="login"] > img:first-child,
-[class*="auth"] > img:first-child {
-  width:220px!important;
-  max-width:82%!important;
-  max-height:120px!important;
-  margin:0 auto 20px!important;
-}
-
-@media (max-width:760px){
-  .login-card .brand-logo,
-  .auth-card .brand-logo,
-  .login-panel .brand-logo,
-  [class*="login"] .brand-logo,
-  [class*="auth"] .brand-logo {
-    width:190px!important;
-    max-width:82%!important;
-    min-height:96px!important;
-    margin-bottom:18px!important;
-  }
-
-  .login-card .brand-logo img,
-  .auth-card .brand-logo img,
-  .login-panel .brand-logo img,
-  [class*="login"] .brand-logo img,
-  [class*="auth"] .brand-logo img {
-    width:190px!important;
-    max-height:104px!important;
-  }
-
-  .login-card > img:first-child,
-  .auth-card > img:first-child,
-  .login-panel > img:first-child,
-  [class*="login"] > img:first-child,
-  [class*="auth"] > img:first-child {
-    width:190px!important;
-    max-width:82%!important;
-    max-height:104px!important;
-    margin-bottom:18px!important;
-  }
-}
-`;
+const ARGOS_ROUND57_LOGIN_LOGO_BIGGER_CSS = ``;
 if (typeof document !== 'undefined') {
   let style57 = document.getElementById('argos-round57-login-logo-bigger');
   if (!style57) {
@@ -10251,87 +10027,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND58_LOGIN_LOGO_RESTORE_SIZE_CSS = `
-/* Round 58: volta a sensação de tamanho da logo anterior.
-   O problema era o respiro interno da imagem, então aqui aumentamos visualmente com scale
-   e apenas damos mais distância do título. */
-.login-card .brand-logo,
-.auth-card .brand-logo,
-.login-panel .brand-logo,
-[class*="login"] .brand-logo,
-[class*="auth"] .brand-logo {
-  width:230px!important;
-  max-width:86%!important;
-  height:120px!important;
-  min-height:120px!important;
-  margin:0 auto 38px!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  overflow:visible!important;
-  border:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-}
-
-.login-card .brand-logo img,
-.auth-card .brand-logo img,
-.login-panel .brand-logo img,
-[class*="login"] .brand-logo img,
-[class*="auth"] .brand-logo img {
-  width:230px!important;
-  max-width:100%!important;
-  height:auto!important;
-  max-height:120px!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  transform:scale(1.72)!important;
-  transform-origin:center center!important;
-}
-
-.login-card h1,
-.auth-card h1,
-.login-panel h1,
-[class*="login"] h1,
-[class*="auth"] h1 {
-  margin-top:0!important;
-  margin-bottom:16px!important;
-  text-align:center!important;
-}
-
-.login-card p,
-.auth-card p,
-.login-panel p,
-[class*="login"] p,
-[class*="auth"] p {
-  text-align:center!important;
-  margin-bottom:28px!important;
-}
-
-@media (max-width:760px){
-  .login-card .brand-logo,
-  .auth-card .brand-logo,
-  .login-panel .brand-logo,
-  [class*="login"] .brand-logo,
-  [class*="auth"] .brand-logo {
-    width:210px!important;
-    max-width:86%!important;
-    height:110px!important;
-    min-height:110px!important;
-    margin-bottom:34px!important;
-  }
-
-  .login-card .brand-logo img,
-  .auth-card .brand-logo img,
-  .login-panel .brand-logo img,
-  [class*="login"] .brand-logo img,
-  [class*="auth"] .brand-logo img {
-    width:210px!important;
-    max-height:110px!important;
-    transform:scale(1.72)!important;
-  }
-}
-`;
+const ARGOS_ROUND58_LOGIN_LOGO_RESTORE_SIZE_CSS = ``;
 
 if (typeof document !== 'undefined') {
   let style58 = document.getElementById('argos-round58-login-logo-restore-size');
@@ -10344,137 +10040,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND59_LOGIN_LOGO_REAL_FIX_CSS = `
-/* Round 59: correção real da logo no login.
-   Mira no card de login e em qualquer imagem/brand visual no topo.
-   Objetivo: logo grande como antes, mas com respiro do título. */
-
-/* Card de login centralizado */
-.login-card,
-.auth-card,
-.login-panel,
-[class*="login"] .card,
-[class*="auth"] .card {
-  text-align:center!important;
-}
-
-/* Qualquer container visual de marca dentro da tela de login */
-.login-card .brand,
-.auth-card .brand,
-.login-panel .brand,
-.login-card .brand-logo,
-.auth-card .brand-logo,
-.login-panel .brand-logo,
-.login-card [class*="logo"],
-.auth-card [class*="logo"],
-.login-panel [class*="logo"],
-[class*="login"] .brand,
-[class*="auth"] .brand,
-[class*="login"] .brand-logo,
-[class*="auth"] .brand-logo,
-[class*="login"] [class*="logo"],
-[class*="auth"] [class*="logo"] {
-  width:260px!important;
-  max-width:86%!important;
-  height:118px!important;
-  min-height:118px!important;
-  margin:0 auto 34px!important;
-  padding:0!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  background:transparent!important;
-  border:0!important;
-  box-shadow:none!important;
-  overflow:visible!important;
-}
-
-/* Imagem da logo dentro do login, independente da classe */
-.login-card img,
-.auth-card img,
-.login-panel img,
-[class*="login"] img,
-[class*="auth"] img {
-  width:240px!important;
-  max-width:86%!important;
-  height:auto!important;
-  max-height:118px!important;
-  min-height:auto!important;
-  display:block!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  margin:0 auto!important;
-  transform:scale(1.45)!important;
-  transform-origin:center center!important;
-}
-
-/* Título mais separado da logo */
-.login-card h1,
-.auth-card h1,
-.login-panel h1,
-[class*="login"] h1,
-[class*="auth"] h1 {
-  margin-top:10px!important;
-  margin-bottom:18px!important;
-  text-align:center!important;
-  line-height:1.05!important;
-}
-
-/* Texto de apoio */
-.login-card p,
-.auth-card p,
-.login-panel p,
-[class*="login"] p,
-[class*="auth"] p {
-  text-align:center!important;
-  margin-bottom:30px!important;
-}
-
-/* Inputs continuam normais */
-.login-card input,
-.auth-card input,
-.login-panel input,
-[class*="login"] input,
-[class*="auth"] input {
-  text-align:left!important;
-}
-
-/* Mobile */
-@media (max-width:760px){
-  .login-card .brand,
-  .auth-card .brand,
-  .login-panel .brand,
-  .login-card .brand-logo,
-  .auth-card .brand-logo,
-  .login-panel .brand-logo,
-  .login-card [class*="logo"],
-  .auth-card [class*="logo"],
-  .login-panel [class*="logo"],
-  [class*="login"] .brand,
-  [class*="auth"] .brand,
-  [class*="login"] .brand-logo,
-  [class*="auth"] .brand-logo,
-  [class*="login"] [class*="logo"],
-  [class*="auth"] [class*="logo"] {
-    width:230px!important;
-    max-width:88%!important;
-    height:104px!important;
-    min-height:104px!important;
-    margin-bottom:30px!important;
-  }
-
-  .login-card img,
-  .auth-card img,
-  .login-panel img,
-  [class*="login"] img,
-  [class*="auth"] img {
-    width:215px!important;
-    max-width:88%!important;
-    max-height:104px!important;
-    transform:scale(1.45)!important;
-  }
-}
-`;
+const ARGOS_ROUND59_LOGIN_LOGO_REAL_FIX_CSS = ``;
 
 if (typeof document !== 'undefined') {
   let style59 = document.getElementById('argos-round59-login-logo-real-fix');
@@ -10487,123 +10053,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND60_LOGIN_LOGO_CROP_SCALE_CSS = `
-/* Round 60: aumenta o DESENHO visível da logo no login.
-   A imagem tem respiro/transparência interna, então aumentar só width não resolve.
-   Aqui o container corta esse respiro e a imagem é ampliada dentro dele. */
-
-.login-card .brand-logo,
-.auth-card .brand-logo,
-.login-panel .brand-logo,
-[class*="login"] .brand-logo,
-[class*="auth"] .brand-logo {
-  width:220px!important;
-  height:92px!important;
-  min-height:92px!important;
-  max-height:92px!important;
-  margin:0 auto 34px!important;
-  padding:0!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  overflow:hidden!important;
-  background:transparent!important;
-  border:0!important;
-  border-radius:0!important;
-  box-shadow:none!important;
-}
-
-/* Mira a imagem real da logo dentro do bloco */
-.login-card .brand-logo img,
-.auth-card .brand-logo img,
-.login-panel .brand-logo img,
-[class*="login"] .brand-logo img,
-[class*="auth"] .brand-logo img {
-  width:220px!important;
-  height:220px!important;
-  max-width:none!important;
-  max-height:none!important;
-  min-width:220px!important;
-  min-height:220px!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  transform:none!important;
-  margin:0!important;
-  display:block!important;
-}
-
-/* Caso o login use imagem direta fora de .brand-logo */
-.login-card > img:first-child,
-.auth-card > img:first-child,
-.login-panel > img:first-child,
-[class*="login"] > img:first-child,
-[class*="auth"] > img:first-child {
-  width:220px!important;
-  height:92px!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  margin:0 auto 34px!important;
-  display:block!important;
-}
-
-/* Título e apoio continuam centralizados, só com respiro decente */
-.login-card h1,
-.auth-card h1,
-.login-panel h1,
-[class*="login"] h1,
-[class*="auth"] h1 {
-  text-align:center!important;
-  margin-top:0!important;
-  margin-bottom:16px!important;
-  line-height:1.05!important;
-}
-
-.login-card p,
-.auth-card p,
-.login-panel p,
-[class*="login"] p,
-[class*="auth"] p {
-  text-align:center!important;
-  margin-bottom:28px!important;
-}
-
-@media (max-width:760px){
-  .login-card .brand-logo,
-  .auth-card .brand-logo,
-  .login-panel .brand-logo,
-  [class*="login"] .brand-logo,
-  [class*="auth"] .brand-logo {
-    width:205px!important;
-    height:86px!important;
-    min-height:86px!important;
-    max-height:86px!important;
-    margin-bottom:30px!important;
-  }
-
-  .login-card .brand-logo img,
-  .auth-card .brand-logo img,
-  .login-panel .brand-logo img,
-  [class*="login"] .brand-logo img,
-  [class*="auth"] .brand-logo img {
-    width:205px!important;
-    height:205px!important;
-    min-width:205px!important;
-    min-height:205px!important;
-    max-width:none!important;
-    max-height:none!important;
-  }
-
-  .login-card > img:first-child,
-  .auth-card > img:first-child,
-  .login-panel > img:first-child,
-  [class*="login"] > img:first-child,
-  [class*="auth"] > img:first-child {
-    width:205px!important;
-    height:86px!important;
-    margin-bottom:30px!important;
-  }
-}
-`;
+const ARGOS_ROUND60_LOGIN_LOGO_CROP_SCALE_CSS = ``;
 
 if (typeof document !== 'undefined') {
   let style60 = document.getElementById('argos-round60-login-logo-crop-scale');
@@ -10616,47 +10066,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND61_LOGIN_LOGO_INLINE_FIX_CSS = `
-/* Round 61: ajuste direto no elemento real .login-logo-big */
-.login .login-card .login-logo-big{
-  width:260px!important;
-  height:150px!important;
-  margin:0 auto 34px!important;
-  display:grid!important;
-  place-items:center!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  overflow:visible!important;
-}
-.login .login-card .login-logo-big img{
-  width:100%!important;
-  height:100%!important;
-  max-width:100%!important;
-  max-height:100%!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  display:block!important;
-  transform:none!important;
-}
-.login .login-card h1{
-  text-align:center!important;
-  margin-top:0!important;
-  margin-bottom:16px!important;
-}
-.login .login-card p{
-  text-align:center!important;
-  margin-bottom:28px!important;
-}
-@media(max-width:760px){
-  .login .login-card .login-logo-big{
-    width:230px!important;
-    height:132px!important;
-    margin-bottom:30px!important;
-  }
-}
-`;
+const ARGOS_ROUND61_LOGIN_LOGO_INLINE_FIX_CSS = ``;
 if (typeof document !== 'undefined') {
   let style61 = document.getElementById('argos-round61-login-logo-inline-fix');
   if (!style61) {
@@ -10668,61 +10078,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND62_LOGIN_TOP_SPACING_CSS = `
-/* Round 62: mantém a logo grande, mas reduz o espaço morto no topo do card de login */
-.login .login-card{
-  padding-top:34px!important;
-  padding-bottom:34px!important;
-}
-
-.login .login-card .login-logo-big{
-  width:260px!important;
-  height:150px!important;
-  margin:0 auto 22px!important;
-  display:grid!important;
-  place-items:center!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  overflow:visible!important;
-}
-
-.login .login-card .login-logo-big img{
-  width:100%!important;
-  height:100%!important;
-  max-width:100%!important;
-  max-height:100%!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  display:block!important;
-  transform:none!important;
-}
-
-.login .login-card h1{
-  margin-top:0!important;
-  margin-bottom:14px!important;
-  text-align:center!important;
-}
-
-.login .login-card p{
-  margin-bottom:26px!important;
-  text-align:center!important;
-}
-
-@media(max-width:760px){
-  .login .login-card{
-    padding-top:32px!important;
-    padding-bottom:32px!important;
-  }
-
-  .login .login-card .login-logo-big{
-    width:230px!important;
-    height:132px!important;
-    margin-bottom:20px!important;
-  }
-}
-`;
+const ARGOS_ROUND62_LOGIN_TOP_SPACING_CSS = ``;
 
 if (typeof document !== 'undefined') {
   let style62 = document.getElementById('argos-round62-login-top-spacing');
@@ -10735,49 +10091,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND63_LOGIN_LOGO_TOP_PULL_CSS = `
-/* Round 63: correção direta.
-   O espaço vinha do padding do card + caixa alta da logo.
-   Aqui o card fica com padding menor e a logo sobe sem perder tamanho. */
-.login .login-card.login-card-brand-fixed{
-  padding:30px 32px 34px!important;
-}
-
-.login .login-card.login-card-brand-fixed .login-logo-big{
-  width:260px!important;
-  height:150px!important;
-  margin:-44px auto 34px!important;
-}
-
-.login .login-card.login-card-brand-fixed .login-logo-big img{
-  width:100%!important;
-  height:100%!important;
-  object-fit:contain!important;
-  object-position:center!important;
-  transform:none!important;
-}
-
-.login .login-card.login-card-brand-fixed h1{
-  margin-top:0!important;
-  margin-bottom:14px!important;
-}
-
-.login .login-card.login-card-brand-fixed p{
-  margin-bottom:26px!important;
-}
-
-@media(max-width:760px){
-  .login .login-card.login-card-brand-fixed{
-    padding:28px 26px 32px!important;
-  }
-
-  .login .login-card.login-card-brand-fixed .login-logo-big{
-    width:230px!important;
-    height:132px!important;
-    margin:-34px auto 28px!important;
-  }
-}
-`;
+const ARGOS_ROUND63_LOGIN_LOGO_TOP_PULL_CSS = ``;
 
 if (typeof document !== 'undefined') {
   let style63 = document.getElementById('argos-round63-login-logo-top-pull');
@@ -10790,42 +10104,7 @@ if (typeof document !== 'undefined') {
 }
 
 
-const ARGOS_ROUND64_LOGIN_LOGO_BALANCE_CSS = `
-/* Round 64: equilíbrio visual do login.
-   Logo mais próxima da borda superior e mais afastada do título. */
-.login .login-card.login-card-brand-fixed{
-  padding:30px 32px 34px!important;
-}
-
-.login .login-card.login-card-brand-fixed .login-logo-big{
-  width:260px!important;
-  height:150px!important;
-  margin:-44px auto 34px!important;
-}
-
-.login .login-card.login-card-brand-fixed h1{
-  margin-top:0!important;
-  margin-bottom:14px!important;
-  text-align:center!important;
-}
-
-.login .login-card.login-card-brand-fixed p{
-  margin-bottom:26px!important;
-  text-align:center!important;
-}
-
-@media(max-width:760px){
-  .login .login-card.login-card-brand-fixed{
-    padding:28px 26px 32px!important;
-  }
-
-  .login .login-card.login-card-brand-fixed .login-logo-big{
-    width:230px!important;
-    height:132px!important;
-    margin:-34px auto 28px!important;
-  }
-}
-`;
+const ARGOS_ROUND64_LOGIN_LOGO_BALANCE_CSS = ``;
 
 if (typeof document !== 'undefined') {
   let style64 = document.getElementById('argos-round64-login-logo-balance');
@@ -12239,42 +11518,7 @@ if (typeof document !== 'undefined') {
   style85.textContent = ARGOS_ROUND85_USERS_AUTH_EDGE_FIX_CSS;
 }
 
-const ARGOS_ROUND93_MOBILE_LOGIN_LOGO_REBALANCE_CSS = `
-/* Round 93: desfaz a logo gigante no mobile.
-   Mantém a logo carregando, mas com proporção elegante de tela de login. */
-@media (max-width:760px){
-  .login .login-card.login-card-brand-fixed{
-    padding:34px 26px 32px!important;
-  }
-
-  .login .login-card.login-card-brand-fixed .login-logo-big,
-  .login .login-card .login-logo-big{
-    width:132px!important;
-    height:82px!important;
-    margin:0 auto 22px!important;
-  }
-
-  .login .login-card.login-card-brand-fixed .login-logo-big img,
-  .login .login-card .login-logo-big img{
-    width:100%!important;
-    height:100%!important;
-    max-width:100%!important;
-    max-height:100%!important;
-    object-fit:contain!important;
-    object-position:center!important;
-    transform:none!important;
-  }
-
-  .login .login-card.login-card-brand-fixed h1{
-    margin-top:0!important;
-    margin-bottom:18px!important;
-  }
-
-  .login .login-card.login-card-brand-fixed p{
-    margin-bottom:30px!important;
-  }
-}
-`;
+const ARGOS_ROUND93_MOBILE_LOGIN_LOGO_REBALANCE_CSS = ``;
 if (typeof document !== 'undefined') {
   let style93 = document.getElementById('argos-round93-mobile-login-logo-rebalance');
   if (!style93) {
@@ -13054,3 +12298,42 @@ if (typeof document !== 'undefined') {
   }
   style282.textContent = ARGOS_ROUND282_MONTH_GAP_ROOT_CAUSE_CSS;
 }
+
+
+const ARGOS_ROUND284_PORTAL_TOUCH_CSS = `
+/* Round284: glow suave na prévia do post. */
+.task-page .insta{
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb),.08),
+    0 0 34px rgba(var(--accent-rgb),.11),
+    0 18px 48px rgba(var(--accent-rgb),.075)!important;
+  transition:box-shadow .22s ease,transform .22s ease!important;
+}
+.task-page .insta:hover{
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb),.13),
+    0 0 40px rgba(var(--accent-rgb),.14),
+    0 20px 52px rgba(var(--accent-rgb),.09)!important;
+}
+`;
+if (typeof document !== 'undefined') {
+  let style284 = document.getElementById('argos-round284-portal-touch');
+  if (!style284) {
+    style284 = document.createElement('style');
+    style284.id = 'argos-round284-portal-touch';
+    document.head.appendChild(style284);
+  }
+  style284.textContent = ARGOS_ROUND284_PORTAL_TOUCH_CSS;
+}
+
+const ARGOS_ROUND286_LOGIN_LOGO_CENTER_CSS = ``;
+if (typeof document !== 'undefined') {
+  let style286 = document.getElementById('argos-round286-login-logo-center');
+  if (!style286) {
+    style286 = document.createElement('style');
+    style286.id = 'argos-round286-login-logo-center';
+    document.head.appendChild(style286);
+  }
+  style286.textContent = ARGOS_ROUND286_LOGIN_LOGO_CENTER_CSS;
+}
+

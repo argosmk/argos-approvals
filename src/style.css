@@ -6055,3 +6055,78 @@ input[type="checkbox"],
   .main .calendar-main .month{padding-top:4px!important;}
   .main .calendar-main .days{grid-auto-rows:minmax(86px,auto)!important;}
 }
+
+/* Login: composição canônica da marca.
+   Uma única fonte visual para impedir conflito com regras históricas. */
+.login > .login-card.login-card-brand-fixed{
+  width:min(380px,calc(100vw - 32px))!important;
+  padding:42px 32px 34px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  gap:0!important;
+}
+
+.login > .login-card.login-card-brand-fixed > .login-logo-big{
+  width:min(220px,100%)!important;
+  height:112px!important;
+  min-height:112px!important;
+  max-height:112px!important;
+  margin:0 auto 30px!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+.login > .login-card.login-card-brand-fixed > .login-logo-big > img{
+  display:block!important;
+  width:auto!important;
+  height:auto!important;
+  max-width:208px!important;
+  max-height:100px!important;
+  margin:auto!important;
+  object-fit:contain!important;
+  object-position:center center!important;
+  transform:none!important;
+}
+
+.login > .login-card.login-card-brand-fixed > h1{
+  margin:0 0 16px!important;
+  text-align:center!important;
+}
+
+.login > .login-card.login-card-brand-fixed > p{
+  margin:0 0 30px!important;
+  text-align:center!important;
+}
+
+.login > .login-card.login-card-brand-fixed > input{
+  margin-bottom:14px!important;
+}
+
+.login > .login-card.login-card-brand-fixed > button{
+  margin-top:2px!important;
+}
+
+@media(max-width:760px){
+  .login > .login-card.login-card-brand-fixed{
+    padding:36px 26px 32px!important;
+  }
+  .login > .login-card.login-card-brand-fixed > .login-logo-big{
+    width:min(196px,100%)!important;
+    height:102px!important;
+    min-height:102px!important;
+    max-height:102px!important;
+    margin:0 auto 26px!important;
+  }
+  .login > .login-card.login-card-brand-fixed > .login-logo-big > img{
+    max-width:186px!important;
+    max-height:90px!important;
+  }
+}
+
