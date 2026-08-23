@@ -5303,6 +5303,11 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   const canViewDetail=id=>detailVisible[id]!==false;
   const canEditDetail=id=>canViewDetail(id)&&detailEditable[id]===true;
   const canApprovePosts=taskPermissionSet.canApprovePosts===true;
+  const approveCopyStatusId=statuses.find(s=>slug(s?.name)==='aprovar-copy')?.id||null;
+  const createCopyStatusId=statuses.find(s=>['criar-copy','copy'].includes(slug(s?.name)))?.id||'copy';
+  const approveCopyIndex=approveCopyStatusId?statuses.findIndex(s=>s.id===approveCopyStatusId):-1;
+  const createPostStatusId=statuses.find(s=>slug(s?.name)==='criar-post')?.id||(approveCopyIndex>=0?statuses.slice(approveCopyIndex+1).find(s=>s.active!==false)?.id:null)||'edicao';
+  const isApproveCopyStatus=!!approveCopyStatusId&&task.status===approveCopyStatusId;
   const configCompanies=isClient
     ? companies.filter(c=>c.id===task.companyId||(effectiveUser.companyIds||[]).includes(c.id))
     : companies;
@@ -5419,7 +5424,24 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
 
     updateTask(task.id,patch,reason?'Marcado como aguardando com comentário.':'Marcado como aguardando.');
   } 
-  function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); updateTask(task.id,{status:'agendamento',statusLogText:`${effectiveUser.name} aprovou a tarefa`}); setClientForm(null); } 
+  function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); updateTask(task.id,{status:'agendamento',statusLogText:`${effectiveUser.name} aprovou a tarefa`}); setClientForm(null); }
+  function approveCopy(){
+    if(!createPostStatusId) return alert('Não foi possível identificar o próximo status após Aprovar copy.');
+    updateTask(task.id,{status:createPostStatusId,statusLogText:`${effectiveUser.name} aprovou a copy`});
+    setClientForm(null);
+  }
+  function requestCopyChange(){
+    const desc=String(clientForm?.copyDescription||'').trim();
+    if(!desc) return alert('Descreva o que precisa ser alterado na copy.');
+    const text=`Solicitação de alteração na copy\nDescrição: ${desc}`;
+    const eventAt=now();
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false};
+    updateTask(task.id,{status:createCopyStatusId,logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} solicitou alteração na copy`});
+    if(isClient){
+      notifyTask(task,text,CLIENT_REQUEST_NOTIFICATION_EVENT,createCopyStatusId,effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});
+    }
+    setClientForm(null);
+  }
   function requestChange(){
     const items=[];
     if(clientForm?.artChange) items.push('Alterar arte/vídeo');
@@ -5499,7 +5521,7 @@ Descrição: ${desc}`;
   {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined,'--status-color':statusById[task.status]?.color||'var(--line)'}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select></div></label>}
   {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
   {canViewDetail('postDate')&&<label>Data do post<input disabled={!canEditDetail('postDate')} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label>}
-</div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2>{canEditDetail('comments')&&<div className="comment-line"><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{canViewDetail('history')&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div>{showBackToTop&&<button type="button" className="app-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo"><BackToTopGlyph/></button>}</section> 
+</div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&isApproveCopyStatus&&<CopyApprovalForm form={clientForm} setForm={setClientForm} approveCopy={approveCopy} requestCopyChange={requestCopyChange} statusById={statusById} createPostStatusId={createPostStatusId} createCopyStatusId={createCopyStatusId}/>} {canApprovePosts&&['alteracao','agendamento'].includes(task.status)&&<button style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2>{canEditDetail('comments')&&<div className="comment-line"><AutoTextarea className="comment-compose" value={comment} onChange={e=>setComment(e.target.value)} minHeight={42} rows={1} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{canViewDetail('history')&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div>{showBackToTop&&<button type="button" className="app-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo"><BackToTopGlyph/></button>}</section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6c-1.7-1.9-4.4-2-6.2-.3L12 6.7 9.4 4.3C7.6 2.6 4.9 2.7 3.2 4.6c-1.8 2-1.6 5.1.4 7l8.4 7.8 8.4-7.8c2-1.9 2.2-5 .4-7Z"/></svg>
@@ -5507,6 +5529,22 @@ function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 3 9.8 14.6M22 3l-7 19-5.2-7.4L2 11.2 22 3Z"/></svg>
   <svg className="save-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3Z"/></svg>
 </div> }
+function CopyApprovalForm({form,setForm,approveCopy,requestCopyChange,statusById,createPostStatusId,createCopyStatusId}){
+  const f=form||{};
+  const F=(k,v)=>setForm({...f,[k]:v});
+  const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {background:color,borderColor:color,color:'#050505'}; };
+  const canRequest=String(f.copyDescription||'').trim().length>0;
+  return <div className="client-actions copy-approval-form">
+    <h3>Aprovar copy</h3>
+    <p className="muted-note">Confirme a copy para seguir para a criação do post.</p>
+    <button style={buttonStyle(createPostStatusId)} onClick={approveCopy}>Aprovar copy</button>
+    <h3>Solicitar alteração</h3>
+    <AutoTextarea value={f.copyDescription||''} onChange={e=>F('copyDescription',e.target.value)} minHeight={88} placeholder="Descreva o que precisa ser alterado na copy"/>
+    <button style={canRequest?buttonStyle(createCopyStatusId):undefined} disabled={!canRequest} onClick={requestCopyChange}>Solicitar alteração</button>
+    {!canRequest&&<small>Descreva o ajuste para liberar a solicitação.</small>}
+  </div>;
+}
+
 function ClientApprovalForm({form,setForm,approve,requestChange,statusById}){ 
   const f=form||{}; 
   const F=(k,v)=>setForm({...f,[k]:v}); 

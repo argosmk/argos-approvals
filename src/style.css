@@ -6130,3 +6130,49 @@ input[type="checkbox"],
   }
 }
 
+
+/* Round287: Aprovar copy + comentários expansivos */
+.comments-panel .comment-line{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:end!important;
+  gap:8px!important;
+}
+.comments-panel .comment-compose{
+  min-height:42px!important;
+  max-height:240px!important;
+  margin:0!important;
+  line-height:1.45!important;
+  white-space:pre-wrap!important;
+  overflow-y:auto!important;
+  resize:vertical!important;
+}
+.comments-panel .comment-line>button{
+  min-height:42px!important;
+  align-self:end!important;
+}
+.comments-panel .comment-log p{
+  white-space:pre-wrap!important;
+  overflow-wrap:anywhere!important;
+}
+.copy-approval-form{
+  margin-top:4px!important;
+}
+.copy-approval-form>h3:not(:first-child){
+  margin-top:14px!important;
+}
+.copy-approval-form .muted-note{
+  margin:-4px 0 2px!important;
+}
+.copy-approval-form textarea{
+  min-height:88px!important;
+  line-height:1.5!important;
+}
+@media(max-width:760px){
+  .comments-panel .comment-line{
+    grid-template-columns:1fr!important;
+  }
+  .comments-panel .comment-line>button{
+    width:100%!important;
+  }
+}
