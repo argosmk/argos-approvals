@@ -3758,8 +3758,20 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
   const roleLabel = viewAs ? 'Visualização simulada' : baseRoleLabel;
   const viewCardSubtitle = realAdmin ? (viewAs ? `${baseRoleLabel} • visão simulada` : 'Minha visão') : baseRoleLabel;
   const activeViewUsers = users.filter(u=>u.active && u.role!=='admin');
-  const teamViewUsers = activeViewUsers.filter(u=>u.role==='team');
+  const teamViewUsers = activeViewUsers.filter(u=>u.role==='team').sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}));
   const clientViewUsers = activeViewUsers.filter(u=>u.role==='client');
+  const clientViewGroups = [...companies]
+    .filter(company=>clientViewUsers.some(user=>(user.companyIds||[]).includes(company.id)))
+    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}))
+    .map(company=>({
+      company,
+      users:clientViewUsers
+        .filter(user=>(user.companyIds||[]).includes(company.id))
+        .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}))
+    }));
+  const ungroupedClientViewUsers = clientViewUsers
+    .filter(user=>!(user.companyIds||[]).some(companyId=>companies.some(company=>company.id===companyId)))
+    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}));
   const goScreen=(id)=>{ setScreen(id); setMobileMenuOpen(false); };
   const pendingNotificationsCount = (notifications||[]).filter(n=>n?.userId===effectiveUser?.id && !n?.done).length;
   return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')}>
@@ -3778,7 +3790,7 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
       </div>
       <div className={`side-user-view-card ${realAdmin?'is-selectable':''}`.trim()}>
         <div className="side-user-view-identity"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{viewCardSubtitle}</small></div></div>
-        {realAdmin&&<><span className="side-user-view-arrow" aria-hidden="true">▾</span><select className="side-user-view-select" aria-label="Selecionar visualização" value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><option disabled>— Pessoas da equipe —</option>{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}<option disabled>— Usuários clientes —</option>{clientViewUsers.length?clientViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhum cliente ativo</option>}</select></>}
+        {realAdmin&&<><span className="side-user-view-arrow" aria-hidden="true">▾</span><select className="side-user-view-select" aria-label="Selecionar visualização" value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup>{clientViewGroups.map(group=><optgroup label={group.company.name} key={group.company.id}>{group.users.map(u=><option value={u.id} key={`${group.company.id}-${u.id}`}>{u.name}</option>)}</optgroup>)}{ungroupedClientViewUsers.length>0&&<optgroup label="Sem empresa">{ungroupedClientViewUsers.map(u=><option value={u.id} key={`ungrouped-${u.id}`}>{u.name}</option>)}</optgroup>}{!clientViewGroups.length&&!ungroupedClientViewUsers.length&&<optgroup label="Usuários clientes"><option disabled>Nenhum cliente ativo</option></optgroup>}</select></>}
       </div>
       <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<span className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</span>}</button>)}</nav>
       <div className="spacer"/>
