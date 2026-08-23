@@ -6176,3 +6176,59 @@ input[type="checkbox"],
     width:100%!important;
   }
 }
+
+/* Round288: status compostos em uma única linha */
+.task-title > span{
+  white-space:nowrap!important;
+  width:max-content!important;
+  min-width:max-content!important;
+  flex:0 0 auto!important;
+}
+
+/* Kanban: ganha largura suficiente para nomes de status compostos */
+.kanban .col{
+  min-width:270px!important;
+  flex:1 0 270px!important;
+  max-width:310px!important;
+}
+.kanban .col > h3{
+  gap:12px!important;
+}
+.kanban .col > h3 > span{
+  white-space:nowrap!important;
+  min-width:max-content!important;
+  flex:0 0 auto!important;
+}
+.kanban .col > h3 > b{
+  white-space:nowrap!important;
+  flex:0 0 auto!important;
+}
+
+/* Calendário: legenda um pouco mais larga e nomes sempre em uma linha */
+.calendar-layout{
+  grid-template-columns:240px minmax(0,1fr)!important;
+}
+.calendar-layout .legend .legend-row{
+  grid-template-columns:12px minmax(0,1fr) auto!important;
+}
+.calendar-layout .legend .legend-row > span{
+  white-space:nowrap!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  min-width:max-content!important;
+}
+
+@media(max-width:1180px){
+  .calendar-layout{
+    grid-template-columns:1fr!important;
+  }
+}
+
+@media(max-width:760px){
+  .kanban .col{
+    min-width:260px!important;
+    flex-basis:260px!important;
+    max-width:290px!important;
+  }
+}
+
