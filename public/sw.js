@@ -9,6 +9,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+self.addEventListener('fetch', () => {
+  // passthrough — não intercepta nem cacheia, só existe pra ajudar o Chrome a considerar o app instalável.
+});
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -20,8 +24,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Argos';
   const options = {
     body: data.body || '',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: 'https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png',
+    badge: 'https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png',
     tag: data.taskId ? `argos-task-${data.taskId}` : undefined,
     data: { url: data.url || '/' },
   };

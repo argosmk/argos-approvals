@@ -8,6 +8,9 @@
   "background_color": "#14171f",
   "theme_color": "#14171f",
   "icons": [
-    { "src": "https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
+    { "src": "https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
