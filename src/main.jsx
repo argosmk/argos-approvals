@@ -3970,7 +3970,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   function goToClientTask(target){ if(!target) return; pauseTimer('Timer pausado ao trocar de tarefa.'); open(target.id); setSlide(0); }
   const hiddenTeam=isTeam&&!canAccess; 
   const showTeamProtected=!hiddenTeam && !isClient;
-  const actionStyle=(statusId,solid=true)=>{ const color=statusById[statusId]?.color||'var(--gold)'; return solid?{background:`${color}22`,borderColor:color,color}:{borderColor:color,color}; };
+  const actionStyle=(statusId,solid=true)=>{ const color=statusById[statusId]?.color||'var(--gold)'; return {borderColor:color,color,'--tint':color}; };
   function start(){
     const patch={startedAt:now(), startedById:effectiveUser.id, timerHeartbeatAt:now()};
     if(task.status==='aguardando'){
@@ -4160,7 +4160,7 @@ function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
 function CopyApprovalForm({form,setForm,approveCopy,requestCopyChange,statusById,createPostStatusId,createCopyStatusId}){
   const f=form||{};
   const F=(k,v)=>setForm({...f,[k]:v});
-  const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {background:`${color}22`,borderColor:color,color}; };
+  const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {borderColor:color,color,'--tint':color}; };
   const canRequest=String(f.copyDescription||'').trim().length>0;
   return <div className="client-actions copy-approval-form">
     <h3>Aprovar copy</h3>
@@ -4177,7 +4177,7 @@ function ClientApprovalForm({form,setForm,approve,requestChange,statusById}){
   const f=form||{}; 
   const F=(k,v)=>setForm({...f,[k]:v}); 
   const hasChange=!!(f.artChange||f.text||f.captionChange||f.redo);
-  const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {background:`${color}22`,borderColor:color,color}; };
+  const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {borderColor:color,color,'--tint':color}; };
   const canRequest=hasChange && String(f.description||'').trim().length>0;
   function toggleRedo(checked){
     if(checked){

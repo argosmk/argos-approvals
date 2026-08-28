@@ -19,7 +19,7 @@ html,body,#root{min-height:100%;margin:0}
 body{
   background:var(--bg);
   color:var(--text);
-  font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:"Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size:14px;
   line-height:1.45;
   letter-spacing:-.015em;
@@ -6860,6 +6860,7 @@ input[type="date"]:disabled::-webkit-calendar-picker-indicator{
   font-size:10px!important;
   font-weight:800!important;
   line-height:1!important;
+  box-shadow:0 0 0 2px var(--bg)!important;
   box-shadow:0 0 0 1px rgba(5,5,5,.9)!important;
   pointer-events:none!important;
 }
@@ -11548,3 +11549,69 @@ button:not(:disabled):active{
 }
 .month::-webkit-scrollbar{height:8px;}
 .month::-webkit-scrollbar-thumb{background:rgba(var(--accent-rgb),.32);border-radius:999px;}
+
+/* ============================================================================
+   REFINO DE DESIGN — fonte, traços e botões de status, 2026-08-27
+   ============================================================================ */
+
+/* Traço padrão um pouco mais discreto/refinado em todo o sistema
+   (painéis, inputs, divisórias herdam de --line). */
+:root{
+  --line:rgba(255,255,255,.06);
+}
+
+/* Botões de ação por status: agora ficam só com contorno + texto na cor
+   do status em repouso — preenchem com a cor só ao passar o mouse.
+   Usa color-mix() lendo a cor real (--tint) que veio do JS, então não
+   precisa hardcodar cor por status aqui. */
+.status-tinted{
+  background:transparent!important;
+}
+.status-tinted:hover{
+  background:color-mix(in srgb, var(--tint) 20%, transparent)!important;
+  box-shadow:0 0 0 1px var(--tint) inset!important;
+}
+
+/* ============================================================================
+   Correção de ritmo visual — modal de criar tarefa, 2026-08-27
+   Antes: rótulo ficava a 6px da própria caixa, mas o espaço até o campo
+   ANTERIOR também era pequeno — dava a impressão de que o rótulo se
+   referia ao campo de cima. Agora o espaço ENTRE campos é bem maior que
+   o espaço rótulo→própria-caixa, deixando o agrupamento óbvio.
+   ============================================================================ */
+.modal.create .rich-text-field{
+  margin-top:24px!important;
+}
+.modal.create .rich-text-field:first-of-type{
+  margin-top:18px!important;
+}
+
+/* ============================================================================
+   Ajustes finos — badge branco, remoção do traço de origem-cliente
+   substituído por texto colorido, e respiro entre nome e conteúdo, 2026-08-27
+   ============================================================================ */
+
+/* 1) O número do badge de notificações ficava herdando a cor dourada/verde
+   de uma regra genérica de "span dentro de item ativo do menu" — agora o
+   número é sempre branco, ativo ou não. */
+.side nav .nav-btn.active .nav-notification-badge,
+.side nav .nav-btn .nav-notification-badge{
+  color:#fff!important;
+}
+
+/* 2) Traço vertical removido — agora o texto da própria notificação
+   (nome de quem originou + mensagem) fica na cor de destaque do sistema
+   quando a notificação veio de um cliente. */
+.notifications-list .notification-list-row.is-client-origin::before{
+  display:none!important;
+}
+.notifications-list .notification-list-row.is-client-origin .notification-copy-message,
+.notifications-list .notification-list-row.is-client-origin .notification-copy-message>strong,
+.notifications-list .notification-list-row.is-client-origin .notification-copy-message>span{
+  color:var(--accent-pale)!important;
+}
+
+/* 3) Respiro entre "Fulano:" e o texto da notificação, que estava colado. */
+.notification-copy-message>strong{
+  margin-right:5px!important;
+}
