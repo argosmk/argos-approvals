@@ -1174,6 +1174,128 @@ function applySystemAccent(value){
   root.style.setProperty('--accent-contrast',accentContrast(accent));
 }
 
+// ---- Push notification (web push) ----------------------------------------
+// VAPID pública: é seguro embutir no bundle, só a privada (no servidor) importa.
+const VAPID_PUBLIC_KEY = 'BBOwZgCFZpfB55QaC2XNUMy5VzC9cJ6Jr5AQtcxeBm1Du8QHYqxCqZIdm9uf9WFtrhVmZEsvhlOahi5O_Yv_pj0';
+
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4 - base64String.length % 4) % 4);
+  const base64=(base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData=window.atob(base64);
+  const outputArray=new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function PushSubscribeWidget({auth}){
+  const [status,setStatus]=useState('idle'); // idle | subscribed | unsupported | busy | denied
+  const [visible,setVisible]=useState(true);
+
+  useEffect(()=>{
+    if(auth?.id && typeof localStorage!=='undefined' && localStorage.getItem(`argos_push_dismissed_${auth.id}`)==='1'){
+      setVisible(false);
+    }
+  },[auth?.id]);
+
+  useEffect(()=>{
+    let alive=true;
+    async function checkSupport(){
+      if(!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification==='undefined'){
+        if(alive) setStatus('unsupported');
+        return;
+      }
+      try{
+        const reg=await navigator.serviceWorker.register('/sw.js');
+        const existing=await reg.pushManager.getSubscription();
+        if(alive) setStatus(existing?'subscribed':(Notification.permission==='denied'?'denied':'idle'));
+      }catch(err){
+        console.warn('sw register failed',err);
+        if(alive) setStatus('unsupported');
+      }
+    }
+    checkSupport();
+    return ()=>{ alive=false; };
+  },[]);
+
+  async function subscribe(){
+    if(!auth?.id) return;
+    setStatus('busy');
+    try{
+      const permission = await Notification.requestPermission();
+      if(permission!=='granted'){ setStatus(permission==='denied'?'denied':'idle'); return; }
+
+      // auth.organizationId costuma vir populado, mas em alguns fluxos de merge
+      // do estado local ele pode ficar vazio -- busca direto do profiles como reforço.
+      let orgId = auth.organizationId;
+      if(!orgId){
+        const { data: prof, error: profErr } = await supabase
+          .from('profiles').select('organization_id').eq('id', auth.id).single();
+        if(profErr) throw profErr;
+        orgId = prof?.organization_id;
+      }
+      if(!orgId) throw new Error('Organização não encontrada para este usuário.');
+
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub){
+        sub=await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      const json=sub.toJSON();
+      const { error } = await supabase.from('push_subscriptions').upsert({
+        organization_id: orgId,
+        profile_id: auth.id,
+        endpoint: json.endpoint,
+        p256dh: json.keys?.p256dh,
+        auth_key: json.keys?.auth,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString(),
+      }, { onConflict:'endpoint' });
+      if(error) throw error;
+      setStatus('subscribed');
+    }catch(err){
+      console.error('push subscribe failed',err);
+      const detail = err?.message || err?.error_description || err?.name || String(err);
+      alert('Não foi possível ativar as notificações neste dispositivo.\n\nDetalhe técnico: ' + detail);
+      setStatus('idle');
+    }
+  }
+
+  async function unsubscribe(){
+    setStatus('busy');
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.getSubscription();
+      if(sub){
+        await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        await sub.unsubscribe();
+      }
+      setStatus('idle');
+    }catch(err){
+      console.error('push unsubscribe failed',err);
+      setStatus('subscribed');
+    }
+  }
+
+  function dismiss(){
+    if(auth?.id && typeof localStorage!=='undefined') localStorage.setItem(`argos_push_dismissed_${auth.id}`,'1');
+    setVisible(false);
+  }
+
+  if(status==='unsupported' || !visible || !auth?.id) return null;
+
+  return <div className="push-widget">
+    {status==='subscribed'
+      ? <button type="button" className="push-widget-btn on" onClick={unsubscribe} title="Desativar notificações no celular">🔔 Notificações ativas</button>
+      : <button type="button" className="push-widget-btn" onClick={subscribe} disabled={status==='busy'||status==='denied'} title={status==='denied'?'Notificações bloqueadas no navegador':'Ativar notificações no celular'}>
+          {status==='busy'?'Ativando...':status==='denied'?'Notificações bloqueadas':'🔔 Ativar notificações'}
+        </button>}
+    <button type="button" className="push-widget-close" onClick={dismiss} aria-label="Fechar">×</button>
+  </div>;
+}
+
 function App(){
   const [users,setUsersState]=useState(()=>load('argos_users_r8', seedUsers));
   const [companies,setCompaniesState]=useState(()=>load('argos_companies_r8', seedCompanies));
@@ -2209,6 +2331,7 @@ function App(){
   return <>
     {IS_LOCAL_DEV&&<div className="argos-environment-banner">Ambiente Local • Supabase Dev • Polling automático desligado</div>}
     <div className="app">
+    <PushSubscribeWidget auth={auth}/>
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {((cloudError&&!dismissCloudAlert)||(realtimeConflict&&!dismissRealtimeAlert))&&<div className="cloud-alert-stack" role="status" aria-live="polite">

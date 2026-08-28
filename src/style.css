@@ -11615,3 +11615,44 @@ button:not(:disabled):active{
 .notification-copy-message>strong{
   margin-right:5px!important;
 }
+
+/* ---- Push notification widget ---- */
+.push-widget{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:6px 8px 6px 14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.push-widget-btn{
+  background:none;
+  border:none;
+  color:var(--text);
+  font-size:13px;
+  cursor:pointer;
+  padding:4px 2px;
+  white-space:nowrap;
+}
+.push-widget-btn.on{ color:var(--gold); }
+.push-widget-btn:disabled{ opacity:.6; cursor:not-allowed; }
+.push-widget-close{
+  background:none;
+  border:none;
+  color:var(--muted);
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+  padding:2px 4px;
+}
+.push-widget-close:hover{ color:var(--text); }
+@media (max-width: 640px){
+  .push-widget{ right:10px; bottom:10px; padding:5px 6px 5px 12px; }
+  .push-widget-btn{ font-size:12px; }
+}

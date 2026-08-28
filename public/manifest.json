@@ -1,0 +1,13 @@
+{
+  "name": "Argos Approval",
+  "short_name": "Argos",
+  "description": "Painel de aprovação e produção da Argos",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#14171f",
+  "theme_color": "#14171f",
+  "icons": [
+    { "src": "https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
