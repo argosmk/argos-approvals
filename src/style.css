@@ -2808,7 +2808,7 @@ a,
    ========================================================================== */
 
 /* Botões neutros e ações gerais */
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story){
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted){
   background:
     linear-gradient(180deg,rgba(var(--accent-rgb),.045),rgba(var(--accent-rgb),.012) 58%,rgba(255,255,255,.005)),
     #090a0c!important;
@@ -2818,7 +2818,7 @@ button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.da
     0 4px 12px rgba(0,0,0,.08)!important;
 }
 
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):hover{
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):hover{
   background:
     linear-gradient(180deg,rgba(var(--accent-rgb),.075),rgba(var(--accent-rgb),.022) 62%,rgba(255,255,255,.008)),
     #0c0d0f!important;
@@ -3042,7 +3042,7 @@ button.primary:hover,
 }
 
 /* Botões escuros devem manter texto claro */
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story){
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted){
   color:#f1ece2!important;
 }
 
@@ -5280,9 +5280,12 @@ body.public-portfolio-scroll-root{
 .notifications-list{
   gap:8px!important;
 }
+/* Revertido: manter linhas coladas (sem espaço entre elas), igual às
+   listas de tarefa — lá o efeito "bonito" é a sombra vazando levemente
+   sobre a vizinha no hover, sem precisar separar os itens fisicamente. */
 .notifications-list .notification-company-group{
   padding:0!important;
-  overflow:hidden;
+  overflow:visible!important;
   border-radius:12px!important;
 }
 .notifications-list .notification-company-group .notification-list-row{
@@ -5403,10 +5406,10 @@ input:hover,select:hover,textarea:hover,.status-select:hover{border-color:rgba(v
 input:focus,select:focus,textarea:focus{
   border-color:rgba(var(--accent-rgb),.52)!important;box-shadow:0 0 0 2px rgba(var(--accent-rgb),.055)!important
 }
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story){
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted){
   background:#0d0e10!important;border-color:rgba(255,255,255,.10)!important;box-shadow:none!important
 }
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):hover{
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):hover{
   background:#131416!important;border-color:rgba(var(--accent-rgb),.32)!important;box-shadow:none!important
 }
 button.primary,.primary{background:var(--gold)!important;border-color:var(--gold)!important;color:#090909!important;box-shadow:none!important}
@@ -8207,10 +8210,11 @@ section>h1+.settings-tabs{display:inline-flex!important;vertical-align:middle!im
   pointer-events:none!important;
   opacity:1!important;
 }
-/* O painel agrupador já tem overflow:hidden e cantos arredondados. Assim, no primeiro e
-   último item, a própria curva externa recorta o dourado como acontece nos cards de status. */
+/* Neutralizado: a estrutura mudou (ver bloco acima) — agora cada
+   notificação é um cartão próprio com sombra flutuante, então o grupo
+   precisa de overflow visível, não mais cortado. */
 .notifications-list .notification-company-group{
-  overflow:hidden!important;
+  overflow:visible!important;
 }
 
 /* ---- extraído do main.jsx: ARGOS_ROUND271_APPEARANCE_CSS ---- */
@@ -11386,6 +11390,17 @@ small,.muted{font-size:var(--fs-xs)!important;}
   box-shadow:var(--shadow-3),var(--shadow-gold)!important;
 }
 
+/* Correção: dentro de um grupo por cliente, as notificações formam uma
+   lista "costurada" (sem margem, sem borda própria, painel com
+   overflow:hidden) — uma regra antiga zera a sombra de propósito nesse
+   contexto, e uma sombra normal seria cortada pelo overflow:hidden mesmo
+   assim. Aqui o destaque certo é um fundo tingido no hover, não sombra. */
+.notifications-list .notification-company-group .notification-list-row:hover{
+  box-shadow:var(--shadow-3),var(--shadow-gold)!important;
+  position:relative;
+  z-index:2;
+}
+
 /* ---------------------------------------------------------------------------
    10) Corrige a separação visual entre o checkbox e a linha nas listas de
        tarefas: antes só o botão interno (.task-list-row) reagia ao hover,
@@ -11419,6 +11434,117 @@ small,.muted{font-size:var(--fs-xs)!important;}
   box-shadow:0 1px 3px rgba(0,0,0,.4);
 }
 .mini-task:hover{
-  box-shadow:var(--shadow-2),0 0 0 1px rgba(var(--accent-rgb),.35),var(--shadow-gold);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--accent-rgb),.55),
+    inset 0 0 20px rgba(var(--accent-rgb),.14),
+    0 3px 8px rgba(0,0,0,.4);
+  border-color:rgba(var(--accent-rgb),.55);
+  background:var(--surface-3);
   z-index:2;
 }
+
+/* ============================================================================
+   RODADA 2 DE MELHORIAS VISUAIS — Calendário + sistema geral, 2026-08-27
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   Datas especiais — redesenhado de novo, a pedido do usuário: nada de barra
+   cobrindo a linha inteira, nem efeito na célula toda. Agora é só um selo
+   (pill) discreto atrás do número do dia. Mantém verde para especiais e
+   dourado para as "maiores", como já era a lógica — só muda o formato.
+   --------------------------------------------------------------------------- */
+.has-special-date{
+  box-shadow:none!important;
+}
+.main .calendar-main .month-day-headline.has-month-special,
+.main .calendar-embedded-view .month-day-headline.has-month-special{
+  background:transparent!important;
+}
+.main .calendar-main .month-day-headline.has-major-month-special,
+.main .calendar-embedded-view .month-day-headline.has-major-month-special{
+  background:transparent!important;
+}
+.main .calendar-main .month-day-headline.has-month-special .month-day-num,
+.main .calendar-embedded-view .month-day-headline.has-month-special .month-day-num{
+  background:rgba(var(--accent-rgb),.22)!important;
+  border-radius:999px!important;
+  color:var(--accent-pale)!important;
+  text-align:center!important;
+}
+.main .calendar-main .month-day-headline.has-major-month-special .month-day-num,
+.main .calendar-embedded-view .month-day-headline.has-major-month-special .month-day-num{
+  background:var(--gold)!important;
+  border-radius:999px!important;
+  color:#1a1300!important;
+  font-weight:800!important;
+  text-align:center!important;
+}
+
+/* Separação mais clara entre a linha da data e as tarefas do dia, pra
+   qualquer dia (especial ou não) — hoje ficava tudo muito colado. */
+.main .calendar-main .month-day-headline,
+.main .calendar-embedded-view .month-day-headline{
+  border-bottom-width:2px!important;
+  margin-bottom:8px!important;
+}
+
+/* ---------------------------------------------------------------------------
+   Dia de hoje — contorno evidente na célula inteira, fácil de achar de
+   relance num mês cheio.
+   --------------------------------------------------------------------------- */
+.day.is-today{
+  box-shadow:inset 0 0 0 2px var(--gold)!important;
+  background:rgba(var(--accent-rgb),.04);
+}
+.day.is-today .month-day-num{
+  color:var(--gold)!important;
+  font-weight:800!important;
+}
+
+/* ---------------------------------------------------------------------------
+   Fins de semana — tom de fundo levemente diferente, só pra escanear rápido
+   quais colunas são sábado/domingo.
+   --------------------------------------------------------------------------- */
+.day.is-weekend{
+  background:rgba(255,255,255,.012);
+}
+
+/* Indicador de volume por dia (3 tracinhos): removido a pedido do usuário
+   após feedback visual — não agradou. */
+
+/* ---------------------------------------------------------------------------
+   Botão "+N mais" — formato pílula com fundo leve, fica claro que é
+   clicável em vez de parecer um rótulo estático.
+   --------------------------------------------------------------------------- */
+.more{
+  border-radius:999px!important;
+  background:rgba(var(--accent-rgb),.07)!important;
+  border-color:rgba(var(--accent-rgb),.24)!important;
+  font-weight:650!important;
+  transition:background .15s ease,border-color .15s ease!important;
+}
+.more:hover{
+  background:rgba(var(--accent-rgb),.14)!important;
+  border-color:rgba(var(--accent-rgb),.4)!important;
+}
+
+/* ---------------------------------------------------------------------------
+   Feedback de clique em todo o sistema — leve "afundada" ao clicar,
+   sensação de resposta mais viva. Não aplica em inputs/selects (não faz
+   sentido visualmente neles).
+   --------------------------------------------------------------------------- */
+button:not(:disabled):active{
+  transform:scale(.97);
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbar customizada na grade do calendário (mobile, quando rola
+   horizontalmente) — consistente com a da sidebar e do Kanban, que já
+   tinham esse tratamento.
+   --------------------------------------------------------------------------- */
+.month{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(var(--accent-rgb),.35) transparent;
+}
+.month::-webkit-scrollbar{height:8px;}
+.month::-webkit-scrollbar-thumb{background:rgba(var(--accent-rgb),.32);border-radius:999px;}

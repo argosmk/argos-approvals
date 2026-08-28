@@ -410,6 +410,7 @@ export const CREATE_TASK_FIELDS = Object.freeze([
   Object.freeze({id:'editorInstructions',label:'Instruções ao editor'}),
   Object.freeze({id:'copy',label:'Copy'}),
   Object.freeze({id:'caption',label:'Legenda'}),
+  Object.freeze({id:'finalLink',label:'Link final'}),
   Object.freeze({id:'usefulLinks',label:'Links úteis'}),
   Object.freeze({id:'materialLinks',label:'Links de material pronto'}),
 ]);
@@ -421,6 +422,7 @@ export const TASK_DETAIL_FIELDS = Object.freeze([
   Object.freeze({id:'editorInstructions',label:'Instruções ao editor'}),
   Object.freeze({id:'copy',label:'Copy'}),
   Object.freeze({id:'caption',label:'Legenda'}),
+  Object.freeze({id:'finalLink',label:'Link final'}),
   Object.freeze({id:'usefulLinks',label:'Links úteis'}),
   Object.freeze({id:'materialLinks',label:'Links de material pronto'}),
   Object.freeze({id:'companyId',label:'Empresa'}),
@@ -440,7 +442,7 @@ export function builtInTaskDetailPermissionsForRole(role){
   if(role==='admin'){
     TASK_DETAIL_FIELDS.forEach(field=>{ editable[field.id]=!['preview','stats','history'].includes(field.id); });
   }else if(role==='team'){
-    ['usefulLinks','materialLinks'].forEach(id=>{editable[id]=true;});
+    ['usefulLinks','materialLinks','finalLink'].forEach(id=>{editable[id]=true;});
     editable.comments=true;
   }else{
     ['copyInstructions','editorInstructions','companyId','responsibleId','type','status','internalDate','stats','history'].forEach(id=>{visible[id]=false;});
