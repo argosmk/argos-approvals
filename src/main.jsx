@@ -7,6 +7,7 @@ import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './
 import { bootstrapNotificationsFromTable, loadNotificationRecords, syncNotificationListDelta } from './services/notificationTableService';
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSettings } from './services/publicPortfolioService';
+import { loadApprovalReminderSettings, saveApprovalReminderSettings } from './services/approvalReminderSettingsService';
 import {
   CALENDAR_PERMISSION_ITEMS,
   CREATE_TASK_FIELDS,
@@ -5395,9 +5396,9 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
   function saveStatus(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); notifySettingsSaved('Status salvo'); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
-  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Aparência']];
+  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['approvalReminders','Lembretes de aprovação'],['general','Aparência']];
   if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
-  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(var(--accent-rgb),.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<AppearanceSettings system={system} setSystem={setSystem}/>}</section> 
+  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(var(--accent-rgb),.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='approvalReminders'&&<ApprovalReminderSettings currentUser={currentUser} statuses={statuses}/>} {tab==='general'&&<AppearanceSettings system={system} setSystem={setSystem}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -5620,6 +5621,70 @@ function AppearanceSettings({system,setSystem}){
   </div></div>
 }
 
+
+function ApprovalReminderSettings({currentUser,statuses}){
+  const organizationId=currentUser?.organizationId;
+  const [form,setForm]=useState({enabled:true,statusKeys:['aprovacao'],firstDayAfter:1,intervalDays:2});
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [message,setMessage]=useState('');
+  const [error,setError]=useState('');
+
+  useEffect(()=>{
+    let alive=true;
+    if(!organizationId){ setLoading(false); setError('Organização não identificada.'); return ()=>{alive=false}; }
+    (async()=>{
+      try{
+        setLoading(true); setError('');
+        const data=await loadApprovalReminderSettings(organizationId);
+        if(alive) setForm(data);
+      }catch(err){ if(alive) setError(err.message||'Não foi possível carregar as configurações.'); }
+      finally{ if(alive) setLoading(false); }
+    })();
+    return()=>{alive=false};
+  },[organizationId]);
+
+  function toggleStatus(key){
+    setForm(prev=>{
+      const has=(prev.statusKeys||[]).includes(key);
+      const next=has?prev.statusKeys.filter(k=>k!==key):[...(prev.statusKeys||[]),key];
+      return {...prev,statusKeys:next};
+    });
+  }
+
+  async function save(){
+    if(!(form.statusKeys||[]).length){ setError('Selecione pelo menos um status.'); setMessage(''); return; }
+    try{
+      setSaving(true); setError(''); setMessage('');
+      const saved=await saveApprovalReminderSettings(organizationId,form);
+      setForm(saved);
+      setMessage('Configurações de lembrete salvas.');
+      notifySettingsSaved('Lembretes de aprovação salvos');
+    }catch(err){ setError(err.message||'Não foi possível salvar as configurações.'); }
+    finally{ setSaving(false); }
+  }
+
+  if(loading) return <div className="settings-section"><div className="panel"><p>Carregando configurações...</p></div></div>;
+
+  return <div className="settings-section"><div className="panel approval-reminder-settings">
+    <div className="public-portfolio-settings-head">
+      <div><p>Controla o lembrete automático (push) enviado ao cliente quando um post fica parado num status. A equipe/admin recebe notificação instantânea à parte, espelhando o sino interno, sem precisar de configuração aqui.</p></div>
+      <label className="public-portfolio-active"><input type="checkbox" checked={form.enabled} onChange={e=>setForm(prev=>({...prev,enabled:e.target.checked}))}/><span>Lembretes ativos</span></label>
+    </div>
+    {error&&<div className="cloud-error">{error}</div>}
+    {message&&<div className="public-portfolio-success">{message}</div>}
+    <h3>Status que geram lembrete</h3>
+    <div className="checks one-col compact-checks-v3">
+      {(statuses||[]).map(s=><label key={s.id}><input type="checkbox" checked={(form.statusKeys||[]).includes(s.id)} onChange={()=>toggleStatus(s.id)}/>{s.name}</label>)}
+    </div>
+    <div className="form-two">
+      <label>Primeiro lembrete após (dias)<input type="number" min="0" value={form.firstDayAfter} onChange={e=>setForm(prev=>({...prev,firstDayAfter:e.target.value}))}/></label>
+      <label>Repetir a cada (dias)<input type="number" min="1" value={form.intervalDays} onChange={e=>setForm(prev=>({...prev,intervalDays:e.target.value}))}/></label>
+    </div>
+    <small className="muted">Exemplo: primeiro lembrete 1 dia depois de entrar no status, repetindo a cada 2 dias — dias 1, 3, 5, 7... enquanto o post não sair do status escolhido.</small>
+    <div className="row-actions"><button className="primary" onClick={save} disabled={saving||!organizationId}>{saving?'Salvando...':'Salvar lembretes'}</button></div>
+  </div></div>
+}
 
 const DEFAULT_DOCUMENT_FOLDERS = ['Clientes','Funcionários','Financeiro','Processos','Modelos','Interno'];
 function isFolderMarker(d){ return d?.documentKind==='folder'; }
