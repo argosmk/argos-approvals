@@ -1188,114 +1188,7 @@ function urlBase64ToUint8Array(base64String){
   return outputArray;
 }
 
-function PushSubscribeWidget({auth}){
-  const [status,setStatus]=useState('idle'); // idle | subscribed | unsupported | busy | denied
-  const [visible,setVisible]=useState(true);
 
-  useEffect(()=>{
-    if(auth?.id && typeof localStorage!=='undefined' && localStorage.getItem(`argos_push_dismissed_${auth.id}`)==='1'){
-      setVisible(false);
-    }
-  },[auth?.id]);
-
-  useEffect(()=>{
-    let alive=true;
-    async function checkSupport(){
-      if(!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification==='undefined'){
-        if(alive) setStatus('unsupported');
-        return;
-      }
-      try{
-        const reg=await navigator.serviceWorker.register('/sw.js');
-        const existing=await reg.pushManager.getSubscription();
-        if(alive) setStatus(existing?'subscribed':(Notification.permission==='denied'?'denied':'idle'));
-      }catch(err){
-        console.warn('sw register failed',err);
-        if(alive) setStatus('unsupported');
-      }
-    }
-    checkSupport();
-    return ()=>{ alive=false; };
-  },[]);
-
-  async function subscribe(){
-    if(!auth?.id) return;
-    setStatus('busy');
-    try{
-      const permission = await Notification.requestPermission();
-      if(permission!=='granted'){ setStatus(permission==='denied'?'denied':'idle'); return; }
-
-      // auth.organizationId costuma vir populado, mas em alguns fluxos de merge
-      // do estado local ele pode ficar vazio -- busca direto do profiles como reforço.
-      let orgId = auth.organizationId;
-      if(!orgId){
-        const { data: prof, error: profErr } = await supabase
-          .from('profiles').select('organization_id').eq('id', auth.id).single();
-        if(profErr) throw profErr;
-        orgId = prof?.organization_id;
-      }
-      if(!orgId) throw new Error('Organização não encontrada para este usuário.');
-
-      const reg=await navigator.serviceWorker.ready;
-      let sub=await reg.pushManager.getSubscription();
-      if(!sub){
-        sub=await reg.pushManager.subscribe({
-          userVisibleOnly:true,
-          applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
-      }
-      const json=sub.toJSON();
-      const { error } = await supabase.from('push_subscriptions').upsert({
-        organization_id: orgId,
-        profile_id: auth.id,
-        endpoint: json.endpoint,
-        p256dh: json.keys?.p256dh,
-        auth_key: json.keys?.auth,
-        user_agent: navigator.userAgent,
-        updated_at: new Date().toISOString(),
-      }, { onConflict:'endpoint' });
-      if(error) throw error;
-      setStatus('subscribed');
-    }catch(err){
-      console.error('push subscribe failed',err);
-      const detail = err?.message || err?.error_description || err?.name || String(err);
-      alert('Não foi possível ativar as notificações neste dispositivo.\n\nDetalhe técnico: ' + detail);
-      setStatus('idle');
-    }
-  }
-
-  async function unsubscribe(){
-    setStatus('busy');
-    try{
-      const reg=await navigator.serviceWorker.ready;
-      const sub=await reg.pushManager.getSubscription();
-      if(sub){
-        await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
-        await sub.unsubscribe();
-      }
-      setStatus('idle');
-    }catch(err){
-      console.error('push unsubscribe failed',err);
-      setStatus('subscribed');
-    }
-  }
-
-  function dismiss(){
-    if(auth?.id && typeof localStorage!=='undefined') localStorage.setItem(`argos_push_dismissed_${auth.id}`,'1');
-    setVisible(false);
-  }
-
-  if(status==='unsupported' || !visible || !auth?.id) return null;
-
-  return <div className="push-widget">
-    {status==='subscribed'
-      ? <button type="button" className="push-widget-btn on" onClick={unsubscribe} title="Desativar notificações no celular">🔔 Notificações ativas</button>
-      : <button type="button" className="push-widget-btn" onClick={subscribe} disabled={status==='busy'||status==='denied'} title={status==='denied'?'Notificações bloqueadas no navegador':'Ativar notificações no celular'}>
-          {status==='busy'?'Ativando...':status==='denied'?'Notificações bloqueadas':'🔔 Ativar notificações'}
-        </button>}
-    <button type="button" className="push-widget-close" onClick={dismiss} aria-label="Fechar">×</button>
-  </div>;
-}
 
 function App(){
   const [users,setUsersState]=useState(()=>load('argos_users_r8', seedUsers));
@@ -1333,6 +1226,11 @@ function App(){
   const notificationAlertBaselineRef=useRef(null);
   const notificationAudioContextRef=useRef(null);
   const [notificationAlertsEnabled,setNotificationAlertsEnabled]=useState(false);
+  const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>typeof localStorage!=='undefined' && localStorage.getItem('argos_sidebar_collapsed')==='1');
+  useEffect(()=>{
+    if(typeof localStorage==='undefined') return;
+    localStorage.setItem('argos_sidebar_collapsed', sidebarCollapsed?'1':'0');
+  },[sidebarCollapsed]);
   const [notificationPermission,setNotificationPermission]=useState(()=>typeof Notification==='undefined'?'unsupported':Notification.permission);
   const taskOpenSessionRef=useRef({});
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
@@ -1778,6 +1676,11 @@ function App(){
     localStorage.setItem(`argos_notification_alerts_${auth.id}`,'enabled');
     notificationAlertBaselineRef.current=new Set((notifications||[]).filter(n=>n?.userId===auth.id).map(n=>String(n.id)));
     setNotificationAlertsEnabled(true);
+  }
+
+  function disableNotificationAlerts(){
+    if(auth?.id) localStorage.removeItem(`argos_notification_alerts_${auth.id}`);
+    setNotificationAlertsEnabled(false);
   }
 
   useEffect(()=>{
@@ -2332,8 +2235,7 @@ function App(){
   return <>
     {IS_LOCAL_DEV&&<div className="argos-environment-banner">Ambiente Local • Supabase Dev • Polling automático desligado</div>}
     <div className="app">
-    <PushSubscribeWidget auth={auth}/>
-    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
+    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth} notificationAlertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableNotificationAlerts={enableNotificationAlerts} disableNotificationAlerts={disableNotificationAlerts} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed}/>
     <main className="main">
       {((cloudError&&!dismissCloudAlert)||(realtimeConflict&&!dismissRealtimeAlert))&&<div className="cloud-alert-stack" role="status" aria-live="polite">
         {cloudError&&!dismissCloudAlert&&<div className="cloud-banner"><button type="button" className="cloud-banner-close" aria-label="Fechar aviso" onClick={()=>setDismissCloudAlert(true)}>×</button>{cloudError}</div>}
@@ -2468,7 +2370,93 @@ function SearchBox({value,setValue,tasks,companies,users,statuses,statusById,use
     }):<p>Nenhuma tarefa encontrada.</p>}<small className="search-note">Pesquisa restrita às tarefas permitidas.</small></div>}
   </div>
 }
-function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notifications=[],system,realAdmin,nav,screen,setScreen,setAuth}){
+function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notifications=[],system,realAdmin,nav,screen,setScreen,setAuth,notificationAlertsEnabled,notificationPermission,enableNotificationAlerts,disableNotificationAlerts,sidebarCollapsed,setSidebarCollapsed}){
+  const [pushStatus,setPushStatus]=useState('idle'); // idle | subscribed | unsupported | busy | denied
+  useEffect(()=>{
+    let alive=true;
+    async function checkSupport(){
+      if(!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification==='undefined'){
+        if(alive) setPushStatus('unsupported');
+        return;
+      }
+      try{
+        const reg=await navigator.serviceWorker.register('/sw.js');
+        const existing=await reg.pushManager.getSubscription();
+        if(alive) setPushStatus(existing?'subscribed':(Notification.permission==='denied'?'denied':'idle'));
+      }catch(err){
+        console.warn('sw register failed',err);
+        if(alive) setPushStatus('unsupported');
+      }
+    }
+    checkSupport();
+    return ()=>{ alive=false; };
+  },[]);
+  async function subscribePush(){
+    if(!auth?.id || pushStatus==='unsupported') return;
+    setPushStatus('busy');
+    try{
+      const permission = await Notification.requestPermission();
+      if(permission!=='granted'){ setPushStatus(permission==='denied'?'denied':'idle'); return; }
+      let orgId = auth.organizationId;
+      if(!orgId){
+        const { data: prof, error: profErr } = await supabase
+          .from('profiles').select('organization_id').eq('id', auth.id).single();
+        if(profErr) throw profErr;
+        orgId = prof?.organization_id;
+      }
+      if(!orgId) throw new Error('Organização não encontrada para este usuário.');
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub){
+        sub=await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      const json=sub.toJSON();
+      const { error } = await supabase.from('push_subscriptions').upsert({
+        organization_id: orgId,
+        profile_id: auth.id,
+        endpoint: json.endpoint,
+        p256dh: json.keys?.p256dh,
+        auth_key: json.keys?.auth,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString(),
+      }, { onConflict:'endpoint' });
+      if(error) throw error;
+      setPushStatus('subscribed');
+    }catch(err){
+      console.error('push subscribe failed',err);
+      setPushStatus('idle');
+    }
+  }
+  async function unsubscribePush(){
+    setPushStatus('busy');
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.getSubscription();
+      if(sub){
+        await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        await sub.unsubscribe();
+      }
+      setPushStatus('idle');
+    }catch(err){
+      console.error('push unsubscribe failed',err);
+      setPushStatus('subscribed');
+    }
+  }
+  const notificationsOn = !!notificationAlertsEnabled || pushStatus==='subscribed';
+  const notificationsBusy = pushStatus==='busy';
+  async function handleNotificationsToggle(){
+    if(notificationsBusy) return;
+    if(notificationsOn){
+      disableNotificationAlerts?.();
+      await unsubscribePush();
+    }else{
+      await enableNotificationAlerts?.();
+      await subscribePush();
+    }
+  }
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const drawerRef=useRef(null);
   const menuButtonRef=useRef(null);
@@ -2509,7 +2497,8 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
     .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}));
   const goScreen=(id)=>{ setScreen(id); setMobileMenuOpen(false); };
   const pendingNotificationsCount = (notifications||[]).filter(n=>n?.userId===effectiveUser?.id && !n?.done).length;
-  return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')}>
+  return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')+(sidebarCollapsed?' collapsed':'')}>
+    <button type="button" className="side-collapse-toggle" onClick={()=>setSidebarCollapsed(v=>!v)} title={sidebarCollapsed?'Expandir menu':'Recolher menu'} aria-label={sidebarCollapsed?'Expandir menu':'Recolher menu'}>{sidebarCollapsed?'»':'«'}</button>
     <div className="mobile-side-bar">
       <div className="mobile-brand-mini">
         <div className="brand-logo">{system?.logo?<img src={argosLogoSrc(system.logo)} onError={e=>{ e.currentTarget.style.display='none'; }}/>:<span>A</span>}</div>
@@ -2528,8 +2517,14 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
         {realAdmin&&<><span className="side-user-view-arrow" aria-hidden="true">▾</span><select className="side-user-view-select" aria-label="Selecionar visualização" value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup>{clientViewGroups.map(group=><optgroup label={group.company.name} key={group.company.id}>{group.users.map(u=><option value={u.id} key={`${group.company.id}-${u.id}`}>{u.name}</option>)}</optgroup>)}{ungroupedClientViewUsers.length>0&&<optgroup label="Sem empresa">{ungroupedClientViewUsers.map(u=><option value={u.id} key={`ungrouped-${u.id}`}>{u.name}</option>)}</optgroup>}{!clientViewGroups.length&&!ungroupedClientViewUsers.length&&<optgroup label="Usuários clientes"><option disabled>Nenhum cliente ativo</option></optgroup>}</select></>}
       </div>
       <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<span className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</span>}</button>)}</nav>
+      <div className="side-notif-section">
+        <button type="button" className={'side-notif-toggle '+(notificationsOn?'is-on':'')} onClick={handleNotificationsToggle} disabled={notificationsBusy || pushStatus==='unsupported'} aria-pressed={notificationsOn} title={notificationsOn?'Desativar notificações':'Ativar notificações'}>
+          <span className="side-notif-toggle-label">🔔 Notificações</span>
+          <span className={'side-notif-switch '+(notificationsOn?'on':'off')}><span className="side-notif-switch-knob"/></span>
+        </button>
+      </div>
       <div className="spacer"/>
-      <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
+      <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>{sidebarCollapsed?'⏻':'Sair'}</button>
     </div>
   </aside> 
 }
@@ -6011,7 +6006,6 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
   },[]);
   return <section><PanelTabsHeader title="Notificações" tabs={permissions.showTabs?[["open","Pendentes"],["done","Concluídas"]]:[]} active={effectiveTab} onChange={setTab}/>
     <div className="filters notification-top-controls">
-      {permissions.canEnableAlerts!==false&&<button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button>}
       {effectiveTab==='open'&&permissions.canCompleteAll&&<button onClick={doneAll} disabled={!openCount}>Concluir todas</button>}
       {effectiveTab==='done'&&permissions.canDeleteCompleted&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}
     </div>
