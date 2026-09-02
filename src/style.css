@@ -486,7 +486,7 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   display:grid!important;
   place-items:center!important;
 }
-.team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,var(--gold))}
+.team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,#16a34a)}
 .team-profile-avatar.working{background:linear-gradient(135deg,#f59e0b,#ef4444,#a855f7)}
 .team-profile-avatar .avatar-mini{
   width:86px!important;
@@ -706,7 +706,7 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   background:rgba(255,255,255,.16) !important;
   box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 12px 26px rgba(0,0,0,.28) !important;
 }
-.team-story-avatar.online{background:linear-gradient(135deg,#22c55e,var(--gold)) !important;}
+.team-story-avatar.online{background:linear-gradient(135deg,#22c55e,#16a34a) !important;}
 .team-story-avatar.working{background:linear-gradient(135deg,#f59e0b,#ef4444,#a855f7) !important;}
 .team-story.selected .team-story-avatar{box-shadow:0 0 0 2px rgba(var(--accent-rgb),.78),0 0 24px rgba(var(--accent-rgb),.16) !important;}
 .team-story-avatar .avatar-mini{
@@ -765,7 +765,7 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   background:rgba(255,255,255,.14) !important;
   margin:0 !important;
 }
-.insta-profile-header .team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,var(--gold)) !important;}
+.insta-profile-header .team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,#16a34a) !important;}
 .insta-profile-header .team-profile-avatar.working{background:linear-gradient(135deg,#f59e0b,#ef4444,#a855f7) !important;}
 .insta-profile-header .team-profile-avatar .avatar-mini{
   width:86px !important;
@@ -2948,7 +2948,7 @@ textarea:focus-visible{
 .team-story-avatar.online,
 .team-story.selected .team-story-avatar.online,
 .team-story.active .team-story-avatar.online{
-  background:linear-gradient(135deg,#22c55e,var(--gold))!important;
+  background:linear-gradient(135deg,#22c55e,#16a34a)!important;
   box-shadow:
     0 0 0 1px rgba(255,255,255,.06),
     0 12px 26px rgba(0,0,0,.28)!important;
@@ -11898,3 +11898,21 @@ button:not(:disabled):active{
     background:rgba(var(--accent-rgb),.16)!important;
   }
 }
+
+/* ---- Claude: aba "Carga" do Dashboard (carga de trabalho por membro) ---- */
+.carga-entity-summary{grid-template-columns:minmax(230px,1.65fr) minmax(120px,.82fr) minmax(105px,.72fr)!important}
+.carga-task-list{padding:0 0 10px;background:rgba(255,255,255,.012)}
+.carga-task-row{padding:10px 14px;border-top:1px solid rgba(255,255,255,.055)}
+.carga-task-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.carga-task-head strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:13px;font-weight:600;color:#eee}
+.carga-task-head span{flex:0 0 auto;font-size:12px;color:var(--muted)}
+.carga-task-track{height:8px;border-radius:999px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.10);overflow:hidden;box-sizing:border-box}
+.carga-task-fill{display:flex;height:100%;min-width:2px;border-radius:999px;overflow:hidden}
+.carga-task-fill>span{display:block;height:100%}
+.carga-legend{display:flex;align-items:center;gap:18px;padding:12px 14px 4px;font-size:12px;color:var(--muted)}
+.carga-legend span{display:inline-flex;align-items:center;gap:6px}
+.carga-legend i{display:inline-block;width:9px;height:9px;border-radius:999px}
+
+/* ---- Claude: altura consistente entre linhas de gráfico com/sem avatar ---- */
+.dashboard-chart .bar{min-height:26px!important}
+.dashboard-chart .bar-label{min-height:24px!important}
