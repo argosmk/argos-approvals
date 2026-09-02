@@ -11952,3 +11952,18 @@ button:not(:disabled):active{
 .carga-entity-summary.carga-locked .dashboard-entity-name strong{
   color:#d6d2c8;
 }
+
+
+/* ---- Claude: destaque de tarefa em andamento (timer ativo) — Kanban, Lista, Calendário ---- */
+.kcard.task-working .k-title,
+.task-row.task-list-row.task-working .task-list-main b,
+.mini-task.task-working .task-working-text{
+  color: var(--gold)!important;
+}
+.kcard.task-working .resp-avatar .avatar-mini{
+  box-shadow: 0 0 0 2px var(--gold)!important;
+  transform: scale(1.12);
+}
+.task-row.task-list-row.task-working .task-list-responsible .avatar-mini{
+  box-shadow: 0 0 0 2px var(--gold)!important;
+}

@@ -3154,7 +3154,7 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
           const deadlineColor=taskDeadlineColor(t,statuses,statusById);
           return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>
             {permissions.canSelectTasks&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>} 
-            <button className="task-row task-list-row" disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+            <button className={'task-row task-list-row'+(t.startedAt?' task-working':'')} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
               <span className="task-list-main"><b title={t.title}>{t.title}{t.archived?' • Arquivada':''}</b></span>
               <span className="task-list-meta">
                 {permissions.showCompany&&<span className="task-list-company-avatar" title={`Empresa: ${c?.name||'Sem empresa'}`}><AvatarMini value={c?.logo} label={c?.name}/></span>}
@@ -3227,7 +3227,7 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
 }
 function AvatarMini({value,label}){ const v=String(value||''); const text=String(label||value||'?').slice(0,2).toUpperCase(); return <span className="avatar-mini">{(/^https?:\/\//.test(v)||v.startsWith('data:'))?<img src={driveDirect(v)} onError={e=>{e.currentTarget.remove();}}/>:text}</span> }
 function EntityLabel({value,label}){ return <span className="entity-label"><AvatarMini value={value} label={label}/><span>{label}</span></span> }
-function TaskButton({t,companies,users,statusById,open,permissions={}}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const meta=[permissions.showCompany?company?.name:null,permissions.showResponsible?resp?.name:null].filter(Boolean).join(' • '); return <button className="mini-task" disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{meta&&<small>{meta}</small>}</button> }
+function TaskButton({t,companies,users,statusById,open,permissions={}}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const isWorking=!!t.startedAt; const showCompanyName=permissions.showCompany?company?.name:null; const showRespName=permissions.showResponsible?resp?.name:null; return <button className={'mini-task'+(isWorking?' task-working':'')} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b className={isWorking?'task-working-text':undefined}>{t.title}</b>}{(showCompanyName||showRespName)&&<small>{showCompanyName}{showCompanyName&&showRespName?' • ':''}{showRespName&&<span className={isWorking?'task-working-text':undefined}>{showRespName}</span>}</small>}</button> }
 
 const FIXED_SPECIAL_DATES = [
   // Janeiro
@@ -3597,12 +3597,13 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search='',e
       return <div className="col" key={s.id} style={{borderTopColor:s.color,'--status-color':s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{
         const companyEntity=companies.find(c=>c.id===t.companyId);
         const respUser=users.find(u=>u.id===t.responsibleId);
-        return <button className="kcard" key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+        const isWorking=!!t.startedAt;
+        return <button className={'kcard'+(isWorking?' task-working':'')} key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
           <b className="k-title" title={t.title}>{t.title}</b>
           <div className="k-meta" style={{alignItems:'center',gap:6}}>
             {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars" style={{flex:'0 0 auto'}}>
               {permissions.showCompany&&<AvatarMini value={companyEntity?.logo} label={companyEntity?.name}/>} 
-              {permissions.showResponsible&&<AvatarMini value={respUser?.avatar} label={respUser?.name}/>} 
+              {permissions.showResponsible&&<span className="resp-avatar"><AvatarMini value={respUser?.avatar} label={respUser?.name}/></span>} 
             </span>}
             {(permissions.showPostDate||permissions.showDeadline)&&<span style={{display:'flex',gap:4,flexWrap:'nowrap',minWidth:0,marginLeft:'auto'}}>
               {permissions.showDeadline&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:`1px solid ${taskDeadlineColor(t,statuses,statusById)}55`,background:`${taskDeadlineColor(t,statuses,statusById)}14`,color:taskDeadlineColor(t,statuses,statusById),fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{fmtDate(t.internalDate)}</small>}
