@@ -11900,7 +11900,7 @@ button:not(:disabled):active{
 }
 
 /* ---- Claude: aba "Carga" do Dashboard (carga de trabalho por membro) ---- */
-.carga-entity-summary{grid-template-columns:minmax(230px,1.65fr) minmax(120px,.82fr) minmax(105px,.72fr)!important}
+.carga-entity-summary{grid-template-columns:minmax(200px,1.35fr) minmax(160px,1.3fr) minmax(110px,.7fr) minmax(100px,.65fr)!important}
 .carga-task-list{padding:0 0 10px;background:rgba(255,255,255,.012)}
 .carga-task-row{padding:10px 14px;border-top:1px solid rgba(255,255,255,.055)}
 .carga-task-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
@@ -11916,3 +11916,28 @@ button:not(:disabled):active{
 /* ---- Claude: altura consistente entre linhas de gráfico com/sem avatar ---- */
 .dashboard-chart .bar{min-height:26px!important}
 .dashboard-chart .bar-label{min-height:24px!important}
+
+/* ---- Claude: status "online" + tarefa atual na linha principal da aba Carga ---- */
+.carga-status{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  overflow:hidden;
+}
+.carga-online-tag{
+  flex:0 0 auto;
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+  color:var(--gold-2);
+}
+.carga-active-task{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:12px;
+  color:#eee;
+}
