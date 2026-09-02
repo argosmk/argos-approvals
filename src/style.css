@@ -11766,24 +11766,34 @@ button:not(:disabled):active{
 @media (min-width:761px){
   .side{ transition:width .18s ease; }
   .main{ transition:margin-left .18s ease; }
+
+  /* A variável --side precisa mudar no ancestral comum (.app), não só em .side --
+     senão .main (que também lê var(--side) pra margem esquerda) nunca sabe que o
+     painel encolheu e o conteúdo não ganha o espaço extra. */
+  .app.sidebar-collapsed{ --side:64px!important; }
+
+  /* Aba em meia-lua: fica colada na borda do painel, saindo pra fora dela, alinhada
+     verticalmente com a logo. Como usa left:var(--side), ela acompanha sozinha a
+     transição de largura do painel (expandido/recolhido). */
   .side .side-collapse-toggle{
     display:grid!important;
     place-items:center!important;
     position:fixed!important;
-    top:18px!important;
-    left:calc(var(--side) - 12px)!important;
+    top:30px!important;
+    left:var(--side)!important;
     right:auto!important;
-    width:22px!important;
-    height:22px!important;
-    min-width:22px!important;
-    min-height:22px!important;
-    max-width:22px!important;
+    width:18px!important;
+    height:38px!important;
+    min-width:18px!important;
+    min-height:38px!important;
+    max-width:18px!important;
     text-align:center!important;
     padding:0!important;
     margin:0!important;
-    border-radius:50%!important;
+    border-radius:0 999px 999px 0!important;
     background:#151517!important;
     border:1px solid rgba(var(--accent-rgb),.5)!important;
+    border-left:0!important;
     color:var(--text)!important;
     font-size:10px!important;
     font-weight:800!important;
@@ -11791,20 +11801,19 @@ button:not(:disabled):active{
     cursor:pointer!important;
     z-index:130!important;
     transition:left .18s ease!important;
-    box-shadow:0 2px 6px rgba(0,0,0,.45)!important;
+    box-shadow:2px 2px 8px rgba(0,0,0,.4)!important;
   }
   .side .side-collapse-toggle:hover{ background:rgba(var(--accent-rgb),.22)!important; }
 
-  .side.collapsed{ --side:64px; }
-  .side.collapsed .side-drawer{ align-items:center; }
-  .side.collapsed .brand.brand-clean.brand-logo-only small{ display:none; }
-  .side.collapsed .brand.brand-clean.brand-logo-only{ justify-content:center; padding-left:0; padding-right:0; }
-  .side.collapsed .side-user-view-card{ display:none; }
-  .side.collapsed nav{ width:100%; }
-  .side.collapsed nav button{ justify-content:center; padding-left:0; padding-right:0; }
-  .side.collapsed nav button span:not(.nav-notification-badge){ display:none; }
-  .side.collapsed .side-notif-section{ display:none; }
-  .side.collapsed > .side-drawer > button{ padding-left:0; padding-right:0; }
+  /* Recolhido: esconde por completo a marca e o cartão de usuário (só ícones ficam) */
+  .side.collapsed .brand.brand-clean.brand-logo-only{ display:none!important; }
+  .side.collapsed .side-user-view-card{ display:none!important; }
+  .side.collapsed .side-drawer{ align-items:center!important; padding-top:38px!important; }
+  .side.collapsed nav{ width:100%!important; }
+  .side.collapsed nav button{ justify-content:center!important; padding-left:0!important; padding-right:0!important; }
+  .side.collapsed nav button span:not(.nav-notification-badge){ display:none!important; }
+  .side.collapsed .side-notif-section{ display:none!important; }
+  .side.collapsed > .side-drawer > button{ padding-left:0!important; padding-right:0!important; }
 }
 
 /* ===== FIX-FINAL-2: painel recolhido -- logo não pode ser cortada pelo overflow ===== */

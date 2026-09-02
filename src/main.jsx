@@ -2239,7 +2239,7 @@ function App(){
   }
   return <>
     {IS_LOCAL_DEV&&<div className="argos-environment-banner">Ambiente Local • Supabase Dev • Polling automático desligado</div>}
-    <div className="app">
+    <div className={'app'+(sidebarCollapsed?' sidebar-collapsed':'')}>
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth} notificationAlertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableNotificationAlerts={enableNotificationAlerts} disableNotificationAlerts={disableNotificationAlerts} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed}/>
     <main className="main">
       {((cloudError&&!dismissCloudAlert)||(realtimeConflict&&!dismissRealtimeAlert))&&<div className="cloud-alert-stack" role="status" aria-live="polite">
