@@ -24,8 +24,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Argos';
   const options = {
     body: data.body || '',
-    icon: 'https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png',
-    badge: 'https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png',
+    icon: 'https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/9283d2e1-e03c-4280-958b-8a379e1c7e7c.png',
+    badge: 'https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/9283d2e1-e03c-4280-958b-8a379e1c7e7c.png',
     tag: data.taskId ? `argos-task-${data.taskId}` : undefined,
     data: { url: data.url || '/' },
   };

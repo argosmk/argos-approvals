@@ -2311,9 +2311,9 @@ function SetupRequired(){
   return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Configuração necessária</h1><p>O Supabase ainda não foi configurado neste projeto.</p><div className="cloud-error">Crie o arquivo <b>.env</b> na raiz do projeto com VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.</div><small>Depois reinicie o servidor com npm run dev.</small></div></div>
 }
 
-function Login({users,companies,setAuth}){ const [email,setEmail]=useState('admin@argos.local'); const [pass,setPass]=useState('123456');
+function Login({users,companies,setAuth,system}){ const [email,setEmail]=useState('admin@argos.local'); const [pass,setPass]=useState('123456');
   function login(){ const u=users.find(x=>x.email===email&&x.password===pass); if(!u) return alert('Login inválido'); if(!u.active) return alert('Usuário inativo'); if(u.role==='client' && !(u.companyIds||[]).some(id=>companies.find(c=>c.id===id)?.active)) return alert('Nenhuma empresa ativa vinculada a este usuário.'); setAuth(u); }
-  return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Argos Approval</h1><p>Central de produção, aprovação e operação.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="login"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password"/><button onClick={login}>Entrar</button></div></div>
+  return <div className="login"><div className="login-card"><div className="logo">A</div><h1>{system?.title || 'Painel de Aprovação'}</h1><p>Central de produção, aprovação e operação.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="login"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password"/><button onClick={login}>Entrar</button></div></div>
 }
 
 function NavIcon({id}){
@@ -5608,13 +5608,13 @@ function AppearanceSettings({system,setSystem}){
     notifySettingsSaved('Aparência salva');
   };
   return <div className="settings-section"><div className="panel general-panel appearance-panel">
+    <h3>Geral</h3>
+    <label className="appearance-system-name"><strong>Nome do sistema</strong><input value={f.title||''} onChange={e=>{set('title',e.target.value);set('loginTitle',e.target.value)}} placeholder="Painel de Aprovação"/><small>Esse é o nome do sistema: aparece na tela de login e no painel (aba do navegador e menu lateral).</small></label>
     <h3>Identidade visual</h3>
     <label>Cor de destaque<div className="appearance-accent-control"><input className="appearance-color-input" type="color" value={normalizeAccentColor(f.accentColor)} onChange={e=>set('accentColor',e.target.value)}/><input className="appearance-color-text" value={f.accentColor||''} onChange={e=>set('accentColor',e.target.value)} onBlur={()=>set('accentColor',normalizeAccentColor(f.accentColor))} placeholder="#cbae6c"/></div><small>Usada em abas ativas, botões principais, gráficos e outros destaques institucionais. Cores funcionais de status e urgência não são alteradas.</small></label>
-    <label>Texto do painel<input value={f.title||''} onChange={e=>set('title',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Logo do sistema<input value={f.logo||''} onChange={e=>set('logo',e.target.value)} placeholder="URL, link do Drive ou upload"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),'system/logo')}/></label>
     <label>Favicon do navegador<input value={f.favicon||''} onChange={e=>set('favicon',e.target.value)} placeholder="URL, link do Drive ou upload"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('favicon',v),'system/favicon')}/><small>Ícone pequeno que aparece na aba do navegador.</small></label>
     <h3>Tela de login</h3>
-    <label>Título da tela de login<input value={f.loginTitle||''} onChange={e=>set('loginTitle',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Texto de apoio da tela de login<input value={f.loginSubtitle||''} onChange={e=>set('loginSubtitle',e.target.value)} placeholder="Entre com seu acesso."/></label>
     <label>Logo da tela de login<input value={f.loginLogo||''} onChange={e=>set('loginLogo',e.target.value)} placeholder="URL, link do Drive ou upload. Se vazio, usa a logo do sistema."/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('loginLogo',v),'system/login')}/></label>
     <div className="row-actions"><button onClick={()=>{setF({...system,accentColor:normalizeAccentColor(system?.accentColor)});applySystemAccent(system?.accentColor);}}>Cancelar</button><button className="primary" onClick={saveAppearance}>Salvar aparência</button></div>

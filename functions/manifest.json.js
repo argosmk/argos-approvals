@@ -5,10 +5,9 @@ const SUPABASE_URL = 'https://wzgdpfjsyxlxiapbuknp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6Z2RwZmpzeXhseGlhcGJ1a25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjI2NTYsImV4cCI6MjA5ODQzODY1Nn0.TdNlxIhdj0B2kvJ_QAnVqvbaIKKyRT7pqPWyfxifwpM';
 const FALLBACK_ICON = 'https://wzgdpfjsyxlxiapbuknp.supabase.co/storage/v1/object/public/avatars/system/favicon/a66ab9e2-e1b5-47cc-88d0-5d75c637ca50.png';
 
-export async function onRequestGet() {
-  let icon = FALLBACK_ICON;
+async function callRpc(name) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_system_favicon`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -19,15 +18,25 @@ export async function onRequestGet() {
     });
     if (res.ok) {
       const data = await res.json();
-      if (typeof data === 'string' && data.trim()) icon = data.trim();
+      if (typeof data === 'string' && data.trim()) return data.trim();
     }
   } catch (err) {
     // mantem o fallback se a consulta falhar
   }
+  return '';
+}
+
+export async function onRequestGet() {
+  const [remoteIcon, remoteTitle] = await Promise.all([
+    callRpc('get_system_favicon'),
+    callRpc('get_system_title'),
+  ]);
+  const icon = remoteIcon || FALLBACK_ICON;
+  const title = remoteTitle || 'Painel de Aprovação';
 
   const manifest = {
-    name: 'Argos Approval',
-    short_name: 'Argos',
+    name: title,
+    short_name: title,
     description: 'Painel de aprovação e produção da Argos',
     start_url: '/',
     scope: '/',
