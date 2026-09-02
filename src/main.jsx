@@ -2241,6 +2241,7 @@ function App(){
     {IS_LOCAL_DEV&&<div className="argos-environment-banner">Ambiente Local • Supabase Dev • Polling automático desligado</div>}
     <div className={'app'+(sidebarCollapsed?' sidebar-collapsed':'')}>
     <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth} notificationAlertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableNotificationAlerts={enableNotificationAlerts} disableNotificationAlerts={disableNotificationAlerts} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed}/>
+    <button type="button" className="side-collapse-toggle" onClick={()=>setSidebarCollapsed(v=>!v)} title={sidebarCollapsed?'Expandir menu':'Recolher menu'} aria-label={sidebarCollapsed?'Expandir menu':'Recolher menu'}>{sidebarCollapsed?'»':'«'}</button>
     <main className="main">
       {((cloudError&&!dismissCloudAlert)||(realtimeConflict&&!dismissRealtimeAlert))&&<div className="cloud-alert-stack" role="status" aria-live="polite">
         {cloudError&&!dismissCloudAlert&&<div className="cloud-banner"><button type="button" className="cloud-banner-close" aria-label="Fechar aviso" onClick={()=>setDismissCloudAlert(true)}>×</button>{cloudError}</div>}
@@ -2503,7 +2504,6 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
   const goScreen=(id)=>{ setScreen(id); setMobileMenuOpen(false); };
   const pendingNotificationsCount = (notifications||[]).filter(n=>n?.userId===effectiveUser?.id && !n?.done).length;
   return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')+(sidebarCollapsed?' collapsed':'')}>
-    <button type="button" className="side-collapse-toggle" onClick={()=>setSidebarCollapsed(v=>!v)} title={sidebarCollapsed?'Expandir menu':'Recolher menu'} aria-label={sidebarCollapsed?'Expandir menu':'Recolher menu'}>{sidebarCollapsed?'»':'«'}</button>
     <div className="mobile-side-bar">
       <div className="mobile-brand-mini">
         <div className="brand-logo">{system?.logo?<img src={argosLogoSrc(system.logo)} onError={e=>{ e.currentTarget.style.display='none'; }}/>:<span>A</span>}</div>
