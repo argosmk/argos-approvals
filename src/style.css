@@ -11941,3 +11941,14 @@ button:not(:disabled):active{
   font-size:12px;
   color:#eee;
 }
+
+/* ---- Claude: linhas bloqueadas na aba Carga (equipe só vê a própria carga) ---- */
+.carga-entity-summary.carga-locked{
+  cursor:default!important;
+}
+.carga-entity-summary.carga-locked:hover{
+  background:transparent!important;
+}
+.carga-entity-summary.carga-locked .dashboard-entity-name strong{
+  color:#d6d2c8;
+}
