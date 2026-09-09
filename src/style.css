@@ -12,7 +12,7 @@
   --gold-2:color-mix(in srgb,var(--accent) 86%,white);
   --danger:#ef4444;
   --radius:14px;
-  --side:202px;
+  --side:184px;
 }
 *{box-sizing:border-box}
 html,body,#root{min-height:100%;margin:0}
@@ -164,7 +164,7 @@ small{color:var(--muted)}
 .login{min-height:100vh;display:grid;place-items:center}.login-card{width:min(360px,92vw);background:var(--surface);border:1px solid var(--line-gold);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:12px}.logo{width:44px;height:44px;border-radius:12px;background:var(--gold);color:#111;display:grid;place-items:center;font-weight:900}
 
 @media(max-width:1180px){
-  :root{--side:192px}.main{padding:14px 18px 48px}.quick-cards,.time-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.task-page{grid-template-columns:1fr}.calendar-layout{grid-template-columns:1fr}.legend{position:static;display:block}.week-grid{grid-template-columns:repeat(7,220px);overflow:auto}.new-btn{position:static;margin-left:auto;display:block;margin-bottom:14px}.search-wrap{max-width:100%}
+  :root{--side:176px}.main{padding:14px 18px 48px}.quick-cards,.time-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}.task-page{grid-template-columns:1fr}.calendar-layout{grid-template-columns:1fr}.legend{position:static;display:block}.week-grid{grid-template-columns:repeat(7,220px);overflow:auto}.new-btn{position:static;margin-left:auto;display:block;margin-bottom:14px}.search-wrap{max-width:100%}
 }
 @media(max-width:760px){
   .side{position:static;width:100%;height:auto;max-height:45vh}.main{margin-left:0;padding:14px}.filters label{width:100%}.quick-cards,.time-cards,.form-two,.checks{grid-template-columns:1fr}.client-grid{grid-template-columns:1fr}.month-head{grid-template-columns:1fr}.weeknames,.days{min-width:760px}.month{overflow:auto}.col{min-width:230px}.comment-line{grid-template-columns:1fr}.row-actions{align-items:stretch}.row-actions button{flex:1}.task-title{align-items:flex-start;flex-direction:column}
@@ -486,7 +486,7 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   display:grid!important;
   place-items:center!important;
 }
-.team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,#16a34a)}
+.team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,var(--gold))}
 .team-profile-avatar.working{background:linear-gradient(135deg,#f59e0b,#ef4444,#a855f7)}
 .team-profile-avatar .avatar-mini{
   width:86px!important;
@@ -706,7 +706,7 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   background:rgba(255,255,255,.16) !important;
   box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 12px 26px rgba(0,0,0,.28) !important;
 }
-.team-story-avatar.online{background:linear-gradient(135deg,#22c55e,#16a34a) !important;}
+.team-story-avatar.online{background:linear-gradient(135deg,#22c55e,var(--gold)) !important;}
 .team-story-avatar.working{background:linear-gradient(135deg,#f59e0b,#ef4444,#a855f7) !important;}
 .team-story.selected .team-story-avatar{box-shadow:0 0 0 2px rgba(var(--accent-rgb),.78),0 0 24px rgba(var(--accent-rgb),.16) !important;}
 .team-story-avatar .avatar-mini{
@@ -765,7 +765,7 @@ button:disabled{opacity:.45;cursor:not-allowed}.client-actions button:disabled:h
   background:rgba(255,255,255,.14) !important;
   margin:0 !important;
 }
-.insta-profile-header .team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,#16a34a) !important;}
+.insta-profile-header .team-profile-avatar.online{background:linear-gradient(135deg,#22c55e,var(--gold)) !important;}
 .insta-profile-header .team-profile-avatar.working{background:linear-gradient(135deg,#f59e0b,#ef4444,#a855f7) !important;}
 .insta-profile-header .team-profile-avatar .avatar-mini{
   width:86px !important;
@@ -2808,7 +2808,7 @@ a,
    ========================================================================== */
 
 /* Botões neutros e ações gerais */
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted){
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):not(.insta-copy-link){
   background:
     linear-gradient(180deg,rgba(var(--accent-rgb),.045),rgba(var(--accent-rgb),.012) 58%,rgba(255,255,255,.005)),
     #090a0c!important;
@@ -2818,7 +2818,7 @@ button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.da
     0 4px 12px rgba(0,0,0,.08)!important;
 }
 
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):hover{
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):not(.insta-copy-link):hover{
   background:
     linear-gradient(180deg,rgba(var(--accent-rgb),.075),rgba(var(--accent-rgb),.022) 62%,rgba(255,255,255,.008)),
     #0c0d0f!important;
@@ -2948,7 +2948,7 @@ textarea:focus-visible{
 .team-story-avatar.online,
 .team-story.selected .team-story-avatar.online,
 .team-story.active .team-story-avatar.online{
-  background:linear-gradient(135deg,#22c55e,#16a34a)!important;
+  background:linear-gradient(135deg,#22c55e,var(--gold))!important;
   box-shadow:
     0 0 0 1px rgba(255,255,255,.06),
     0 12px 26px rgba(0,0,0,.28)!important;
@@ -3042,7 +3042,7 @@ button.primary:hover,
 }
 
 /* Botões escuros devem manter texto claro */
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted){
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):not(.insta-copy-link){
   color:#f1ece2!important;
 }
 
@@ -4927,7 +4927,7 @@ body.public-portfolio-scroll-root{
 
 /* Round172A — densidade compacta nativa para uso em 100% de zoom */
 @media(min-width:761px){
-  :root{--side:190px}
+  :root{--side:174px}
 
   body{font-size:13px}
 
@@ -5406,10 +5406,10 @@ input:hover,select:hover,textarea:hover,.status-select:hover{border-color:rgba(v
 input:focus,select:focus,textarea:focus{
   border-color:rgba(var(--accent-rgb),.52)!important;box-shadow:0 0 0 2px rgba(var(--accent-rgb),.055)!important
 }
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted){
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):not(.insta-copy-link){
   background:#0d0e10!important;border-color:rgba(255,255,255,.10)!important;box-shadow:none!important
 }
-button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):hover{
+button:not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.status-tinted):not(.insta-copy-link):hover{
   background:#131416!important;border-color:rgba(var(--accent-rgb),.32)!important;box-shadow:none!important
 }
 button.primary,.primary{background:var(--gold)!important;border-color:var(--gold)!important;color:#090909!important;box-shadow:none!important}
@@ -5584,14 +5584,14 @@ button.primary:hover,.primary:hover{background:var(--gold-2)!important;border-co
    ========================================================= */
 
 /* Botões de apoio: grafite limpo, sem gradientes legados. */
-button:not([style]):not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.danger):not(.danger-button){
+button:not([style]):not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.danger):not(.danger-button):not(.insta-copy-link){
   background:#0d0e10!important;
   border-color:rgba(255,255,255,.12)!important;
   color:rgba(255,255,255,.86)!important;
   box-shadow:none!important;
 }
 
-button:not([style]):not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.danger):not(.danger-button):hover{
+button:not([style]):not(.primary):not(.status-pill):not(.priority-pill):not(.nav-btn):not(.day-num):not(.mini-task):not(.kcard):not(.task-row):not(.team-story):not(.danger):not(.danger-button):not(.insta-copy-link):hover{
   background:#131417!important;
   border-color:rgba(var(--accent-rgb),.34)!important;
   color:#f4f0e7!important;
@@ -11616,354 +11616,32 @@ button:not(:disabled):active{
   margin-right:5px!important;
 }
 
-/* ---- Push notification widget ---- */
-.push-widget{
-  position:fixed;
-  right:18px;
-  bottom:18px;
-  z-index:9999;
-  display:flex;
-  align-items:center;
-  gap:6px;
-  background:var(--surface-2);
-  border:1px solid var(--line);
-  border-radius:999px;
-  padding:6px 8px 6px 14px;
-  box-shadow:0 8px 24px rgba(0,0,0,.35);
-}
-.push-widget-btn{
-  background:none;
-  border:none;
-  color:var(--text);
-  font-size:13px;
-  cursor:pointer;
-  padding:4px 2px;
-  white-space:nowrap;
-}
-.push-widget-btn.on{ color:var(--gold); }
-.push-widget-btn:disabled{ opacity:.6; cursor:not-allowed; }
-.push-widget-close{
-  background:none;
-  border:none;
-  color:var(--muted);
-  font-size:16px;
-  line-height:1;
-  cursor:pointer;
-  padding:2px 4px;
-}
-.push-widget-close:hover{ color:var(--text); }
-@media (max-width: 640px){
-  .push-widget{ right:10px; bottom:10px; padding:5px 6px 5px 12px; }
-  .push-widget-btn{ font-size:12px; }
-}
-
-/* ===== FIX-FINAL: toggle único de notificações no painel lateral ===== */
-.side-notif-section{
-  margin-top:10px;
-  padding-top:12px;
-  border-top:1px solid rgba(255,255,255,.1);
-}
-.side-notif-toggle{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  width:100%;
-  gap:10px;
-  padding:9px 10px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,.08);
-  background:rgba(255,255,255,.02);
-  color:var(--text);
-  cursor:pointer;
-  font-size:13px;
-  font-weight:650;
-  font-family:inherit;
-  transition:background .15s ease,border-color .15s ease;
-}
-.side-notif-toggle:hover{background:rgba(255,255,255,.05);}
-.side-notif-toggle:disabled{opacity:.55;cursor:not-allowed;}
-.side-notif-toggle.is-on{border-color:rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.08);}
-.side-notif-toggle-label{display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.side-notif-switch{
-  position:relative;
-  width:38px;
-  height:22px;
-  min-width:38px;
-  border-radius:999px;
-  background:rgba(255,255,255,.16);
-  transition:background .18s ease;
-  flex:0 0 auto;
-}
-.side-notif-switch.on{background:linear-gradient(180deg,#f4c430,#c9971f);}
-.side-notif-switch-knob{
-  position:absolute;
-  top:2px;
-  left:2px;
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  background:#fff;
-  box-shadow:0 1px 3px rgba(0,0,0,.4);
-  transition:left .18s ease;
-}
-.side-notif-switch.on .side-notif-switch-knob{left:18px;}
-
-/* ===== FIX-FINAL: cabeçalho mobile decisivo (logo centralizada, sem título, menu à esquerda) =====
-   Este bloco vence os anteriores por ordem de cascata (é o último no arquivo, mesma especificidade). */
-@media (max-width:760px){
-  /* remove de vez o brand duplicado dentro do drawer -- era o espaço em branco no topo do painel mobile */
-  .side-drawer > .brand,
-  .side-drawer .brand.brand-clean,
-  .side-drawer .brand.brand-logo-only{
-    display:none!important;
-    visibility:hidden!important;
-    height:0!important;
-    min-height:0!important;
-    max-height:0!important;
-    margin:0!important;
-    padding:0!important;
-    border:0!important;
-    overflow:hidden!important;
-  }
-
-  .mobile-side-bar{
-    position:relative!important;
-    display:flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-  }
-  .mobile-brand-mini{
-    position:absolute!important;
-    left:50%!important;
-    top:50%!important;
-    right:auto!important;
-    transform:translate(-50%,-50%)!important;
-    width:auto!important;
-    max-width:none!important;
-    justify-content:center!important;
-  }
-  .mobile-brand-mini .brand-logo{
-    position:static!important;
-    left:auto!important;
-    top:auto!important;
-    transform:none!important;
-  }
-  .mobile-brand-mini strong{
-    display:none!important;
-  }
-  .mobile-menu-toggle{
-    position:absolute!important;
-    left:12px!important;
-    right:auto!important;
-    top:50%!important;
-    transform:translateY(-50%)!important;
-    margin-left:0!important;
-  }
-}
-
-/* ===== FIX-FINAL: opção de recolher o painel lateral no desktop ===== */
-.side-collapse-toggle{ display:none; }
-@media (min-width:761px){
-  .side{ transition:width .18s ease; }
-  .main{ transition:margin-left .18s ease; }
-
-  /* A variável --side precisa mudar no ancestral comum (.app), não só em .side --
-     senão .main (que também lê var(--side) pra margem esquerda) nunca sabe que o
-     painel encolheu e o conteúdo não ganha o espaço extra. */
-  .app.sidebar-collapsed{ --side:64px!important; }
-
-  /* Aba em meia-lua: fica colada na borda do painel, saindo pra fora dela, alinhada
-     verticalmente com a logo. Como usa left:var(--side), ela acompanha sozinha a
-     transição de largura do painel (expandido/recolhido). */
-  .side .side-collapse-toggle{
-    display:grid!important;
-    place-items:center!important;
-    position:fixed!important;
-    top:30px!important;
-    left:var(--side)!important;
-    right:auto!important;
-    width:18px!important;
-    height:38px!important;
-    min-width:18px!important;
-    min-height:38px!important;
-    max-width:18px!important;
-    text-align:center!important;
-    padding:0!important;
-    margin:0!important;
-    border-radius:0 10px 10px 0!important;
-    background:#151517!important;
-    border:1px solid rgba(var(--accent-rgb),.5)!important;
-    border-left:0!important;
-    color:var(--text)!important;
-    font-size:10px!important;
-    font-weight:800!important;
-    line-height:1!important;
-    cursor:pointer!important;
-    z-index:130!important;
-    transition:left .18s ease!important;
-    box-shadow:2px 2px 8px rgba(0,0,0,.4)!important;
-  }
-  .side .side-collapse-toggle:hover{ background:rgba(var(--accent-rgb),.22)!important; }
-
-  /* Recolhido: esconde por completo a marca e o cartão de usuário (só ícones ficam) */
-  .side.collapsed .brand.brand-clean.brand-logo-only{ display:none!important; }
-  .side.collapsed .side-user-view-card{ display:none!important; }
-  .side.collapsed .side-drawer{ align-items:center!important; padding-top:38px!important; }
-  .side.collapsed nav{ width:100%!important; }
-  .side.collapsed nav button{ justify-content:center!important; padding-left:0!important; padding-right:0!important; }
-  .side.collapsed nav button span:not(.nav-notification-badge){ display:none!important; }
-  .side.collapsed .side-notif-section{ display:none!important; }
-  .side.collapsed > .side-drawer > button{ padding-left:0!important; padding-right:0!important; }
-}
-
-/* ===== FIX-FINAL-2: painel recolhido -- logo não pode ser cortada pelo overflow ===== */
-@media (min-width:761px){
-  .side.collapsed .brand.brand-clean.brand-logo-only,
-  .side.collapsed .brand.brand-logo-only{
-    padding:8px 0 12px!important;
-    margin:0 0 8px!important;
-  }
-  .side.collapsed .brand.brand-clean.brand-logo-only .brand-logo,
-  .side.collapsed .brand.brand-logo-only .brand-logo{
-    width:34px!important;
-    height:34px!important;
-    min-width:34px!important;
-    max-width:34px!important;
-  }
-  .side.collapsed .brand.brand-clean.brand-logo-only .brand-logo img,
-  .side.collapsed .brand.brand-logo-only .brand-logo img{
-    width:100%!important;
-    height:100%!important;
-    object-fit:contain!important;
-  }
-}
-
-/* ===== FIX-FINAL-2: gaveta do menu mobile abre da ESQUERDA (mesma borda do desktop) ===== */
-@media (max-width:760px){
-  .side-drawer{
-    left:0!important;
-    right:auto!important;
-    transform:translateX(-105%)!important;
-    border-right:1px solid rgba(255,255,255,.08)!important;
-    border-left:0!important;
-    box-shadow:28px 0 80px rgba(0,0,0,.54)!important;
-  }
-  .side.mobile-open .side-drawer{
-    transform:translateX(0)!important;
-  }
-}
-
-/* ---- Claude: campo "Nome do sistema" em destaque no topo de Aparência ---- */
-.general-panel .appearance-system-name{
-  padding:14px 16px;
-  border:1px solid rgba(var(--accent-rgb),.35);
-  border-radius:10px;
-  background:rgba(var(--accent-rgb),.06);
-  margin-bottom:22px!important;
-}
-.general-panel .appearance-system-name strong{
-  display:block;
-  margin-bottom:6px;
-  font-size:14px;
-  color:var(--gold-2);
-}
-.general-panel .appearance-system-name input{
-  font-size:15px;
-  font-weight:600;
-}
-
-/* ---- Claude: abas de painel (Configurações, Calendário, Docs) como chips no mobile ---- */
-@media(max-width:760px){
-  .main .panel-tabs-header .panel-tabs{
-    gap:8px!important;
-    padding:2px 2px 8px!important;
-    -webkit-overflow-scrolling:touch!important;
-    scrollbar-width:none!important;
-  }
-  .main .panel-tabs-header .panel-tabs::-webkit-scrollbar{display:none!important}
-  .main .panel-tabs-header .panel-tab-link{
-    flex:0 0 auto!important;
-    padding:9px 14px!important;
-    border:1px solid rgba(255,255,255,.10)!important;
-    border-radius:999px!important;
-    background:rgba(255,255,255,.04)!important;
-    font-size:13px!important;
-    min-height:36px!important;
-    box-sizing:border-box!important;
-  }
-  .main .panel-tabs-header .panel-tab-link.active,
-  .main .panel-tabs-header .panel-tab-link[aria-current="page"],
-  .main .panel-tabs-header .panel-tab-link[aria-selected="true"]{
-    border-color:var(--gold-2)!important;
-    background:rgba(var(--accent-rgb),.16)!important;
-  }
-}
-
-/* ---- Claude: aba "Carga" do Dashboard (carga de trabalho por membro) ---- */
-.carga-entity-summary{grid-template-columns:minmax(200px,1.35fr) minmax(160px,1.3fr) minmax(110px,.7fr) minmax(100px,.65fr)!important}
-.carga-task-list{padding:0 0 10px;background:rgba(255,255,255,.012)}
-.carga-task-row{padding:10px 14px;border-top:1px solid rgba(255,255,255,.055)}
-.carga-task-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
-.carga-task-head strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:13px;font-weight:600;color:#eee}
-.carga-task-head span{flex:0 0 auto;font-size:12px;color:var(--muted)}
-.carga-task-track{height:8px;border-radius:999px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.10);overflow:hidden;box-sizing:border-box}
-.carga-task-fill{display:flex;height:100%;min-width:2px;border-radius:999px;overflow:hidden}
-.carga-task-fill>span{display:block;height:100%}
-.carga-legend{display:flex;align-items:center;gap:18px;padding:12px 14px 4px;font-size:12px;color:var(--muted)}
-.carga-legend span{display:inline-flex;align-items:center;gap:6px}
-.carga-legend i{display:inline-block;width:9px;height:9px;border-radius:999px}
-
-/* ---- Claude: altura consistente entre linhas de gráfico com/sem avatar ---- */
-.dashboard-chart .bar{min-height:26px!important}
-.dashboard-chart .bar-label{min-height:24px!important}
-
-/* ---- Claude: status "online" + tarefa atual na linha principal da aba Carga ---- */
-.carga-status{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  min-width:0;
-  overflow:hidden;
-}
-.carga-online-tag{
-  flex:0 0 auto;
-  font-size:11px;
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:.03em;
-  color:var(--gold-2);
-}
-.carga-active-task{
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  font-size:12px;
-  color:#eee;
-}
-
-/* ---- Claude: linhas bloqueadas na aba Carga (equipe só vê a própria carga) ---- */
-.carga-entity-summary.carga-locked{
-  cursor:default!important;
-}
-.carga-entity-summary.carga-locked:hover{
+/* ============================================================================
+   Botão de copiar link no cabeçalho da prévia do Instagram, 2026-08-27
+   ============================================================================ */
+.insta-top .insta-copy-link{
+  margin-left:auto!important;
   background:transparent!important;
+  border:0!important;
+  padding:4px!important;
+  min-height:auto!important;
+  width:auto!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  color:#111!important;
+  cursor:pointer;
+  box-shadow:none!important;
 }
-.carga-entity-summary.carga-locked .dashboard-entity-name strong{
-  color:#d6d2c8;
+.insta-top .insta-copy-link svg{
+  width:20px;
+  height:20px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
 }
-
-
-/* ---- Claude: destaque de tarefa em andamento (timer ativo) — Kanban, Lista, Calendário ---- */
-.kcard.task-working .k-title,
-.task-row.task-list-row.task-working .task-list-main b,
-.mini-task.task-working .task-working-text{
-  color: var(--gold)!important;
-}
-.kcard.task-working .resp-avatar .avatar-mini{
-  box-shadow: 0 0 0 2px var(--gold)!important;
-  transform: scale(1.12);
-}
-.task-row.task-list-row.task-working .task-list-responsible .avatar-mini{
-  box-shadow: 0 0 0 2px var(--gold)!important;
+.insta-top .insta-copy-link:hover{
+  opacity:.6;
 }

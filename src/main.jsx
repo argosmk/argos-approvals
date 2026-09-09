@@ -7,7 +7,6 @@ import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './
 import { bootstrapNotificationsFromTable, loadNotificationRecords, syncNotificationListDelta } from './services/notificationTableService';
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSettings } from './services/publicPortfolioService';
-import { loadApprovalReminderSettings, saveApprovalReminderSettings } from './services/approvalReminderSettingsService';
 import {
   CALENDAR_PERMISSION_ITEMS,
   CREATE_TASK_FIELDS,
@@ -1175,21 +1174,6 @@ function applySystemAccent(value){
   root.style.setProperty('--accent-contrast',accentContrast(accent));
 }
 
-// ---- Push notification (web push) ----------------------------------------
-// VAPID pública: é seguro embutir no bundle, só a privada (no servidor) importa.
-const VAPID_PUBLIC_KEY = 'BBOwZgCFZpfB55QaC2XNUMy5VzC9cJ6Jr5AQtcxeBm1Du8QHYqxCqZIdm9uf9WFtrhVmZEsvhlOahi5O_Yv_pj0';
-
-function urlBase64ToUint8Array(base64String){
-  const padding='='.repeat((4 - base64String.length % 4) % 4);
-  const base64=(base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
-  const rawData=window.atob(base64);
-  const outputArray=new Uint8Array(rawData.length);
-  for(let i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
-  return outputArray;
-}
-
-
-
 function App(){
   const [users,setUsersState]=useState(()=>load('argos_users_r8', seedUsers));
   const [companies,setCompaniesState]=useState(()=>load('argos_companies_r8', seedCompanies));
@@ -1226,11 +1210,6 @@ function App(){
   const notificationAlertBaselineRef=useRef(null);
   const notificationAudioContextRef=useRef(null);
   const [notificationAlertsEnabled,setNotificationAlertsEnabled]=useState(false);
-  const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>typeof localStorage!=='undefined' && localStorage.getItem('argos_sidebar_collapsed')==='1');
-  useEffect(()=>{
-    if(typeof localStorage==='undefined') return;
-    localStorage.setItem('argos_sidebar_collapsed', sidebarCollapsed?'1':'0');
-  },[sidebarCollapsed]);
   const [notificationPermission,setNotificationPermission]=useState(()=>typeof Notification==='undefined'?'unsupported':Notification.permission);
   const taskOpenSessionRef=useRef({});
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
@@ -1678,11 +1657,6 @@ function App(){
     setNotificationAlertsEnabled(true);
   }
 
-  function disableNotificationAlerts(){
-    if(auth?.id) localStorage.removeItem(`argos_notification_alerts_${auth.id}`);
-    setNotificationAlertsEnabled(false);
-  }
-
   useEffect(()=>{
     if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !taskTablesReady || DISABLE_POLLING) return;
     let alive=true;
@@ -1904,14 +1878,9 @@ function App(){
   useEffect(()=>{
     const favicon = system?.favicon || '';
     if(favicon){
-      const faviconUrl = driveDirect(favicon);
       let link = document.querySelector("link[rel~='icon']");
       if(!link){ link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
-      link.href = faviconUrl;
-      // iOS/iPadOS lê o apple-touch-icon (não o manifest.json) ao "Adicionar à Tela de Início".
-      let appleLink = document.querySelector("link[rel='apple-touch-icon']");
-      if(!appleLink){ appleLink = document.createElement('link'); appleLink.rel = 'apple-touch-icon'; document.head.appendChild(appleLink); }
-      appleLink.href = faviconUrl;
+      link.href = driveDirect(favicon);
     }
     if(system?.title) document.title = system.title;
   },[system?.favicon, system?.title]);
@@ -2239,9 +2208,8 @@ function App(){
   }
   return <>
     {IS_LOCAL_DEV&&<div className="argos-environment-banner">Ambiente Local • Supabase Dev • Polling automático desligado</div>}
-    <div className={'app'+(sidebarCollapsed?' sidebar-collapsed':'')}>
-    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth} notificationAlertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableNotificationAlerts={enableNotificationAlerts} disableNotificationAlerts={disableNotificationAlerts} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed}/>
-    <button type="button" className="side-collapse-toggle" onClick={()=>setSidebarCollapsed(v=>!v)} title={sidebarCollapsed?'Expandir menu':'Recolher menu'} aria-label={sidebarCollapsed?'Expandir menu':'Recolher menu'}>{sidebarCollapsed?'»':'«'}</button>
+    <div className="app">
+    <Sidebar auth={auth} effectiveUser={effectiveUser} viewAs={viewAs} setViewAs={setViewAs} users={users} companies={companies} notifications={notifications} system={system} realAdmin={realAdmin} nav={nav} screen={activeScreen} setScreen={navigateScreen} setAuth={setAuth}/>
     <main className="main">
       {((cloudError&&!dismissCloudAlert)||(realtimeConflict&&!dismissRealtimeAlert))&&<div className="cloud-alert-stack" role="status" aria-live="polite">
         {cloudError&&!dismissCloudAlert&&<div className="cloud-banner"><button type="button" className="cloud-banner-close" aria-label="Fechar aviso" onClick={()=>setDismissCloudAlert(true)}>×</button>{cloudError}</div>}
@@ -2311,9 +2279,9 @@ function SetupRequired(){
   return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Configuração necessária</h1><p>O Supabase ainda não foi configurado neste projeto.</p><div className="cloud-error">Crie o arquivo <b>.env</b> na raiz do projeto com VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.</div><small>Depois reinicie o servidor com npm run dev.</small></div></div>
 }
 
-function Login({users,companies,setAuth,system}){ const [email,setEmail]=useState('admin@argos.local'); const [pass,setPass]=useState('123456');
+function Login({users,companies,setAuth}){ const [email,setEmail]=useState('admin@argos.local'); const [pass,setPass]=useState('123456');
   function login(){ const u=users.find(x=>x.email===email&&x.password===pass); if(!u) return alert('Login inválido'); if(!u.active) return alert('Usuário inativo'); if(u.role==='client' && !(u.companyIds||[]).some(id=>companies.find(c=>c.id===id)?.active)) return alert('Nenhuma empresa ativa vinculada a este usuário.'); setAuth(u); }
-  return <div className="login"><div className="login-card"><div className="logo">A</div><h1>{system?.title || 'Painel de Aprovação'}</h1><p>Central de produção, aprovação e operação.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="login"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password"/><button onClick={login}>Entrar</button></div></div>
+  return <div className="login"><div className="login-card"><div className="logo">A</div><h1>Argos Approval</h1><p>Central de produção, aprovação e operação.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="login"/><input value={pass} onChange={e=>setPass(e.target.value)} placeholder="senha" type="password"/><button onClick={login}>Entrar</button></div></div>
 }
 
 function NavIcon({id}){
@@ -2376,93 +2344,7 @@ function SearchBox({value,setValue,tasks,companies,users,statuses,statusById,use
     }):<p>Nenhuma tarefa encontrada.</p>}<small className="search-note">Pesquisa restrita às tarefas permitidas.</small></div>}
   </div>
 }
-function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notifications=[],system,realAdmin,nav,screen,setScreen,setAuth,notificationAlertsEnabled,notificationPermission,enableNotificationAlerts,disableNotificationAlerts,sidebarCollapsed,setSidebarCollapsed}){
-  const [pushStatus,setPushStatus]=useState('idle'); // idle | subscribed | unsupported | busy | denied
-  useEffect(()=>{
-    let alive=true;
-    async function checkSupport(){
-      if(!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification==='undefined'){
-        if(alive) setPushStatus('unsupported');
-        return;
-      }
-      try{
-        const reg=await navigator.serviceWorker.register('/sw.js');
-        const existing=await reg.pushManager.getSubscription();
-        if(alive) setPushStatus(existing?'subscribed':(Notification.permission==='denied'?'denied':'idle'));
-      }catch(err){
-        console.warn('sw register failed',err);
-        if(alive) setPushStatus('unsupported');
-      }
-    }
-    checkSupport();
-    return ()=>{ alive=false; };
-  },[]);
-  async function subscribePush(){
-    if(!auth?.id || pushStatus==='unsupported') return;
-    setPushStatus('busy');
-    try{
-      const permission = await Notification.requestPermission();
-      if(permission!=='granted'){ setPushStatus(permission==='denied'?'denied':'idle'); return; }
-      let orgId = auth.organizationId;
-      if(!orgId){
-        const { data: prof, error: profErr } = await supabase
-          .from('profiles').select('organization_id').eq('id', auth.id).single();
-        if(profErr) throw profErr;
-        orgId = prof?.organization_id;
-      }
-      if(!orgId) throw new Error('Organização não encontrada para este usuário.');
-      const reg=await navigator.serviceWorker.ready;
-      let sub=await reg.pushManager.getSubscription();
-      if(!sub){
-        sub=await reg.pushManager.subscribe({
-          userVisibleOnly:true,
-          applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
-      }
-      const json=sub.toJSON();
-      const { error } = await supabase.from('push_subscriptions').upsert({
-        organization_id: orgId,
-        profile_id: auth.id,
-        endpoint: json.endpoint,
-        p256dh: json.keys?.p256dh,
-        auth_key: json.keys?.auth,
-        user_agent: navigator.userAgent,
-        updated_at: new Date().toISOString(),
-      }, { onConflict:'endpoint' });
-      if(error) throw error;
-      setPushStatus('subscribed');
-    }catch(err){
-      console.error('push subscribe failed',err);
-      setPushStatus('idle');
-    }
-  }
-  async function unsubscribePush(){
-    setPushStatus('busy');
-    try{
-      const reg=await navigator.serviceWorker.ready;
-      const sub=await reg.pushManager.getSubscription();
-      if(sub){
-        await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
-        await sub.unsubscribe();
-      }
-      setPushStatus('idle');
-    }catch(err){
-      console.error('push unsubscribe failed',err);
-      setPushStatus('subscribed');
-    }
-  }
-  const notificationsOn = !!notificationAlertsEnabled || pushStatus==='subscribed';
-  const notificationsBusy = pushStatus==='busy';
-  async function handleNotificationsToggle(){
-    if(notificationsBusy) return;
-    if(notificationsOn){
-      disableNotificationAlerts?.();
-      await unsubscribePush();
-    }else{
-      await enableNotificationAlerts?.();
-      await subscribePush();
-    }
-  }
+function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notifications=[],system,realAdmin,nav,screen,setScreen,setAuth}){
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const drawerRef=useRef(null);
   const menuButtonRef=useRef(null);
@@ -2503,7 +2385,7 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
     .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}));
   const goScreen=(id)=>{ setScreen(id); setMobileMenuOpen(false); };
   const pendingNotificationsCount = (notifications||[]).filter(n=>n?.userId===effectiveUser?.id && !n?.done).length;
-  return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')+(sidebarCollapsed?' collapsed':'')}>
+  return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')}>
     <div className="mobile-side-bar">
       <div className="mobile-brand-mini">
         <div className="brand-logo">{system?.logo?<img src={argosLogoSrc(system.logo)} onError={e=>{ e.currentTarget.style.display='none'; }}/>:<span>A</span>}</div>
@@ -2522,14 +2404,8 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
         {realAdmin&&<><span className="side-user-view-arrow" aria-hidden="true">▾</span><select className="side-user-view-select" aria-label="Selecionar visualização" value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup>{clientViewGroups.map(group=><optgroup label={group.company.name} key={group.company.id}>{group.users.map(u=><option value={u.id} key={`${group.company.id}-${u.id}`}>{u.name}</option>)}</optgroup>)}{ungroupedClientViewUsers.length>0&&<optgroup label="Sem empresa">{ungroupedClientViewUsers.map(u=><option value={u.id} key={`ungrouped-${u.id}`}>{u.name}</option>)}</optgroup>}{!clientViewGroups.length&&!ungroupedClientViewUsers.length&&<optgroup label="Usuários clientes"><option disabled>Nenhum cliente ativo</option></optgroup>}</select></>}
       </div>
       <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<span className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</span>}</button>)}</nav>
-      <div className="side-notif-section">
-        <button type="button" className={'side-notif-toggle '+(notificationsOn?'is-on':'')} onClick={handleNotificationsToggle} disabled={notificationsBusy || pushStatus==='unsupported'} aria-pressed={notificationsOn} title={notificationsOn?'Desativar notificações':'Ativar notificações'}>
-          <span className="side-notif-toggle-label">🔔 Notificações</span>
-          <span className={'side-notif-switch '+(notificationsOn?'on':'off')}><span className="side-notif-switch-knob"/></span>
-        </button>
-      </div>
       <div className="spacer"/>
-      <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>{sidebarCollapsed?'⏻':'Sair'}</button>
+      <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>Sair</button>
     </div>
   </aside> 
 }
@@ -2702,14 +2578,13 @@ function Dashboard({tasks,companies,users,statuses,statusById,user,open,search='
     visible.showTeamTab!==false&&['team','Equipe'],
     visible.showCompaniesTab!==false&&['companies','Clientes'],
     visible.showTypesTab!==false&&['types','Tipos'],
-    visible.showCargaTab!==false&&['carga','Carga'],
   ].filter(Boolean);
   const effectiveTab=detailTabs.some(([id])=>id===tab)?tab:(detailTabs[0]?.[0]||'summary');
   useEffect(()=>{if(effectiveTab!==tab)setTab(effectiveTab);},[effectiveTab,tab]);
-  const entityOptions=effectiveTab==='team'||effectiveTab==='carga'?activeUsers.map(item=>({id:item.id,name:item.name,avatar:item.avatar})):effectiveTab==='companies'?activeCompanies.map(item=>({id:item.id,name:item.name,avatar:item.logo})):effectiveTab==='types'?TASK_TYPES.map(item=>({id:item,name:item})):[];
+  const entityOptions=effectiveTab==='team'?activeUsers.map(item=>({id:item.id,name:item.name,avatar:item.avatar})):effectiveTab==='companies'?activeCompanies.map(item=>({id:item.id,name:item.name,avatar:item.logo})):effectiveTab==='types'?TASK_TYPES.map(item=>({id:item,name:item})):[];
   useEffect(()=>{if(effectiveTab==='summary'||!entityOptions.some(item=>item.id===selectedEntity))setSelectedEntity('');},[effectiveTab,entityOptions.map(item=>item.id).join('|')]);
-  const entityTasks=effectiveTab==='team'||effectiveTab==='carga'?filtered.map(task=>({...task,__entityId:task.responsibleId})):effectiveTab==='companies'?filtered.map(task=>({...task,__entityId:task.companyId})):effectiveTab==='types'?filtered.map(task=>({...task,__entityId:task.type})):[];
-  return <section className="dashboard-page"><PanelTabsHeader title="Dashboard" tabs={detailTabs} active={effectiveTab} onChange={setTab}/><div className="filters">{visible.showPeriodFilter!==false&&<PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={setTo}/>} {visible.showCompanyFilter!==false&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{visible.showTeamFilter!==false&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}{visible.showTypeFilter!==false&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}</div>{effectiveTab==='summary'?<>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</>:(effectiveTab==='carga'?<DashboardCargaDetail options={entityOptions} tasks={entityTasks} liveTasks={tasks} users={activeUsers} selected={selectedEntity} setSelected={setSelectedEntity} statusById={statusById} viewerId={user.id} canViewAll={isAdmin}/>:<DashboardEntityDetail mode={tab} options={entityOptions} selected={selectedEntity} setSelected={setSelectedEntity} tasks={entityTasks} companies={companies} users={users} statusById={statusById} statuses={statuses} open={open}/>)}</section>
+  const entityTasks=effectiveTab==='team'?filtered.map(task=>({...task,__entityId:task.responsibleId})):effectiveTab==='companies'?filtered.map(task=>({...task,__entityId:task.companyId})):effectiveTab==='types'?filtered.map(task=>({...task,__entityId:task.type})):[];
+  return <section className="dashboard-page"><PanelTabsHeader title="Dashboard" tabs={detailTabs} active={effectiveTab} onChange={setTab}/><div className="filters">{visible.showPeriodFilter!==false&&<PeriodFilters period={period} setPeriod={setPeriod} from={from} setFrom={setFrom} to={setTo}/>} {visible.showCompanyFilter!==false&&<label>Cliente<select value={company} onChange={e=>setCompany(e.target.value)}><option value="all">Todos</option>{activeCompanies.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>}{visible.showTeamFilter!==false&&<label>Equipe<select value={resp} onChange={e=>setResp(e.target.value)}><option value="all">Todos</option>{activeUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></label>}{visible.showTypeFilter!==false&&<label>Tipo de post<select value={type} onChange={e=>setType(e.target.value)}><option value="all">Todos</option>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label>}</div>{effectiveTab==='summary'?<>{(quickCards.length||timeCards.length)?<div className="dash-zone">{quickCards.length>0&&<div className="cards quick-cards">{quickCards}</div>}{timeCards.length>0&&<div className="cards time-cards">{timeCards}</div>}</div>:null}{charts.length>0&&<div className="grid2">{charts}</div>}</>:<DashboardEntityDetail mode={tab} options={entityOptions} selected={selectedEntity} setSelected={setSelectedEntity} tasks={entityTasks} companies={companies} users={users} statusById={statusById} statuses={statuses} open={open}/>}</section>
 }
 function DashboardEntityDetail({mode,options,selected,setSelected,tasks,companies,users,statusById,open}){
   const [sort,setSort]=useState({key:'count',direction:'desc'});
@@ -2724,51 +2599,6 @@ function DashboardEntityDetail({mode,options,selected,setSelected,tasks,companie
   const headings=[['name','Nome'],['count','Qt. tarefas'],['average','Tempo médio'],['total','Tempo total'],['edit','Edição'],['alter','Alteração'],['rate','Taxa alt.']];
   const marksFor=task=>{const company=companies.find(item=>item.id===task.companyId),responsible=users.find(item=>item.id===task.responsibleId),status=statusById[task.status];return <span className="dashboard-task-marks">{mode!=='companies'&&company&&<AvatarMini value={company.logo} label={company.name}/>} {mode!=='team'&&responsible&&<AvatarMini value={responsible.avatar} label={responsible.name}/>}<span className="dashboard-status" style={{color:status?.color,borderColor:`${status?.color||'#777'}66`,background:`${status?.color||'#777'}18`}}>{status?.name||task.status}</span></span>};
   return <div className="dashboard-detail panel dashboard-entity-list"><div className="dashboard-entity-head">{headings.map(([key,label])=><button type="button" className="dashboard-sort-heading" key={key} onClick={()=>changeSort(key)} aria-label={`Ordenar por ${label}`}><span>{label}</span>{sort.key===key&&<span className="dashboard-sort-arrow">{sort.direction==='asc'?'▲':'▼'}</span>}</button>)}</div>{orderedRows.map(row=>{const expanded=selected===row.id;const sorted=[...row.tasks].sort((a,b)=>((b.totalEditSeconds||0)+(b.totalAlterSeconds||0))-((a.totalEditSeconds||0)+(a.totalAlterSeconds||0))||String(a.title||'').localeCompare(String(b.title||''),'pt-BR'));return <div className="dashboard-entity-group" key={row.id}><button type="button" className={`dashboard-entity-summary${expanded?' active':''}`} aria-expanded={expanded} onClick={()=>setSelected(expanded?'':row.id)}><span className="dashboard-entity-name"><span className="dashboard-chevron">{expanded?'⌄':'›'}</span>{row.avatar&&<AvatarMini value={row.avatar} label={row.name}/>}<strong>{row.name}</strong></span><span className="dashboard-stat">{row.tasks.length}</span><span className="dashboard-stat">{fmtSec(row.average)}</span><span className="dashboard-stat">{fmtSec(row.total)}</span><span className="dashboard-stat">{fmtSec(row.edit)}</span><span className="dashboard-stat">{fmtSec(row.alter)}</span><span className="dashboard-stat">{row.rate}%</span></button>{expanded&&<div className="dashboard-task-detail">{sorted.map(task=>{const edit=task.totalEditSeconds||0,alter=task.totalAlterSeconds||0,total=edit+alter;return <button type="button" className="dashboard-task-detail-row" key={task.id} onClick={()=>open?.(task.id)}><span className="dashboard-task-identity"><span className="dashboard-chevron">−</span><strong className="dashboard-task-name">{task.title}</strong></span>{marksFor(task)}<span className="dashboard-task-empty-column" aria-hidden="true"/><span>{fmtSec(total)}</span><span>{fmtSec(edit)}</span><span>{fmtSec(alter)}</span><span>{task.alterationCount||0}</span></button>})}{!sorted.length&&<div className="dashboard-empty-detail">Nenhuma tarefa encontrada nesse período.</div>}</div>}</div>})}{!orderedRows.length&&<div className="dashboard-empty-detail">Nenhuma opção disponível.</div>}</div>;
-}
-function DashboardCargaDetail({options,tasks,liveTasks=[],users=[],selected,setSelected,statusById,viewerId='',canViewAll=false}){
-  const editColor=statusById?.['edicao']?.color||'#a855f7';
-  const alterColor=statusById?.['alteracao']?.color||'#ef4444';
-  const rows=options.map(item=>{
-    const itemTasks=tasks.filter(task=>task.__entityId===item.id);
-    const edit=itemTasks.reduce((sum,task)=>sum+(task.totalEditSeconds||0),0),alter=itemTasks.reduce((sum,task)=>sum+(task.totalAlterSeconds||0),0),total=edit+alter;
-    const fullUser=users.find(u=>u.id===item.id)||null;
-    const online=isUserOnline(fullUser);
-    const activeTask=activeTimerTaskForUser(liveTasks,fullUser);
-    const canSeeDetails=canViewAll||item.id===viewerId;
-    return {...item,tasks:itemTasks,edit,alter,total,online,activeTask,canSeeDetails};
-  }).sort((a,b)=>b.total-a.total||String(a.name).localeCompare(String(b.name),'pt-BR',{sensitivity:'base'}));
-  return <div className="dashboard-detail panel dashboard-entity-list dashboard-carga-list">
-    {rows.map(row=>{
-      const expanded=row.canSeeDetails&&selected===row.id;
-      const sorted=[...row.tasks].sort((a,b)=>((b.totalEditSeconds||0)+(b.totalAlterSeconds||0))-((a.totalEditSeconds||0)+(a.totalAlterSeconds||0))||String(a.title||'').localeCompare(String(b.title||''),'pt-BR'));
-      const maxTotal=Math.max(1,...sorted.map(t=>(t.totalEditSeconds||0)+(t.totalAlterSeconds||0)));
-      return <div className="dashboard-entity-group" key={row.id}>
-        <button type="button" className={`dashboard-entity-summary carga-entity-summary${expanded?' active':''}${row.canSeeDetails?'':' carga-locked'}`} aria-expanded={expanded} disabled={!row.canSeeDetails} onClick={()=>row.canSeeDetails&&setSelected(expanded?'':row.id)}>
-          <span className="dashboard-entity-name"><span className="dashboard-chevron">{row.canSeeDetails?(expanded?'⌄':'›'):''}</span>{row.avatar&&<AvatarMini value={row.avatar} label={row.name}/>}<strong>{row.name}</strong></span>
-          <span className="carga-status">{row.online&&<><span className="carga-online-tag">Online</span>{row.activeTask&&<span className="carga-active-task">{row.canSeeDetails?row.activeTask.title:'Em trabalho'}</span>}</>}</span>
-          <span className="dashboard-stat">{row.canSeeDetails?`${row.tasks.length} tarefa(s)`:'—'}</span>
-          <span className="dashboard-stat">{row.canSeeDetails?fmtSec(row.total):''}</span>
-        </button>
-        {expanded&&<div className="carga-task-list">
-          {sorted.map(task=>{
-            const edit=task.totalEditSeconds||0,alter=task.totalAlterSeconds||0,total=edit+alter;
-            const editPct=total?edit/total*100:0,alterPct=total?alter/total*100:0;
-            const widthPct=total/maxTotal*100;
-            return <div className="carga-task-row" key={task.id}>
-              <div className="carga-task-head"><strong>{task.title}</strong><span>{fmtSec(total)}</span></div>
-              <div className="carga-task-track"><div className="carga-task-fill" style={{width:`${widthPct}%`}}>
-                {edit>0&&<span style={{width:`${editPct}%`,background:editColor}} title={`Edição: ${fmtSec(edit)}`}/>}
-                {alter>0&&<span style={{width:`${alterPct}%`,background:alterColor}} title={`Alteração: ${fmtSec(alter)}`}/>}
-              </div></div>
-            </div>
-          })}
-          {!sorted.length&&<div className="dashboard-empty-detail">Nenhuma tarefa encontrada nesse período.</div>}
-        </div>}
-      </div>
-    })}
-    {!rows.length&&<div className="dashboard-empty-detail">Nenhuma opção disponível.</div>}
-    <div className="carga-legend"><span><i style={{background:editColor}}/>Edição</span><span><i style={{background:alterColor}}/>Alteração</span></div>
-  </div>;
 }
 function Card({title,value}){ return <div className="card"><small>{title}</small><b>{value}</b></div> }
 function Bar({title,rows,tone=''}){
@@ -3154,7 +2984,7 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
           const deadlineColor=taskDeadlineColor(t,statuses,statusById);
           return <div className={'task-row-wrap '+(t.archived?'archived-card':'')} key={t.id}>
             {permissions.canSelectTasks&&<input className="task-row-check" type="checkbox" checked={selected.includes(t.id)} onChange={e=>{e.stopPropagation();toggleSelected(t.id)}} onClick={e=>e.stopPropagation()}/>} 
-            <button className={'task-row task-list-row'+(t.startedAt?' task-working':'')} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+            <button className="task-row task-list-row" disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
               <span className="task-list-main"><b title={t.title}>{t.title}{t.archived?' • Arquivada':''}</b></span>
               <span className="task-list-meta">
                 {permissions.showCompany&&<span className="task-list-company-avatar" title={`Empresa: ${c?.name||'Sem empresa'}`}><AvatarMini value={c?.logo} label={c?.name}/></span>}
@@ -3227,7 +3057,7 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
 }
 function AvatarMini({value,label}){ const v=String(value||''); const text=String(label||value||'?').slice(0,2).toUpperCase(); return <span className="avatar-mini">{(/^https?:\/\//.test(v)||v.startsWith('data:'))?<img src={driveDirect(v)} onError={e=>{e.currentTarget.remove();}}/>:text}</span> }
 function EntityLabel({value,label}){ return <span className="entity-label"><AvatarMini value={value} label={label}/><span>{label}</span></span> }
-function TaskButton({t,companies,users,statusById,open,permissions={}}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const isWorking=!!t.startedAt; const showCompanyName=permissions.showCompany?company?.name:null; const showRespName=permissions.showResponsible?resp?.name:null; return <button className={'mini-task'+(isWorking?' task-working':'')} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b className={isWorking?'task-working-text':undefined}>{t.title}</b>}{(showCompanyName||showRespName)&&<small>{showCompanyName}{showCompanyName&&showRespName?' • ':''}{showRespName&&<span className={isWorking?'task-working-text':undefined}>{showRespName}</span>}</small>}</button> }
+function TaskButton({t,companies,users,statusById,open,permissions={}}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const meta=[permissions.showCompany?company?.name:null,permissions.showResponsible?resp?.name:null].filter(Boolean).join(' • '); return <button className="mini-task" disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{meta&&<small>{meta}</small>}</button> }
 
 const FIXED_SPECIAL_DATES = [
   // Janeiro
@@ -3597,13 +3427,12 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search='',e
       return <div className="col" key={s.id} style={{borderTopColor:s.color,'--status-color':s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{
         const companyEntity=companies.find(c=>c.id===t.companyId);
         const respUser=users.find(u=>u.id===t.responsibleId);
-        const isWorking=!!t.startedAt;
-        return <button className={'kcard'+(isWorking?' task-working':'')} key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+        return <button className="kcard" key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
           <b className="k-title" title={t.title}>{t.title}</b>
           <div className="k-meta" style={{alignItems:'center',gap:6}}>
             {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars" style={{flex:'0 0 auto'}}>
               {permissions.showCompany&&<AvatarMini value={companyEntity?.logo} label={companyEntity?.name}/>} 
-              {permissions.showResponsible&&<span className="resp-avatar"><AvatarMini value={respUser?.avatar} label={respUser?.name}/></span>} 
+              {permissions.showResponsible&&<AvatarMini value={respUser?.avatar} label={respUser?.name}/>} 
             </span>}
             {(permissions.showPostDate||permissions.showDeadline)&&<span style={{display:'flex',gap:4,flexWrap:'nowrap',minWidth:0,marginLeft:'auto'}}>
               {permissions.showDeadline&&<small style={{display:'inline-flex',alignItems:'center',padding:'3px 6px',borderRadius:6,border:`1px solid ${taskDeadlineColor(t,statuses,statusById)}55`,background:`${taskDeadlineColor(t,statuses,statusById)}14`,color:taskDeadlineColor(t,statuses,statusById),fontSize:10,fontWeight:400,lineHeight:1.1,whiteSpace:'nowrap'}}>{fmtDate(t.internalDate)}</small>}
@@ -4261,7 +4090,7 @@ Descrição: ${desc}`;
     const url=taskShareUrl(task.id);
     try{
       await navigator.clipboard.writeText(url);
-      alert('Link da tarefa copiado.');
+      notifySettingsSaved('Link da tarefa copiado');
     }catch(err){
       prompt('Copie o link da tarefa:', url);
     }
@@ -4298,7 +4127,7 @@ Descrição: ${desc}`;
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
   return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left">
   {canViewDetail('title')&&<div className="task-title">{canEditDetail('title')?<input className="task-title-input" value={task.title||''} data-task-id={task.id} data-task-field="title" onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{canViewDetail('status')&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div>}
-  {canViewDetail('preview')&&<div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <RichTextDisplay value={task.caption||''}/></div></div>}
+  {canViewDetail('preview')&&<div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b><button type="button" className="insta-copy-link" onClick={copyTaskLink} aria-label="Copiar link da tarefa" title="Copiar link da tarefa"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <RichTextDisplay value={task.caption||''}/></div></div>}
   <div className="content-fields">
     {!hiddenTeam&&canViewDetail('copyInstructions')&&(canEditDetail('copyInstructions')?<RichTextField label="Instruções ao copy" value={task.copyInstructions||''} taskId={task.id} taskField="copyInstructions" onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/>) }
     {!hiddenTeam&&canViewDetail('editorInstructions')&&(canEditDetail('editorInstructions')?<RichTextField label="Instruções ao editor" value={task.editorInstructions||''} taskId={task.id} taskField="editorInstructions" onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/>) }
@@ -5443,9 +5272,9 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
   function saveStatus(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); notifySettingsSaved('Status salvo'); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
-  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['approvalReminders','Lembretes de aprovação'],['general','Aparência']];
+  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Aparência']];
   if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
-  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(var(--accent-rgb),.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='approvalReminders'&&<ApprovalReminderSettings currentUser={currentUser} statuses={statuses}/>} {tab==='general'&&<AppearanceSettings system={system} setSystem={setSystem}/>}</section> 
+  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(var(--accent-rgb),.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<AppearanceSettings system={system} setSystem={setSystem}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -5655,83 +5484,19 @@ function AppearanceSettings({system,setSystem}){
     notifySettingsSaved('Aparência salva');
   };
   return <div className="settings-section"><div className="panel general-panel appearance-panel">
-    <h3>Geral</h3>
-    <label className="appearance-system-name"><strong>Nome do sistema</strong><input value={f.title||''} onChange={e=>{set('title',e.target.value);set('loginTitle',e.target.value)}} placeholder="Painel de Aprovação"/><small>Esse é o nome do sistema: aparece na tela de login e no painel (aba do navegador e menu lateral).</small></label>
     <h3>Identidade visual</h3>
     <label>Cor de destaque<div className="appearance-accent-control"><input className="appearance-color-input" type="color" value={normalizeAccentColor(f.accentColor)} onChange={e=>set('accentColor',e.target.value)}/><input className="appearance-color-text" value={f.accentColor||''} onChange={e=>set('accentColor',e.target.value)} onBlur={()=>set('accentColor',normalizeAccentColor(f.accentColor))} placeholder="#cbae6c"/></div><small>Usada em abas ativas, botões principais, gráficos e outros destaques institucionais. Cores funcionais de status e urgência não são alteradas.</small></label>
+    <label>Texto do painel<input value={f.title||''} onChange={e=>set('title',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Logo do sistema<input value={f.logo||''} onChange={e=>set('logo',e.target.value)} placeholder="URL, link do Drive ou upload"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),'system/logo')}/></label>
     <label>Favicon do navegador<input value={f.favicon||''} onChange={e=>set('favicon',e.target.value)} placeholder="URL, link do Drive ou upload"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('favicon',v),'system/favicon')}/><small>Ícone pequeno que aparece na aba do navegador.</small></label>
     <h3>Tela de login</h3>
+    <label>Título da tela de login<input value={f.loginTitle||''} onChange={e=>set('loginTitle',e.target.value)} placeholder="Painel de Aprovação"/></label>
     <label>Texto de apoio da tela de login<input value={f.loginSubtitle||''} onChange={e=>set('loginSubtitle',e.target.value)} placeholder="Entre com seu acesso."/></label>
     <label>Logo da tela de login<input value={f.loginLogo||''} onChange={e=>set('loginLogo',e.target.value)} placeholder="URL, link do Drive ou upload. Se vazio, usa a logo do sistema."/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('loginLogo',v),'system/login')}/></label>
     <div className="row-actions"><button onClick={()=>{setF({...system,accentColor:normalizeAccentColor(system?.accentColor)});applySystemAccent(system?.accentColor);}}>Cancelar</button><button className="primary" onClick={saveAppearance}>Salvar aparência</button></div>
   </div></div>
 }
 
-
-function ApprovalReminderSettings({currentUser,statuses}){
-  const organizationId=currentUser?.organizationId;
-  const [form,setForm]=useState({enabled:true,statusKeys:['aprovacao'],firstDayAfter:1,intervalDays:2});
-  const [loading,setLoading]=useState(true);
-  const [saving,setSaving]=useState(false);
-  const [message,setMessage]=useState('');
-  const [error,setError]=useState('');
-
-  useEffect(()=>{
-    let alive=true;
-    if(!organizationId){ setLoading(false); setError('Organização não identificada.'); return ()=>{alive=false}; }
-    (async()=>{
-      try{
-        setLoading(true); setError('');
-        const data=await loadApprovalReminderSettings(organizationId);
-        if(alive) setForm(data);
-      }catch(err){ if(alive) setError(err.message||'Não foi possível carregar as configurações.'); }
-      finally{ if(alive) setLoading(false); }
-    })();
-    return()=>{alive=false};
-  },[organizationId]);
-
-  function toggleStatus(key){
-    setForm(prev=>{
-      const has=(prev.statusKeys||[]).includes(key);
-      const next=has?prev.statusKeys.filter(k=>k!==key):[...(prev.statusKeys||[]),key];
-      return {...prev,statusKeys:next};
-    });
-  }
-
-  async function save(){
-    if(!(form.statusKeys||[]).length){ setError('Selecione pelo menos um status.'); setMessage(''); return; }
-    try{
-      setSaving(true); setError(''); setMessage('');
-      const saved=await saveApprovalReminderSettings(organizationId,form);
-      setForm(saved);
-      setMessage('Configurações de lembrete salvas.');
-      notifySettingsSaved('Lembretes de aprovação salvos');
-    }catch(err){ setError(err.message||'Não foi possível salvar as configurações.'); }
-    finally{ setSaving(false); }
-  }
-
-  if(loading) return <div className="settings-section"><div className="panel"><p>Carregando configurações...</p></div></div>;
-
-  return <div className="settings-section"><div className="panel approval-reminder-settings">
-    <div className="public-portfolio-settings-head">
-      <div><p>Controla o lembrete automático (push) enviado ao cliente quando um post fica parado num status. A equipe/admin recebe notificação instantânea à parte, espelhando o sino interno, sem precisar de configuração aqui.</p></div>
-      <label className="public-portfolio-active"><input type="checkbox" checked={form.enabled} onChange={e=>setForm(prev=>({...prev,enabled:e.target.checked}))}/><span>Lembretes ativos</span></label>
-    </div>
-    {error&&<div className="cloud-error">{error}</div>}
-    {message&&<div className="public-portfolio-success">{message}</div>}
-    <h3>Status que geram lembrete</h3>
-    <div className="checks one-col compact-checks-v3">
-      {(statuses||[]).map(s=><label key={s.id}><input type="checkbox" checked={(form.statusKeys||[]).includes(s.id)} onChange={()=>toggleStatus(s.id)}/>{s.name}</label>)}
-    </div>
-    <div className="form-two">
-      <label>Primeiro lembrete após (dias)<input type="number" min="0" value={form.firstDayAfter} onChange={e=>setForm(prev=>({...prev,firstDayAfter:e.target.value}))}/></label>
-      <label>Repetir a cada (dias)<input type="number" min="1" value={form.intervalDays} onChange={e=>setForm(prev=>({...prev,intervalDays:e.target.value}))}/></label>
-    </div>
-    <small className="muted">Exemplo: primeiro lembrete 1 dia depois de entrar no status, repetindo a cada 2 dias — dias 1, 3, 5, 7... enquanto o post não sair do status escolhido.</small>
-    <div className="row-actions"><button className="primary" onClick={save} disabled={saving||!organizationId}>{saving?'Salvando...':'Salvar lembretes'}</button></div>
-  </div></div>
-}
 
 const DEFAULT_DOCUMENT_FOLDERS = ['Clientes','Funcionários','Financeiro','Processos','Modelos','Interno'];
 function isFolderMarker(d){ return d?.documentKind==='folder'; }
@@ -6058,6 +5823,7 @@ function NotificationsPage({notifications,setNotifications,open,tasks,companies,
   },[]);
   return <section><PanelTabsHeader title="Notificações" tabs={permissions.showTabs?[["open","Pendentes"],["done","Concluídas"]]:[]} active={effectiveTab} onChange={setTab}/>
     <div className="filters notification-top-controls">
+      {permissions.canEnableAlerts!==false&&<button className={alertsEnabled?'primary':''} onClick={enableAlerts} disabled={alertsEnabled||notificationPermission==='unsupported'}>{alertsEnabled?'Alertas ativados':notificationPermission==='denied'?'Notificações bloqueadas':'Ativar som e notificações'}</button>}
       {effectiveTab==='open'&&permissions.canCompleteAll&&<button onClick={doneAll} disabled={!openCount}>Concluir todas</button>}
       {effectiveTab==='done'&&permissions.canDeleteCompleted&&<button onClick={clearDone} disabled={!doneCount}>Limpar concluídas</button>}
     </div>

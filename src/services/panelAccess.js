@@ -92,7 +92,6 @@ export const DASHBOARD_WIDGETS = Object.freeze([
   Object.freeze({id:'typeChart',label:'Gráfico por tipo'}),
   Object.freeze({id:'companyChart',label:'Gráfico por cliente'}),
   Object.freeze({id:'memberChart',label:'Gráfico por membro',adminOnly:true}),
-  Object.freeze({id:'showCargaTab',label:'Aba Carga'}),
 ]);
 
 export function fullDashboardVisibility(){
