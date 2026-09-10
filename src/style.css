@@ -11659,9 +11659,8 @@ button:not(:disabled):active{
 
 /* ===== FIX-FINAL: toggle único de notificações no painel lateral ===== */
 .side-notif-section{
-  margin-top:10px;
-  padding-top:12px;
-  border-top:1px solid rgba(255,255,255,.1);
+  margin-top:0;
+  padding-top:0;
 }
 .side-notif-toggle{
   display:flex;
@@ -11694,7 +11693,7 @@ button:not(:disabled):active{
   transition:background .18s ease;
   flex:0 0 auto;
 }
-.side-notif-switch.on{background:linear-gradient(180deg,#f4c430,#c9971f);}
+.side-notif-switch.on{background:linear-gradient(180deg,var(--gold),var(--accent-dark));}
 .side-notif-switch-knob{
   position:absolute;
   top:2px;
@@ -11995,4 +11994,211 @@ button:not(:disabled):active{
 }
 .insta-top .insta-copy-link:hover{
   opacity:.6;
+}
+
+/* ============================================================================
+   Linha separando o bloco (logo/usuário/notificações) dos painéis de
+   navegação na sidebar, 2026-09-10
+   ============================================================================ */
+.side-drawer hr.side-section-divider{
+  border:0;
+  border-top:1px solid rgba(255,255,255,.1);
+  margin:12px 0 10px;
+}
+.side-drawer .side-user-view-card{
+  margin-bottom:8px!important;
+}
+
+/* ============================================================================
+   "Suas solicitações" — aba própria do cliente pra acompanhar pedidos que
+   ainda não entraram na produção visível, 2026-09-10
+   ============================================================================ */
+.own-requests-panel{margin-bottom:16px;}
+.own-requests-panel > p{margin:0 0 14px;}
+.own-requests-rows{display:flex;flex-direction:column;gap:10px;}
+.own-request-row{
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+  justify-content:flex-start!important;
+  text-align:left!important;
+}
+.own-request-row b{flex:1;}
+.own-request-row .status-pill{
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid;
+  font-size:12px;
+  font-weight:650;
+  flex:0 0 auto;
+}
+
+/* ============================================================================
+   Linha do tempo unificada (log + comentário), 2026-09-10
+   ============================================================================ */
+.timeline-entry{
+  padding:9px 12px;
+  border-radius:10px;
+  background:#101116;
+  border:1px solid rgba(255,255,255,.06);
+  margin-top:8px;
+}
+.timeline-entry.is-log{
+  background:transparent;
+  border-color:rgba(255,255,255,.05);
+  padding:6px 12px;
+}
+.timeline-entry.resolved{opacity:.6;}
+.timeline-entry.resolved p{text-decoration:line-through;}
+.timeline-entry-head{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.timeline-entry-head b{font-size:13px;}
+.timeline-entry-head small{color:var(--muted);font-size:11.5px;}
+.timeline-entry-head .status-transition{
+  margin-left:auto;
+  font-size:12px;
+  font-weight:650;
+  white-space:nowrap;
+}
+.timeline-entry p{margin:4px 0 0;font-size:13px;line-height:1.4;}
+.timeline-entry .timeline-log-text{color:var(--text-2);font-size:12.5px;}
+.timeline-entry .status-pill-small{
+  display:inline-block;
+  margin-top:6px;
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid;
+  font-size:11px;
+  font-weight:650;
+}
+.timeline-entry .resolve-btn{
+  width:auto;
+  min-height:auto;
+  margin-top:6px;
+  padding:3px 9px;
+  font-size:11px;
+}
+.timeline-entry .resolved-note{
+  display:block;
+  margin-top:6px;
+  color:var(--gold);
+  font-size:11.5px;
+}
+
+/* Linha divisória entre grupos de campos (briefing / conteúdo / entrega),
+   na criação de tarefa e na visualização da tarefa. */
+hr.content-fields-divider{
+  border:0;
+  border-top:1px solid var(--line);
+  margin:18px 0;
+}
+
+/* ============================================================================
+   Botão "+" de criação rápida em cada dia do calendário, 2026-09-10
+   ============================================================================ */
+.day{position:relative;}
+.day-quick-add{
+  position:absolute;
+  top:4px;
+  left:4px;
+  width:20px;
+  height:20px;
+  min-height:20px;
+  padding:0;
+  border-radius:6px;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1);
+  color:var(--muted);
+  font-size:14px;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:0;
+  transition:opacity .15s ease,background .15s ease,color .15s ease;
+  z-index:3;
+}
+.day:hover .day-quick-add{opacity:1;}
+.day-quick-add:hover{
+  background:rgba(var(--accent-rgb),.18);
+  border-color:rgba(var(--accent-rgb),.4);
+  color:var(--gold);
+}
+@media (hover:none){
+  .day-quick-add{opacity:.55;}
+}
+
+/* ============================================================================
+   Arrastar e soltar (Kanban e Calendário) — somente admin, 2026-09-10
+   ============================================================================ */
+.kcard[draggable="true"],
+.mini-task[draggable="true"]{
+  cursor:grab;
+}
+.kcard[draggable="true"]:active,
+.mini-task[draggable="true"]:active{
+  cursor:grabbing;
+}
+.col.drag-over{
+  background:rgba(var(--accent-rgb),.06);
+  box-shadow:inset 0 0 0 2px rgba(var(--accent-rgb),.4);
+  border-radius:10px;
+}
+.day.drag-over{
+  background:rgba(var(--accent-rgb),.08)!important;
+  box-shadow:inset 0 0 0 2px rgba(var(--accent-rgb),.5)!important;
+}
+
+/* ============================================================================
+   Sistema de votos do comitê — quando uma empresa tem mais de um aprovador,
+   2026-09-10
+   ============================================================================ */
+.approval-votes-banner{
+  padding:10px 12px;
+  margin-bottom:12px;
+  border-radius:10px;
+  background:rgba(234,179,8,.08);
+  border:1px solid rgba(234,179,8,.35);
+  color:#eab308;
+  font-size:12.5px;
+  font-weight:600;
+  line-height:1.4;
+}
+
+/* ============================================================================
+   Destaque de acesso personalizado — versão 2 (revisada), 2026-09-10
+   Nada de cor no texto: só uma bolinha marca o que é diferente do padrão.
+   O texto fica esmaecido por padrão, e "acende" (opacidade normal) só
+   quando o valor realmente diverge do padrão da função.
+   ============================================================================ */
+.item-custom-dot{
+  display:inline-block;
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  background:var(--gold);
+  flex:0 0 auto;
+}
+.custom-access-field{
+  opacity:1!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+}
+
+/* ============================================================================
+   Interruptor único de "acesso personalizado" — substitui os 12 seletores
+   espalhados por seção, 2026-09-10
+   ============================================================================ */
+.master-custom-access-toggle{
+  padding:14px 16px!important;
+  border:1px solid var(--line)!important;
+}
+.master-custom-access-toggle.is-custom{
+  border-color:rgba(var(--accent-rgb),.4)!important;
+  background:rgba(var(--accent-rgb),.05)!important;
 }

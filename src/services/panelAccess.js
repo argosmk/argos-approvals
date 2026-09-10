@@ -411,9 +411,9 @@ export const CREATE_TASK_FIELDS = Object.freeze([
   Object.freeze({id:'editorInstructions',label:'Instruções ao editor'}),
   Object.freeze({id:'copy',label:'Copy'}),
   Object.freeze({id:'caption',label:'Legenda'}),
-  Object.freeze({id:'finalLink',label:'Link final'}),
+  Object.freeze({id:'finalLink',label:'Link da pasta final'}),
   Object.freeze({id:'usefulLinks',label:'Links úteis'}),
-  Object.freeze({id:'materialLinks',label:'Links de material pronto'}),
+  Object.freeze({id:'materialLinks',label:'Links de material finalizado'}),
 ]);
 
 export const TASK_DETAIL_FIELDS = Object.freeze([
@@ -423,9 +423,9 @@ export const TASK_DETAIL_FIELDS = Object.freeze([
   Object.freeze({id:'editorInstructions',label:'Instruções ao editor'}),
   Object.freeze({id:'copy',label:'Copy'}),
   Object.freeze({id:'caption',label:'Legenda'}),
-  Object.freeze({id:'finalLink',label:'Link final'}),
+  Object.freeze({id:'finalLink',label:'Link da pasta final'}),
   Object.freeze({id:'usefulLinks',label:'Links úteis'}),
-  Object.freeze({id:'materialLinks',label:'Links de material pronto'}),
+  Object.freeze({id:'materialLinks',label:'Links de material finalizado'}),
   Object.freeze({id:'companyId',label:'Empresa'}),
   Object.freeze({id:'responsibleId',label:'Responsável'}),
   Object.freeze({id:'type',label:'Tipo'}),
@@ -446,7 +446,7 @@ export function builtInTaskDetailPermissionsForRole(role){
     ['usefulLinks','materialLinks','finalLink'].forEach(id=>{editable[id]=true;});
     editable.comments=true;
   }else{
-    ['copyInstructions','editorInstructions','companyId','responsibleId','type','status','internalDate','stats','history'].forEach(id=>{visible[id]=false;});
+    ['copyInstructions','editorInstructions','companyId','responsibleId','type','internalDate','stats','history'].forEach(id=>{visible[id]=false;});
     editable.usefulLinks=true;
     editable.comments=true;
   }

@@ -734,20 +734,50 @@ function periodMatch(date, period, from, to){
   if(period==='custom') return (!from || d>=dObj(from)) && (!to || d<=dObj(to));
   return true;
 }
-function canUserAccessTask(task, user, statuses){
+function companyApprovers(companyId, users){
+  return (users||[]).filter(u=>u.active!==false && u.role==='client' && (u.companyIds||[]).includes(companyId));
+}
+const CUSTOM_ACCESS_SECTION_LABELS={
+  statuses:'Status visíveis', types:'Tipos visíveis', notifications:'Notificações',
+  dashboard:'Dashboard', actions:'Ações da tarefa', tasks:'Tarefa (ações e campos)',
+  taskDetail:'Tarefa aberta', kanban:'Kanban', calendar:'Calendário',
+  portfolio:'Portfólio', planning:'Planejamento', documents:'Documentos', tasksList:'Listas'
+};
+function userHasCustomAccess(user){
+  if(!user) return false;
+  if(user.panelPermissions?.mode==='custom') return true;
+  const inh=user.accessInheritance||{};
+  return Object.values(inh).some(v=>v==='custom');
+}
+function userCustomAccessLabels(user){
+  const labels=[];
+  if(user?.panelPermissions?.mode==='custom') labels.push('Painéis do menu');
+  const inh=user?.accessInheritance||{};
+  const seen=new Set();
+  for(const key in inh){
+    if(inh[key]!=='custom') continue;
+    const label=CUSTOM_ACCESS_SECTION_LABELS[key];
+    if(label && !seen.has(label)){ labels.push(label); seen.add(label); }
+  }
+  return labels;
+}
+function canUserAccessTask(task, user, statuses, users){
   if(!task || !user) return false;
   if(task.archived) return user.role === 'admin';
   if(user.role === 'admin') return true;
   const allowedStatuses = user.visibleStatuses || [];
-  if(!allowedStatuses.includes(task.status)) return false;
+  const creatorId=task.logs?.[0]?.userId;
+  const creator=creatorId&&users?users.find(u=>u.id===creatorId):null;
+  const isCompanyClientRequest = user.role==='client' && creator?.role==='client' && (user.companyIds||[]).includes(task.companyId);
+  if(!allowedStatuses.includes(task.status) && !isCompanyClientRequest) return false;
   const allowedTypes = Array.isArray(user.visibleTypes) ? user.visibleTypes : TASK_TYPES;
   if(!allowedTypes.includes(task.type)) return false;
   if(user.role === 'team') return task.responsibleId === user.id;
   if(user.role === 'client') return (user.companyIds || []).includes(task.companyId);
   return false;
 }
-function baseVisibleTasks(tasks, user, statuses){
-  return tasks.filter(t=>canUserAccessTask(t, user, statuses));
+function baseVisibleTasks(tasks, user, statuses, users){
+  return tasks.filter(t=>canUserAccessTask(t, user, statuses, users));
 }
 function applyFilters(tasks, filters={}){
   return tasks.filter(t=>{
@@ -1941,7 +1971,7 @@ function App(){
   const effectiveUser=resolveUserAccess(rawEffectiveUser,system);
   const realAdmin=authUser.role==='admin'; const isAdmin=effectiveUser.role==='admin';
   const statusById=Object.fromEntries(statuses.map(s=>[s.id,s]));
-  const visibleTasks=baseVisibleTasks(tasks,effectiveUser,statuses);
+  const visibleTasks=baseVisibleTasks(tasks,effectiveUser,statuses,users);
   const effectiveTaskTypes=effectiveUser.role==='admin'?TASK_TYPES:(Array.isArray(effectiveUser.visibleTypes)?effectiveUser.visibleTypes:TASK_TYPES);
   async function reset(){
     const code = prompt('ATENÇÃO: esta ação pode apagar dados locais/reais do sistema. Use apenas se tiver certeza absoluta. Digite RESETAR para confirmar.');
@@ -1958,6 +1988,12 @@ function App(){
     const permissions=effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role);
     if(!permissions.canCreate) return;
     setForm({ title:'', companyId:'', responsibleId:'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:'', internalDate:'', copyInstructions:'', editorInstructions:'', usefulLinks:'', copy:'', caption:'', materialLinks:'' });
+    setCreateOpen(true);
+  }
+  function openCreateForDate(dateStr){
+    const permissions=effectiveUser.taskPermissions||builtInTaskPermissionsForRole(effectiveUser.role);
+    if(!permissions.canCreate) return;
+    setForm({ title:'', companyId:'', responsibleId:'', type:TASK_TYPES[0], status:statuses[0]?.id||'', postDate:dateStr, internalDate:dateStr, copyInstructions:'', editorInstructions:'', usefulLinks:'', copy:'', caption:'', materialLinks:'' });
     setCreateOpen(true);
   }
   function createTask(){
@@ -2071,6 +2107,8 @@ function App(){
       type:'status',
       visibility:'internal',
       at:eventAt,
+      fromStatusId:original.status,
+      toStatusId:patch.status,
       text:patch.statusLogText||`${effectiveUser.name} alterou de ${fromStatus} para ${toStatus}`
     }:null;
 
@@ -2142,9 +2180,9 @@ function App(){
 
   function addLog(id,text,type='comment',visibility='internal'){
     const eventAt=now();
-    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:eventAt,text,resolved:false};
-    setTasks(prev=>prev.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     const task=tasks.find(t=>t.id===id);
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type,visibility,at:eventAt,text,resolved:false,statusAtTime:task?.status||null};
+    setTasks(prev=>prev.map(t=>t.id===id?{...t,logs:[...(t.logs||[]),entry]}:t));
     if(type==='comment'){
       notifyTask(task,text,'Comentário na tarefa',task?.status,effectiveUser.id,{
         actorName:effectiveUser.name,
@@ -2259,7 +2297,7 @@ function App(){
         </div>
         {activeScreen==='dashboard' && <Dashboard tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} search=""/>}
         {activeScreen==='teamhub' && effectiveUser.role!=='client' && <TeamHubPage users={users} setUsers={setUsers} setAuth={setAuth} tasks={tasks} statuses={statuses} auth={auth} viewer={effectiveUser} open={openTaskRoute}/>}
-        {activeScreen==='tasks' && <TasksWorkspace tabs={taskTabs} requestedTab={screen} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute}/>} 
+        {activeScreen==='tasks' && <TasksWorkspace tabs={taskTabs} requestedTab={screen} tasks={visibleTasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={effectiveUser} open={openTaskRoute} openCreateForDate={(effectiveUser.taskPermissions?.canCreate??(effectiveUser.role!=='client'))?openCreateForDate:null} updateTask={updateTask}/>} 
         {activeScreen==='planning' && <PlanningPage companies={companies} setCompanies={setCompanies} users={users} tasks={tasks} createWeeklyTasks={createWeeklyTasks} open={openTaskRoute} user={effectiveUser}/>} 
         {activeScreen==='documents' && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>} 
         {activeScreen==='financial' && <FinancialLab tasks={tasks} companies={companies} users={users} currentUser={effectiveUser}/>} 
@@ -2521,13 +2559,14 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
         <div className="side-user-view-identity"><AvatarMini value={displayAvatar} label={effectiveUser.name}/><div><b>{effectiveUser.name}</b><small>{viewCardSubtitle}</small></div></div>
         {realAdmin&&<><span className="side-user-view-arrow" aria-hidden="true">▾</span><select className="side-user-view-select" aria-label="Selecionar visualização" value={viewAs?.id||''} onChange={e=>setViewAs(users.find(u=>u.id===e.target.value)||null)}><option value="">Minha visão</option><optgroup label="Pessoas da equipe">{teamViewUsers.length?teamViewUsers.map(u=><option value={u.id} key={u.id}>{u.name}</option>):<option disabled>Nenhuma pessoa ativa</option>}</optgroup>{clientViewGroups.map(group=><optgroup label={group.company.name} key={group.company.id}>{group.users.map(u=><option value={u.id} key={`${group.company.id}-${u.id}`}>{u.name}</option>)}</optgroup>)}{ungroupedClientViewUsers.length>0&&<optgroup label="Sem empresa">{ungroupedClientViewUsers.map(u=><option value={u.id} key={`ungrouped-${u.id}`}>{u.name}</option>)}</optgroup>}{!clientViewGroups.length&&!ungroupedClientViewUsers.length&&<optgroup label="Usuários clientes"><option disabled>Nenhum cliente ativo</option></optgroup>}</select></>}
       </div>
-      <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<span className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</span>}</button>)}</nav>
       <div className="side-notif-section">
         <button type="button" className={'side-notif-toggle '+(notificationsOn?'is-on':'')} onClick={handleNotificationsToggle} disabled={notificationsBusy || pushStatus==='unsupported'} aria-pressed={notificationsOn} title={notificationsOn?'Desativar notificações':'Ativar notificações'}>
           <span className="side-notif-toggle-label">🔔 Notificações</span>
           <span className={'side-notif-switch '+(notificationsOn?'on':'off')}><span className="side-notif-switch-knob"/></span>
         </button>
       </div>
+      <hr className="side-section-divider"/>
+      <nav>{nav.map(([id,label])=><button key={id} onClick={()=>goScreen(id)} className={'nav-btn '+(screen===id?'active':'')}><NavIcon id={id}/><span>{label}</span>{id==='notifications'&&pendingNotificationsCount>0&&<span className="nav-notification-badge" aria-label={`${pendingNotificationsCount} notificações pendentes`}>{pendingNotificationsCount>9?'9+':pendingNotificationsCount}</span>}</button>)}</nav>
       <div className="spacer"/>
       <button onClick={async()=>{ if(isSupabaseConfigured) await supabase.auth.signOut(); setAuth(null); location.reload(); }}>{sidebarCollapsed?'⏻':'Sair'}</button>
     </div>
@@ -2632,14 +2671,18 @@ function CreateModal({form,setForm,companies,users,statuses,types,createTask,clo
 
     {fields.usefulLinks&&<RichTextField label="Links úteis" value={form.usefulLinks||''} onChange={e=>F('usefulLinks',e.target.value)} placeholder="Cole links e descreva para que serve cada um."/>}
 
+    <hr className="content-fields-divider"/>
+
     {fields.copy&&<RichTextField label="Copy" value={form.copy||''} onChange={e=>F('copy',e.target.value)} placeholder="Insira o texto do post."/>}
 
     {fields.caption&&<RichTextField label="Legenda" value={form.caption||''} onChange={e=>F('caption',e.target.value)} placeholder="Insira a legenda do post."/>}
 
-    {fields.finalLink&&<RichTextField label="Link final" value={form.finalLink||''} onChange={e=>F('finalLink',e.target.value)} placeholder="Link liberado ao cliente após a aprovação (ex: pasta do Google Drive)."/>}
+    <hr className="content-fields-divider"/>
+
+    {fields.finalLink&&<RichTextField label="Link da pasta final" value={form.finalLink||''} onChange={e=>F('finalLink',e.target.value)} placeholder="Link liberado ao cliente após a aprovação (ex: pasta do Google Drive)."/>}
 
     {fields.materialLinks&&<TextFieldWithCopy
-      label="Links de material pronto"
+      label="Links de material finalizado"
       value={form.materialLinks||''}
       onChange={e=>F('materialLinks',e.target.value)}
       placeholder="Cole um link por linha para artes, vídeos ou arquivos finalizados."
@@ -2956,8 +2999,12 @@ function TeamFeedItem({task,open,canOpen=true}){
   </article>;
 }
 
-function TasksWorkspace({tabs,requestedTab,tasks,setTasks,companies,users,statuses,statusById,user,open}){
-  const allowedIds=tabs.map(([id])=>id);
+function TasksWorkspace({tabs,requestedTab,tasks,setTasks,companies,users,statuses,statusById,user,open,openCreateForDate,updateTask}){
+  const ownHiddenRequests = user?.role==='client'
+    ? tasks.filter(t=>!(user.visibleStatuses||[]).includes(t.status))
+    : [];
+  const fullTabs = user?.role==='client' ? [...tabs,['ownRequests','Solicitações']] : tabs;
+  const allowedIds=fullTabs.map(([id])=>id);
   const storageKey=`argos:tasks-workspace-tab:${user?.id||user?.role||'user'}`;
   const resolveInitialTab=()=>{
     if(requestedTab!=='tasks'&&allowedIds.includes(requestedTab)) return requestedTab;
@@ -2970,18 +3017,29 @@ function TasksWorkspace({tabs,requestedTab,tasks,setTasks,companies,users,status
   const [tab,setTab]=useState(resolveInitialTab);
   useEffect(()=>{
     if(!allowedIds.includes(tab)) setTab(resolveInitialTab());
-  },[tabs.map(([id])=>id).join('|'),requestedTab,user?.id]);
+  },[fullTabs.map(([id])=>id).join('|'),requestedTab,user?.id]);
   const changeTab=next=>{
     if(!allowedIds.includes(next)) return;
     setTab(next);
     try{ localStorage.setItem(storageKey,next); }catch{}
     if(requestedTab!=='tasks') setAppRoute({screen:'tasks'});
   };
-  if(!tabs.length) return <section><PanelTabsHeader title="Tarefas"/><div className="panel"><p className="muted">Nenhuma visualização de tarefas está liberada para este usuário.</p></div></section>;
+  if(!fullTabs.length) return <section><PanelTabsHeader title="Tarefas"/><div className="panel"><p className="muted">Nenhuma visualização de tarefas está liberada para este usuário.</p></div></section>;
   return <section className="tasks-workspace">
-    <PanelTabsHeader title="Tarefas" tabs={tabs} active={tab} onChange={changeTab}/>
-    {tab==='kanban'&&<Kanban tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} search="" embedded/>}
-    {tab==='calendar'&&<Calendar tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} search="" embedded/>}
+    <PanelTabsHeader title="Tarefas" tabs={fullTabs} active={tab} onChange={changeTab}/>
+    {tab==='ownRequests'&&<div className="panel own-requests-panel">
+      <p className="muted">Solicitações da sua empresa que ainda não entraram na etapa de produção visível — qualquer pessoa da empresa pode acompanhar e comentar aqui.</p>
+      {ownHiddenRequests.length?<div className="own-requests-rows">{ownHiddenRequests.map(t=>{
+        const st=statusById[t.status];
+        return <button key={t.id} className="task-row task-list-row own-request-row" onClick={()=>open(t.id)}>
+          <b>{t.title}</b>
+          <span className="status-pill" style={{color:st?.color,background:`${st?.color}20`,borderColor:st?.color}}>{st?.name||t.status}</span>
+          <small className="muted">{fmtDate(t.postDate)}</small>
+        </button>;
+      })}</div>:<p className="muted-note">Nenhuma solicitação pendente no momento.</p>}
+    </div>}
+    {tab==='kanban'&&<Kanban tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} search="" embedded updateTask={updateTask}/>}
+    {tab==='calendar'&&<Calendar tasks={tasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} search="" embedded onQuickAdd={openCreateForDate} updateTask={updateTask}/>}
     {tab==='tasks'&&<TasksPanel tasks={tasks} setTasks={setTasks} companies={companies} users={users} statuses={statuses} statusById={statusById} user={user} open={open} embedded/>}
   </section>;
 }
@@ -3171,7 +3229,7 @@ function TasksPanel({tasks,setTasks,companies,users,statuses,statusById,user,ope
   </div>
 </section>
 }
-function Calendar({tasks,companies,users,statuses,statusById,user,open,search='',embedded=false}){ 
+function Calendar({tasks,companies,users,statuses,statusById,user,open,search='',embedded=false,onQuickAdd,updateTask}){ 
   const preferencesStorageKey=`argos_calendar_preferences_${user?.id||'anonymous'}`;
   const initialPreferences=load(preferencesStorageKey,{view:'month',company:'all',resp:'all',type:'all',status:'all',archivedOnly:false});
   const [view,setView]=useState(initialPreferences.view||'month'),[selectedDay,setSelectedDay]=useState(todayStr()),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[status,setStatus]=useState(initialPreferences.status||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly);
@@ -3218,7 +3276,7 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
       </aside>}
       <div className="calendar-main">
         {embedded&&<div className={`calendar-main-header view-${view}`}>{calendarHeaderControls}</div>}
-        {view==='month'&&<MonthView selectedDay={selectedDay} days={days} tasks={filtered} companies={companies} users={users} statusById={statusById} setDay={d=>{setSelectedDay(d);if(permissions.showViewTabs)setView('day')}} open={open} permissions={taskDisplayPermissions}/>} 
+        {view==='month'&&<MonthView selectedDay={selectedDay} days={days} tasks={filtered} companies={companies} users={users} statusById={statusById} setDay={d=>{setSelectedDay(d);if(permissions.showViewTabs)setView('day')}} open={open} permissions={taskDisplayPermissions} onQuickAdd={onQuickAdd} updateTask={updateTask} isAdmin={user?.role==='admin'}/>} 
         {view==='week'&&<WeekView selectedDay={selectedDay} setSelectedDay={setSelectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>} 
         {view==='day'&&<DayView day={selectedDay} tasks={filtered} companies={companies} users={users} statusById={statusById} open={open} permissions={taskDisplayPermissions}/>} 
       </div>
@@ -3227,7 +3285,7 @@ function Calendar({tasks,companies,users,statuses,statusById,user,open,search=''
 }
 function AvatarMini({value,label}){ const v=String(value||''); const text=String(label||value||'?').slice(0,2).toUpperCase(); return <span className="avatar-mini">{(/^https?:\/\//.test(v)||v.startsWith('data:'))?<img src={driveDirect(v)} onError={e=>{e.currentTarget.remove();}}/>:text}</span> }
 function EntityLabel({value,label}){ return <span className="entity-label"><AvatarMini value={value} label={label}/><span>{label}</span></span> }
-function TaskButton({t,companies,users,statusById,open,permissions={}}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const isWorking=!!t.startedAt; const showCompanyName=permissions.showCompany?company?.name:null; const showRespName=permissions.showResponsible?resp?.name:null; return <button className={'mini-task'+(isWorking?' task-working':'')} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b className={isWorking?'task-working-text':undefined}>{t.title}</b>}{(showCompanyName||showRespName)&&<small>{showCompanyName}{showCompanyName&&showRespName?' • ':''}{showRespName&&<span className={isWorking?'task-working-text':undefined}>{showRespName}</span>}</small>}</button> }
+function TaskButton({t,companies,users,statusById,open,permissions={},draggable:isDraggable=false,onDragStart}){ const company=companies.find(c=>c.id===t.companyId); const resp=users.find(u=>u.id===t.responsibleId); const isWorking=!!t.startedAt; const showCompanyName=permissions.showCompany?company?.name:null; const showRespName=permissions.showResponsible?resp?.name:null; return <button className={'mini-task'+(isWorking?' task-working':'')} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderLeftColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}} draggable={isDraggable} onDragStart={isDraggable?(e=>onDragStart&&onDragStart(e,t)):undefined}>{permissions.showTaskTitle!==false&&<b className={isWorking?'task-working-text':undefined}>{t.title}</b>}{(showCompanyName||showRespName)&&<small>{showCompanyName}{showCompanyName&&showRespName?' • ':''}{showRespName&&<span className={isWorking?'task-working-text':undefined}>{showRespName}</span>}</small>}</button> }
 
 const FIXED_SPECIAL_DATES = [
   // Janeiro
@@ -3526,14 +3584,15 @@ function CalendarHeaderControls({view,selectedDay,setSelectedDay,countLabel,titl
     {trailing&&<div className="calendar-header-trailing">{trailing}</div>}
   </div>;
 }
-function MonthView({selectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={}}){ const cur=dObj(selectedDay); const todayKey=todayStr(); return <div className="month"><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); const hasMajorSpecial=specials.some(isMajorSpecialDate); const specialTitle=specials.map(i=>`${i.name}${i.market==='us'?' • EUA':''}`).join(' • '); const isToday=ds===todayKey; const weekday=d.getDay(); const isWeekend=weekday===0||weekday===6; return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date ':'')+(isToday?'is-today ':'')+(isWeekend?'is-weekend':'')} key={ds}><div className={'day-headline month-day-headline'+(specials.length?' has-month-special':'')+(hasMajorSpecial?' has-major-month-special':'')} title={specialTitle||undefined} role="button" tabIndex={0} onClick={()=>setDay(ds)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setDay(ds)}}}>{hasMajorSpecial?<span className="month-special-star-mark" aria-label={`Data importante: ${specialTitle}`}>✦</span>:<span className="month-special-star-space" aria-hidden="true"/>}<span className="day-num month-day-num">{d.getDate()}</span></div>{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
+function MonthView({selectedDay,days,tasks,companies,users,statusById,setDay,open,permissions={},onQuickAdd,updateTask,isAdmin}){ const cur=dObj(selectedDay); const todayKey=todayStr(); const canDrag=isAdmin&&!!updateTask; return <div className="month"><div className="weeknames">{['DOM','SEG','TER','QUA','QUI','SEX','SÁB'].map(d=><b key={d}>{d}</b>)}</div><div className="days">{days.map(d=>{const ds=dateKeyLocal(d); const list=tasks.filter(t=>t.postDate===ds); const other=d.getMonth()!==cur.getMonth(); const specials=specialDatesFor(ds); const hasUsSpecial=specials.some(i=>i.market==='us'); const hasMajorSpecial=specials.some(isMajorSpecialDate); const specialTitle=specials.map(i=>`${i.name}${i.market==='us'?' • EUA':''}`).join(' • '); const isToday=ds===todayKey; const weekday=d.getDay(); const isWeekend=weekday===0||weekday===6; return <div className={'day '+(other?'muted-day ':'')+(specials.length?'has-special-date ':'')+(hasUsSpecial?'has-us-special-date ':'')+(isToday?'is-today ':'')+(isWeekend?'is-weekend':'')} key={ds} onDragOver={e=>{if(canDrag){e.preventDefault();e.currentTarget.classList.add('drag-over');}}} onDragLeave={e=>{e.currentTarget.classList.remove('drag-over');}} onDrop={e=>{if(!canDrag)return;e.preventDefault();e.currentTarget.classList.remove('drag-over');const taskId=e.dataTransfer.getData('text/plain');if(taskId)updateTask(taskId,{postDate:ds});}}><div className={'day-headline month-day-headline'+(specials.length?' has-month-special':'')+(hasMajorSpecial?' has-major-month-special':'')} title={specialTitle||undefined} role="button" tabIndex={0} onClick={()=>setDay(ds)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setDay(ds)}}}>{hasMajorSpecial?<span className="month-special-star-mark" aria-label={`Data importante: ${specialTitle}`}>✦</span>:<span className="month-special-star-space" aria-hidden="true"/>}<span className="day-num month-day-num">{d.getDate()}</span></div>{onQuickAdd&&<button type="button" className="day-quick-add" onClick={e=>{e.stopPropagation();onQuickAdd(ds);}} title="Criar tarefa neste dia" aria-label="Criar tarefa neste dia">+</button>}{list.slice(0,4).map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions} draggable={canDrag} onDragStart={(e,task)=>e.dataTransfer.setData('text/plain',task.id)}/>)}{list.length>4&&<button className="more" onClick={()=>setDay(ds)}>+{list.length-4} mais</button>}</div>})}</div></div> }
 function WeekView({selectedDay,setSelectedDay,tasks,companies,users,statusById,open,permissions={}}){ const base=dObj(selectedDay); const start=new Date(base); start.setDate(base.getDate()-base.getDay()+1); const days=[...Array(7)].map((_,i)=>{const d=new Date(start); d.setDate(start.getDate()+i); return dateKeyLocal(d)}); return <div className="calendar-period-content"><div className="week-grid">{days.map(ds=>{const list=tasks.filter(t=>t.postDate===ds); const specials=specialDatesFor(ds); return <div className={'week-col '+(specials.length?'has-special-date':'')} key={ds}><button className="day-num" onClick={()=>setSelectedDay(ds)}>{fmtDate(ds)}</button><SpecialDateMarks items={specials}/>{list.map(t=><TaskButton key={t.id} t={t} companies={companies} users={users} statusById={statusById} open={open} permissions={permissions}/>)}</div>})}</div></div> }
 function DayView({day,tasks,companies,users,statusById,open,permissions={}}){ 
   const list=tasks.filter(t=>t.postDate===day); 
   const specials=specialDatesFor(day);
   return <div className="calendar-period-content"><SpecialDatePanel items={specials}/><div className="day-list clean-day-list">{list.map(t=><button className="day-card clean-day-card" key={t.id} disabled={permissions.canOpenTasks===false} onClick={()=>permissions.canOpenTasks!==false&&open(t.id)} style={{borderColor:permissions.showStatus===false?'transparent':statusById[t.status]?.color,cursor:permissions.canOpenTasks===false?'default':undefined}}>{permissions.showTaskTitle!==false&&<b>{t.title}</b>}{permissions.showDeadline&&<><small>Prazo: {fmtDate(t.internalDate)}</small><small>Prioridade: {priorityText(t.internalDate)}</small></>}{permissions.showStatus!==false&&<span className="status-pill" style={{background:statusById[t.status]?.color}}>{statusById[t.status]?.name}</span>}</button>)}</div></div> 
 }
-function Kanban({tasks,companies,users,statuses,statusById,user,open,search='',embedded=false}){ 
+function Kanban({tasks,companies,users,statuses,statusById,user,open,search='',embedded=false,updateTask}){ 
+  const isAdmin=user?.role==='admin';
   const preferencesStorageKey=`argos_kanban_preferences_${user?.id||'anonymous'}`;
   const initialPreferences=load(preferencesStorageKey,{period:'current',from:'',to:'',company:'all',resp:'all',type:'all',archivedOnly:false,sort:'priority'});
   const [period,setPeriod]=useState(initialPreferences.period||'current'),[from,setFrom]=useState(initialPreferences.from||''),[to,setTo]=useState(initialPreferences.to||''),[company,setCompany]=useState(initialPreferences.company||'all'),[resp,setResp]=useState(initialPreferences.resp||'all'),[type,setType]=useState(initialPreferences.type||'all'),[archivedOnly,setArchivedOnly]=useState(!!initialPreferences.archivedOnly),[sort,setSort]=useState(initialPreferences.sort||'priority');
@@ -3594,11 +3653,11 @@ function Kanban({tasks,companies,users,statuses,statusById,user,open,search='',e
     <div className="kanban">{allowed.map(s=>{
       const columnTasks=filtered.filter(t=>t.status===s.id);
       const visibleTasks=columnTasks.slice(0,visibleLimit(s.id));
-      return <div className="col" key={s.id} style={{borderTopColor:s.color,'--status-color':s.color}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{
+      return <div className="col" key={s.id} style={{borderTopColor:s.color,'--status-color':s.color}} onDragOver={e=>{if(isAdmin&&updateTask){e.preventDefault();e.currentTarget.classList.add('drag-over');}}} onDragLeave={e=>{e.currentTarget.classList.remove('drag-over');}} onDrop={e=>{if(!isAdmin||!updateTask)return;e.preventDefault();e.currentTarget.classList.remove('drag-over');const taskId=e.dataTransfer.getData('text/plain');const draggedTask=filtered.find(x=>x.id===taskId);if(taskId&&draggedTask&&draggedTask.status!==s.id)updateTask(taskId,{status:s.id});}}><h3><span style={{color:s.color}}>{s.name}</span><b>{Math.min(visibleTasks.length,columnTasks.length)} de {columnTasks.length}</b></h3>{visibleTasks.map(t=>{
         const companyEntity=companies.find(c=>c.id===t.companyId);
         const respUser=users.find(u=>u.id===t.responsibleId);
         const isWorking=!!t.startedAt;
-        return <button className={'kcard'+(isWorking?' task-working':'')} key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined}>
+        return <button className={'kcard'+(isWorking?' task-working':'')} key={t.id} disabled={!permissions.canOpenTasks} onClick={()=>permissions.canOpenTasks&&open(t.id)} style={!permissions.canOpenTasks?{cursor:'default'}:undefined} draggable={isAdmin&&!!updateTask} onDragStart={e=>{if(isAdmin&&updateTask)e.dataTransfer.setData('text/plain',t.id);}}>
           <b className="k-title" title={t.title}>{t.title}</b>
           <div className="k-meta" style={{alignItems:'center',gap:6}}>
             {(permissions.showCompany||permissions.showResponsible)&&<span className="avatars" style={{flex:'0 0 auto'}}>
@@ -3689,7 +3748,7 @@ function TextFieldWithCopy({label,value,onChange,placeholder,minHeight=92}){
   </label>;
 }
 
-function ReadOnlyReadyLinks({title='Links de material pronto',text}){
+function ReadOnlyReadyLinks({title='Links de material finalizado',text}){
   const links=String(text||'').split('\n').map(x=>x.trim()).filter(Boolean);
   return <div className="readonly-instruction">
     <label>{title}</label>
@@ -3837,7 +3896,7 @@ function WeeklyTemplateEditor({company,users,save,cancel}){
   return <div className="modal-bg"><div className="modal company-modal"><ModalDismiss onClose={cancel}/>
 <div className="section-header"><div><h2>Template semanal</h2><p>{company.name}</p></div></div>
 {weeklyTemplate.length?weeklyTemplate.map((item,index)=><div className="panel template-item" key={item.id}><h3 className="template-line-title">Linha {index+1}</h3>
-<div className="form-two"><label>Tipo<select value={item.type||TASK_TYPES[0]} onChange={e=>updateTemplate(item.id,{type:e.target.value})}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Quantidade<input type="number" min="0" value={item.quantity??1} onChange={e=>updateTemplate(item.id,{quantity:Number(e.target.value)})}/></label></div><div className="form-two"><label>Responsável<select value={item.responsibleId||''} onChange={e=>updateTemplate(item.id,{responsibleId:e.target.value})}><option value="">Padrão do sistema</option>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Dia de postagem<select value={item.postDay??0} onChange={e=>updateTemplate(item.id,{postDay:Number(e.target.value)})}>{WEEK_DAYS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select></label></div><label>Prazo interno<input type="number" min="0" value={item.internalOffset??1} onChange={e=>updateTemplate(item.id,{internalOffset:Number(e.target.value)})}/><small>Quantos dias antes da postagem. Ex: 1 = um dia antes.</small></label><RichTextField label="Instruções ao copy" value={item.copyInstructions||''} onChange={e=>updateTemplate(item.id,{copyInstructions:e.target.value})} placeholder="Orientações padrão para o copy desta linha."/><RichTextField label="Instruções ao editor" value={item.editorInstructions||''} onChange={e=>updateTemplate(item.id,{editorInstructions:e.target.value})} placeholder="Orientações padrão para edição/design desta linha."/><RichTextField label="Links úteis" value={item.usefulLinks||''} onChange={e=>updateTemplate(item.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/><RichTextField label="Link final (padrão)" value={item.finalLink||''} onChange={e=>updateTemplate(item.id,{finalLink:e.target.value})} placeholder="Padrão de link final pra esse cliente, se aplicável (opcional)."/><div className="row-actions"><button type="button" onClick={()=>removeTemplateItem(item.id)}>Remover linha</button></div></div>
+<div className="form-two"><label>Tipo<select value={item.type||TASK_TYPES[0]} onChange={e=>updateTemplate(item.id,{type:e.target.value})}>{TASK_TYPES.map(t=><option key={t}>{t}</option>)}</select></label><label>Quantidade<input type="number" min="0" value={item.quantity??1} onChange={e=>updateTemplate(item.id,{quantity:Number(e.target.value)})}/></label></div><div className="form-two"><label>Responsável<select value={item.responsibleId||''} onChange={e=>updateTemplate(item.id,{responsibleId:e.target.value})}><option value="">Padrão do sistema</option>{teams.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Dia de postagem<select value={item.postDay??0} onChange={e=>updateTemplate(item.id,{postDay:Number(e.target.value)})}>{WEEK_DAYS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select></label></div><label>Prazo interno<input type="number" min="0" value={item.internalOffset??1} onChange={e=>updateTemplate(item.id,{internalOffset:Number(e.target.value)})}/><small>Quantos dias antes da postagem. Ex: 1 = um dia antes.</small></label><RichTextField label="Instruções ao copy" value={item.copyInstructions||''} onChange={e=>updateTemplate(item.id,{copyInstructions:e.target.value})} placeholder="Orientações padrão para o copy desta linha."/><RichTextField label="Instruções ao editor" value={item.editorInstructions||''} onChange={e=>updateTemplate(item.id,{editorInstructions:e.target.value})} placeholder="Orientações padrão para edição/design desta linha."/><RichTextField label="Links úteis" value={item.usefulLinks||''} onChange={e=>updateTemplate(item.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/><RichTextField label="Link da pasta final (padrão)" value={item.finalLink||''} onChange={e=>updateTemplate(item.id,{finalLink:e.target.value})} placeholder="Padrão de link final pra esse cliente, se aplicável (opcional)."/><div className="row-actions"><button type="button" onClick={()=>removeTemplateItem(item.id)}>Remover linha</button></div></div>
 ):<p className="muted-note">Nenhuma linha de template. Clique em + Linha para criar a remessa semanal deste cliente.</p>}<div className="modal-actions template-modal-actions"><button type="button" className="template-add-line" onClick={addTemplateItem}>+ Linha</button><div className="template-save-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={()=>save(company.id,weeklyTemplate)}>Salvar template</button></div></div></div></div>
 }
 
@@ -4089,8 +4148,13 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   const detailEditable={...builtInTaskDetailPermissionsForRole(effectiveUser.role).editable,...(taskPermissionSet.detailFields?.editable||{})};
   const canViewDetail=id=>detailVisible[id]!==false;
   const canEditDetail=id=>canViewDetail(id)&&detailEditable[id]===true;
-  const canApprovePosts=taskPermissionSet.canApprovePosts===true;
+  const rawCanApprovePosts=taskPermissionSet.canApprovePosts===true;
   const approveCopyStatusId=statuses.find(s=>slug(s?.name)==='aprovar-copy')?.id||null;
+  const approversForCompany=companyApprovers(task.companyId, users);
+  const isMultiApprover=approversForCompany.length>1;
+  const canApprovePosts=rawCanApprovePosts||(isClient&&isMultiApprover);
+  const myVoteAlready=isMultiApprover&&(task.approvalVotes||[]).some(v=>v.userId===effectiveUser.id);
+  const myCopyVoteAlready=isMultiApprover&&(task.copyApprovalVotes||[]).some(v=>v.userId===effectiveUser.id);
   const createCopyStatusId=statuses.find(s=>['criar-copy','copy'].includes(slug(s?.name)))?.id||'copy';
   const approveCopyIndex=approveCopyStatusId?statuses.findIndex(s=>s.id===approveCopyStatusId):-1;
   const createPostStatusId=statuses.find(s=>slug(s?.name)==='criar-post')?.id||(approveCopyIndex>=0?statuses.slice(approveCopyIndex+1).find(s=>s.active!==false)?.id:null)||'edicao';
@@ -4105,6 +4169,19 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
   const timeline=(task.logs||[]).filter(l=>!isClient||l.visibility==='client'||l.userId===effectiveUser.id).slice().sort((a,b)=>new Date(b.at)-new Date(a.at)); 
   const comments=timeline.filter(l=>l.type==='comment');
   const history=timeline.filter(l=>l.type!=='comment');
+  function timelineTimeLabel(dateStr){
+    if(!dateStr) return '';
+    const d=new Date(dateStr);
+    const nowD=new Date();
+    const sameDay=d.toDateString()===nowD.toDateString();
+    if(sameDay){
+      const diffMin=Math.floor((nowD-d)/60000);
+      if(diffMin<1) return 'agora';
+      if(diffMin<60) return `há ${diffMin}min`;
+      return `há ${Math.floor(diffMin/60)}h`;
+    }
+    return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }
   function escapeRegExp(value){ return String(value||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
   function cleanCommentText(log){
     const raw=String(log?.text||'').trim();
@@ -4180,7 +4257,8 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
       visibility:'internal',
       at:now(),
       text:`${effectiveUser.name} retornou para Copy. Motivo: ${reason}`,
-      resolved:false
+      resolved:false,
+      statusAtTime:task.status
     }]};
     if(task.status==='alteracao') patch.totalAlterSeconds=(task.totalAlterSeconds||0)+elapsed;
     else patch.totalEditSeconds=(task.totalEditSeconds||0)+elapsed;
@@ -4207,17 +4285,57 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
         visibility:'internal',
         at:now(),
         text:`${effectiveUser.name} enviou para Aguardando. Motivo: ${reason}`,
-        resolved:false
+        resolved:false,
+        statusAtTime:task.status
       }];
     }
 
     updateTask(task.id,patch,reason?'Marcado como aguardando com comentário.':'Marcado como aguardando.');
     notifySettingsSaved('Marcado como aguardando');
   } 
-  function approve(){ if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.'); updateTask(task.id,{status:'agendamento',statusLogText:`${effectiveUser.name} aprovou a tarefa`}); setClientForm(null); notifySettingsSaved('Tarefa aprovada'); }
+  function approve(){
+    if(!clientForm?.art||!clientForm?.caption) return alert('Selecione artes/vídeos aprovados e legenda aprovada para aprovar.');
+    const eventAt=now();
+    if(isMultiApprover){
+      if((task.approvalVotes||[]).some(v=>v.userId===effectiveUser.id)){
+        alert('Você já registrou sua aprovação para esta tarefa.');
+        setClientForm(null);
+        return;
+      }
+      const votes=[...(task.approvalVotes||[]),{userId:effectiveUser.id,userName:effectiveUser.name,at:eventAt}];
+      const names=votes.map(v=>v.userName).join(', ');
+      const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a tarefa. (${votes.length} de ${approversForCompany.length} aprovaram)`,resolved:false,statusAtTime:task.status};
+      updateTask(task.id,{approvalVotes:votes,logs:[...(task.logs||[]),entry]},`Voto de aprovação registrado (${votes.length} de ${approversForCompany.length}).`);
+      notifyTask(task,`${votes.length} de ${approversForCompany.length} aprovaram (${names}). Confirme manualmente antes de despachar.`,'Aprovação',task.status,effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
+      setClientForm(null);
+      notifySettingsSaved('Aprovação registrada');
+      return;
+    }
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a tarefa.`,resolved:false,statusAtTime:task.status};
+    updateTask(task.id,{status:'agendamento',logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} aprovou a tarefa`});
+    setClientForm(null);
+    notifySettingsSaved('Tarefa aprovada');
+  }
   function approveCopy(){
     if(!createPostStatusId) return alert('Não foi possível identificar o próximo status após Aprovar copy.');
-    updateTask(task.id,{status:createPostStatusId,statusLogText:`${effectiveUser.name} aprovou a copy`});
+    const eventAt=now();
+    if(isMultiApprover){
+      if((task.copyApprovalVotes||[]).some(v=>v.userId===effectiveUser.id)){
+        alert('Você já registrou sua aprovação da copy para esta tarefa.');
+        setClientForm(null);
+        return;
+      }
+      const votes=[...(task.copyApprovalVotes||[]),{userId:effectiveUser.id,userName:effectiveUser.name,at:eventAt}];
+      const names=votes.map(v=>v.userName).join(', ');
+      const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a copy. (${votes.length} de ${approversForCompany.length} aprovaram)`,resolved:false,statusAtTime:task.status};
+      updateTask(task.id,{copyApprovalVotes:votes,logs:[...(task.logs||[]),entry]},`Voto de aprovação de copy registrado (${votes.length} de ${approversForCompany.length}).`);
+      notifyTask(task,`${votes.length} de ${approversForCompany.length} aprovaram a copy (${names}). Confirme manualmente antes de despachar.`,'Aprovação',task.status,effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
+      setClientForm(null);
+      notifySettingsSaved('Aprovação de copy registrada');
+      return;
+    }
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a copy.`,resolved:false,statusAtTime:task.status};
+    updateTask(task.id,{status:createPostStatusId,logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} aprovou a copy`});
     setClientForm(null);
     notifySettingsSaved('Copy aprovada');
   }
@@ -4226,7 +4344,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
     if(!desc) return alert('Descreva o que precisa ser alterado na copy.');
     const text=`Solicitação de alteração na copy\nDescrição: ${desc}`;
     const eventAt=now();
-    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false};
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false,statusAtTime:task.status};
     updateTask(task.id,{status:createCopyStatusId,logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} solicitou alteração na copy`});
     if(isClient){
       notifyTask(task,text,CLIENT_REQUEST_NOTIFICATION_EVENT,createCopyStatusId,effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});
@@ -4247,7 +4365,7 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
 Itens marcados: ${items.join(', ')}
 Descrição: ${desc}`;
     const eventAt=now();
-    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false};
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false,statusAtTime:task.status};
     updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]});
     if(isClient){
       notifyTask(task,text,CLIENT_REQUEST_NOTIFICATION_EVENT,'alteracao',effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});
@@ -4256,7 +4374,17 @@ Descrição: ${desc}`;
     notifySettingsSaved('Alteração solicitada');
   }
   function reopenFromApproval(){ const nextStatus=task.previousWorkStatus||'edicao'; updateTask(task.id,{status:nextStatus,startedAt:now(),startedById:effectiveUser.id,timerHeartbeatAt:now()},`Tarefa reaberta para ${statusById[nextStatus]?.name||nextStatus}.`); notifySettingsSaved('Tarefa reaberta'); }
-  function reviewAgain(){ updateTask(task.id,{status:'aprovacao'},'Cliente voltou para revisão.'); } 
+  function reviewAgain(){ updateTask(task.id,{status:'aprovacao'},'Cliente voltou para revisão.'); }
+  function retractVote(){
+    const votes=(task.approvalVotes||[]).filter(v=>v.userId!==effectiveUser.id);
+    updateTask(task.id,{approvalVotes:votes},`${effectiveUser.name} retirou o voto de aprovação (${votes.length} de ${approversForCompany.length}).`);
+    notifySettingsSaved('Voto retirado');
+  }
+  function retractCopyVote(){
+    const votes=(task.copyApprovalVotes||[]).filter(v=>v.userId!==effectiveUser.id);
+    updateTask(task.id,{copyApprovalVotes:votes},`${effectiveUser.name} retirou o voto de aprovação da copy (${votes.length} de ${approversForCompany.length}).`);
+    notifySettingsSaved('Voto de copy retirado');
+  } 
   async function copyTaskLink(){
     const url=taskShareUrl(task.id);
     try{
@@ -4297,21 +4425,23 @@ Descrição: ${desc}`;
   function addComment(){ if(!comment.trim()) return; addLog(task.id,comment,'comment',isClient?'client':'internal'); setComment(''); notifySettingsSaved('Comentário adicionado'); }
   function resolveLog(logId){ updateTask(task.id,{logs:(task.logs||[]).map(l=>l.id===logId?{...l,resolved:!l.resolved,resolvedAt:!l.resolved?now():null,resolvedBy:!l.resolved?effectiveUser.name:null}:l)}); }
   return <section><div className="task-topbar task-topbar-split"><button onClick={handleTaskBack}>← Voltar</button><div className="task-nav-actions task-top-nav"><button disabled={!previousClientTask} onClick={()=>goToClientTask(previousClientTask)}>← Tarefa anterior</button><button disabled={!nextClientTask} onClick={()=>goToClientTask(nextClientTask)}>Próxima tarefa →</button></div></div><div className={'task-page '+(isClient?'client-task':'')}><div className="task-left">
-  {canViewDetail('title')&&<div className="task-title">{canEditDetail('title')?<input className="task-title-input" value={task.title||''} data-task-id={task.id} data-task-field="title" onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{canViewDetail('status')&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div>}
+  {canViewDetail('title')&&<div className="task-title">{canEditDetail('title')?<input className="task-title-input" value={task.title||''} data-task-id={task.id} data-task-field="title" onChange={e=>updateTask(task.id,{title:e.target.value})} aria-label="Nome da tarefa"/>:<h1>{task.title}</h1>}{(canViewDetail('status')||isClient)&&<span style={{borderColor:statusById[task.status]?.color,color:statusById[task.status]?.color}}>{statusById[task.status]?.name}</span>}</div>}
   {canViewDetail('preview')&&<div className="insta"><div className="insta-top"><AvatarMini value={company?.logo} label={company?.name}/><b>{company?.name}</b><button type="button" className="insta-copy-link" onClick={copyTaskLink} aria-label="Copiar link da tarefa" title="Copiar link da tarefa"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div><div className="media-box adaptive-media-box">{links.length?<><Media url={links[Math.min(slide,links.length-1)]} type={task.type} slide={Math.min(slide,links.length-1)} total={links.length}/>{links.length>1&&<div className="slide-controls"><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.max(0,v-1));}}>‹</button><button onClick={(e)=>{e.preventDefault();e.stopPropagation();setSlide(v=>Math.min(links.length-1,v+1));}}>›</button></div>}</>:<div className="empty-media">Sem material pronto ainda</div>}</div><InstagramIcons/><div className="insta-caption"><b>{company?.name}</b> <RichTextDisplay value={task.caption||''}/></div></div>}
   <div className="content-fields">
     {!hiddenTeam&&canViewDetail('copyInstructions')&&(canEditDetail('copyInstructions')?<RichTextField label="Instruções ao copy" value={task.copyInstructions||''} taskId={task.id} taskField="copyInstructions" onChange={e=>updateTask(task.id,{copyInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao copy" text={task.copyInstructions||''}/>) }
     {!hiddenTeam&&canViewDetail('editorInstructions')&&(canEditDetail('editorInstructions')?<RichTextField label="Instruções ao editor" value={task.editorInstructions||''} taskId={task.id} taskField="editorInstructions" onChange={e=>updateTask(task.id,{editorInstructions:e.target.value})}/>:<ReadOnlyInstruction title="Instruções ao editor" text={task.editorInstructions||''}/>) }
     {!hiddenTeam&&canViewDetail('usefulLinks')&&(canEditDetail('usefulLinks')?<RichTextField label="Links úteis" value={task.usefulLinks||''} taskId={task.id} taskField="usefulLinks" onChange={e=>updateTask(task.id,{usefulLinks:e.target.value})} placeholder="Cole links e descreva para que serve cada um."/>:<ReadOnlyInstruction title="Links úteis" text={task.usefulLinks||''}/>) }
+    <hr className="content-fields-divider"/>
     {canViewDetail('copy')&&(canEditDetail('copy')?<RichTextField label="Copy" value={task.copy||''} taskId={task.id} taskField="copy" onChange={e=>updateTask(task.id,{copy:e.target.value})}/>:<ReadOnlyInstruction title="Copy" text={task.copy||''}/>) }
     {canViewDetail('caption')&&(canEditDetail('caption')?<RichTextField label="Legenda" value={task.caption||''} taskId={task.id} taskField="caption" onChange={e=>updateTask(task.id,{caption:e.target.value})}/>:<ReadOnlyInstruction title="Legenda" text={task.caption||''}/>) }
+    <hr className="content-fields-divider"/>
     {canViewDetail('finalLink')&&(isClient
       ? (['agendamento','pronto'].includes(task.status) && task.finalLink
           ? <ReadOnlyInstruction title="Download dos arquivos" text={task.finalLink||''}/>
           : null)
-      : (canEditDetail('finalLink')?<RichTextField label="Link final" value={task.finalLink||''} taskId={task.id} taskField="finalLink" onChange={e=>updateTask(task.id,{finalLink:e.target.value})} placeholder="Cole o link final liberado após a aprovação"/>:<ReadOnlyInstruction title="Link final" text={task.finalLink||''}/>)
+      : (canEditDetail('finalLink')?<RichTextField label="Link da pasta final" value={task.finalLink||''} taskId={task.id} taskField="finalLink" onChange={e=>updateTask(task.id,{finalLink:e.target.value})} placeholder="Cole o link final liberado após a aprovação"/>:<ReadOnlyInstruction title="Link da pasta final" text={task.finalLink||''}/>)
     ) }
-    {!isClient&&canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material pronto" placeholder="Adicionar material pronto"/>:<ReadOnlyReadyLinks title="Links de material pronto" text={task.materialLinks||''}/>) }
+    {!isClient&&canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material finalizado" placeholder="Adicionar material finalizado"/>:<ReadOnlyReadyLinks title="Links de material finalizado" text={task.materialLinks||''}/>) }
   </div>
 </div><aside className="task-side">{['companyId','responsibleId','type','status','internalDate','postDate'].some(canViewDetail)&&<div className="panel panel-config"><h2>Configurações</h2>
   {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{[...companies].sort((a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'})).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
@@ -4320,7 +4450,7 @@ Descrição: ${desc}`;
   {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined,'--status-color':statusById[task.status]?.color||'var(--line)'}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id} style={{background:`${s.color}20`,color:s.color}}>{s.name}</option>)}</select></div></label>}
   {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
   {canViewDetail('postDate')&&<label>Data do post<input disabled={!canEditDetail('postDate')} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label>}
-</div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="status-tinted" style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button className="status-tinted" style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button className="status-tinted" style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&isApproveCopyStatus&&<CopyApprovalForm form={clientForm} setForm={setClientForm} approveCopy={approveCopy} requestCopyChange={requestCopyChange} statusById={statusById} createPostStatusId={createPostStatusId} createCopyStatusId={createCopyStatusId}/>} {canApprovePosts&&['alteracao','agendamento'].includes(task.status)&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Comentários</h2>{canEditDetail('comments')&&<div className="comment-line"><AutoTextarea className="comment-compose" value={comment} onChange={e=>setComment(e.target.value)} minHeight={42} rows={1} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{comments.length?comments.map(l=><div className={'log comment-log '+(l.resolved?'resolved':'')} key={l.id}><div className="log-head"><b>{l.user}</b><small>{new Date(l.at).toLocaleString('pt-BR')}</small>{!isClient&&<button onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}</div><p>{linkify(cleanCommentText(l))}</p>{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' em '+new Date(l.resolvedAt).toLocaleString('pt-BR'):''}</small>}</div>):<p className="muted-note">Nenhum comentário ainda.</p>}{canViewDetail('history')&&<details className="task-history"><summary>Histórico da tarefa <span>{history.length}</span></summary>{history.length?history.map(l=><div className="history-row" key={l.id}><small>{new Date(l.at).toLocaleString('pt-BR')}</small><p>{linkify(l.text)}</p><em>{l.user}</em></div>):<p className="muted-note">Nenhum histórico registrado.</p>}</details>}</div>}</aside></div>{showBackToTop&&<button type="button" className="app-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo"><BackToTopGlyph/></button>}</section> 
+</div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isMultiApprover&&task.status==='aprovacao'&&(task.approvalVotes?.length>0)&&<div className="approval-votes-banner">⚠ {task.approvalVotes.length} de {approversForCompany.length} usuários aprovaram ({task.approvalVotes.map(v=>v.userName).join(', ')}). Confirme manualmente antes de despachar.</div>}{isMultiApprover&&isApproveCopyStatus&&(task.copyApprovalVotes?.length>0)&&<div className="approval-votes-banner">⚠ {task.copyApprovalVotes.length} de {approversForCompany.length} usuários aprovaram a copy ({task.copyApprovalVotes.map(v=>v.userName).join(', ')}). Confirme manualmente antes de despachar.</div>}{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="status-tinted" style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button className="status-tinted" style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button className="status-tinted" style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&isMultiApprover&&task.status==='aprovacao'&&(task.approvalVotes?.length>0)&&<button className="status-tinted" style={actionStyle('agendamento')} onClick={()=>{ if(confirm('Avançar esta tarefa para Agendamento mesmo sem todos os votos do comitê?')) updateTask(task.id,{status:'agendamento',approvalVotes:[]},`${effectiveUser.name} avançou manualmente para Agendamento (comitê: ${task.approvalVotes.length} de ${approversForCompany.length}).`); }}>Avançar mesmo assim</button>}{isAdmin&&isMultiApprover&&isApproveCopyStatus&&createPostStatusId&&(task.copyApprovalVotes?.length>0)&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={()=>{ if(confirm('Avançar a copy desta tarefa mesmo sem todos os votos do comitê?')) updateTask(task.id,{status:createPostStatusId,copyApprovalVotes:[]},`${effectiveUser.name} avançou a copy manualmente (comitê: ${task.copyApprovalVotes.length} de ${approversForCompany.length}).`); }}>Avançar mesmo assim</button>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&!myVoteAlready&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&task.status==='aprovacao'&&myVoteAlready&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={retractVote}>Revisar novamente</button>} {canApprovePosts&&isApproveCopyStatus&&!myCopyVoteAlready&&<CopyApprovalForm form={clientForm} setForm={setClientForm} approveCopy={approveCopy} requestCopyChange={requestCopyChange} statusById={statusById} createPostStatusId={createPostStatusId} createCopyStatusId={createCopyStatusId}/>} {canApprovePosts&&isApproveCopyStatus&&myCopyVoteAlready&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={retractCopyVote}>Revisar novamente</button>} {canApprovePosts&&task.status==='agendamento'&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Linha do tempo</h2>{canEditDetail('comments')&&!(isClient&&(['agendamento','pronto'].includes(task.status)||(task.status==='aprovacao'&&myVoteAlready)||(isApproveCopyStatus&&myCopyVoteAlready)))&&<div className="comment-line"><AutoTextarea className="comment-compose" value={comment} onChange={e=>setComment(e.target.value)} minHeight={42} rows={1} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{isClient&&['agendamento','pronto'].includes(task.status)&&<p className="muted-note">Esta tarefa já avançou na produção — comentários de cliente ficam desabilitados a partir daqui.</p>}{isClient&&!['agendamento','pronto'].includes(task.status)&&((task.status==='aprovacao'&&myVoteAlready)||(isApproveCopyStatus&&myCopyVoteAlready))&&<p className="muted-note">Você já registrou sua decisão — comentários ficam disponíveis novamente se você revisar.</p>}{(canViewDetail('history')?timeline:comments).length?(canViewDetail('history')?timeline:comments).map(l=>{const isComment=l.type==='comment';const fromSt=l.fromStatusId?statusById[l.fromStatusId]:null;const toSt=l.toStatusId?statusById[l.toStatusId]:null;const atSt=l.statusAtTime?statusById[l.statusAtTime]:null;return <div className={'timeline-entry '+(isComment?'is-comment':'is-log')+(l.resolved?' resolved':'')} key={l.id}><div className="timeline-entry-head"><b>{l.user}</b><small>{timelineTimeLabel(l.at)}</small>{fromSt&&toSt&&<span className="status-transition"><span style={{color:fromSt.color}}>{fromSt.name}</span> → <span style={{color:toSt.color}}>{toSt.name}</span></span>}</div>{isComment&&<p>{linkify(cleanCommentText(l))}</p>}{isComment&&atSt&&<span className="status-pill status-pill-small" style={{color:atSt.color,background:`${atSt.color}20`,borderColor:atSt.color}}>em: {atSt.name}</span>}{!isComment&&!(fromSt&&toSt)&&<p className="timeline-log-text">{linkify(l.text)}</p>}{isComment&&!isClient&&<button className="resolve-btn" onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' · '+timelineTimeLabel(l.resolvedAt):''}</small>}</div>;}):<p className="muted-note">Nenhuma atividade ainda.</p>}</div>}</aside></div>{showBackToTop&&<button type="button" className="app-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo"><BackToTopGlyph/></button>}</section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6c-1.7-1.9-4.4-2-6.2-.3L12 6.7 9.4 4.3C7.6 2.6 4.9 2.7 3.2 4.6c-1.8 2-1.6 5.1.4 7l8.4 7.8 8.4-7.8c2-1.9 2.2-5 .4-7Z"/></svg>
@@ -4491,7 +4621,7 @@ function ClientUsersPage({users,setUsers,companies,statuses,currentUser=null,acc
     setConfiguring(null);
     notifySettingsSaved('Configurações do responsável salvas');
   }
-  return <div className="settings-section"><div className="section-header section-header-actions-only"><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div></div>)}</div>{editing&&<UserEditor u={editing} save={saveClient} cancel={()=>setEditing(null)} clientMode currentUser={currentUser} onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={companies} statuses={statuses} save={saveClientSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
+  return <div className="settings-section"><div className="section-header section-header-actions-only"><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'company',label:'Empresa'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'client',name:'',email:'',password:'123456',active:true,avatar:'',companyIds:[],visibleStatuses:CLIENT_DEFAULT,createdAt:now()})}>+ Novo responsável</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedClients.map(u=><div className={'panel '+(u.active===false?'archived-card':'')} key={u.id}><div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2 title={userHasCustomAccess(u)?`Acesso personalizado: ${userCustomAccessLabels(u).join(', ')}`:undefined}>{userHasCustomAccess(u)&&<span className="item-custom-dot" style={{marginRight:6}}/>}{u.name}</h2><small className="linked-companies">{(u.companyIds||[]).map(id=>companies.find(c=>c.id===id)?.name).filter(Boolean).join(', ') || 'Sem empresa'} {u.active===false?'• Arquivado':''}</small></div></div><div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div></div>)}</div>{editing&&<UserEditor u={editing} save={saveClient} cancel={()=>setEditing(null)} clientMode currentUser={currentUser} onArchive={archiveClient} onDelete={excludeClient} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={companies} statuses={statuses} save={saveClientSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
 }
 function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefaults=null}){
   const preferencesStorageKey=`argos_settings_team_preferences_${currentUser?.id||'admin'}`;
@@ -4586,7 +4716,7 @@ function TeamPage({users,setUsers,statuses,tasks=[],currentUser=null,accessDefau
     }
   }
   return <div className="settings-section"><div className="section-header section-header-actions-only"><div className="settings-toolbar"><label className="toggle-archived"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar só arquivados</label><SortControl value={sort} setValue={setSort} options={[{value:'role',label:'Tipo de usuário'},{value:'name',label:'Nome'},{value:'created',label:'Data de criação'}]}/><button className="primary" onClick={()=>setEditing({role:'team',name:'',email:'',password:'123456',active:true,avatar:'',title:'',visibleStatuses:TEAM_DEFAULT,createdAt:now()})}>+ Novo usuário</button></div></div><div className="client-grid compact-admin-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{sortedPeople.map(u=><div className={'panel team-user-panel '+(u.active===false?'archived-card':'')} key={u.id}>
-      <div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2>{u.name}</h2><small>{u.role==='admin'?'Admin':(u.title||'Equipe')} {u.active===false?'• Arquivado':''}</small></div></div>
+      <div className="mini-title"><AvatarMini value={u.avatar} label={u.name}/><div><h2 title={userHasCustomAccess(u)?`Acesso personalizado: ${userCustomAccessLabels(u).join(', ')}`:undefined}>{userHasCustomAccess(u)&&<span className="item-custom-dot" style={{marginRight:6}}/>}{u.name}</h2><small>{u.role==='admin'?'Admin':(u.title||'Equipe')} {u.active===false?'• Arquivado':''}</small></div></div>
       <div className="row-actions"><button onClick={()=>setEditing(u)}>Editar</button><button onClick={()=>setConfiguring(u)}>Configurações</button></div>
     </div>)}</div>{editing&&<UserEditor u={editing} save={saveTeamUser} cancel={()=>setEditing(null)} currentUser={currentUser} onArchive={archiveTeamUser} onDelete={excludeTeamUser} onResetPassword={resetPassword}/>} {configuring&&<UserSystemSettings user={configuring} companies={[]} statuses={statuses} save={saveTeamSettings} cancel={()=>setConfiguring(null)} currentUser={currentUser} accessDefaults={accessDefaults}/>}</div>
 }
@@ -4597,7 +4727,7 @@ function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
   return <div className="modal-bg"><div className="modal"><ModalDismiss onClose={cancel}/><h2>Empresa</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Instagram<input value={f.instagram} onChange={e=>set('instagram',e.target.value)}/></label><label>Logo ou link de imagem<input value={f.logo} onChange={e=>set('logo',e.target.value)} placeholder="Inicial, URL pública ou link do Drive"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),`companies/${f.id||slug(f.name)||'pending'}`)}/></label><label>Entrada<input type="date" value={f.entryDate||''} onChange={e=>set('entryDate',e.target.value)}/></label>{isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Use arquivar para esconder sem perder histórico. Excluir remove o cadastro do painel.</p><div className="danger-zone-actions"><button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar empresa':'Arquivar empresa'}</button><button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir empresa</button></div></div>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div>
 }
 
-function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleActive=null,onToggleOpen=null,children,accent=false}){
+function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleActive=null,onToggleOpen=null,children,accent=false,customized=false}){
   const hasToggle=typeof active==='boolean';
   return <div className="panel" style={{padding:0,overflow:'hidden',borderColor:open?'rgba(var(--accent-rgb),.48)':'var(--line)'}}>
     <div
@@ -4615,8 +4745,8 @@ function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleA
         onChange={e=>onToggleActive?.(e.target.checked)}
         style={{width:16,height:16,minWidth:16,margin:0}}
       />}
-      <span className="status-dot" style={{background:hasToggle?(active?'var(--gold)':'#5b6472'):(accent?'var(--gold)':'#747d8c')}}></span>
-      <b style={{flex:1,color:'var(--text)',fontSize:14}}>{title}</b>
+      <span className="status-dot" style={{background:customized?'var(--gold)':'transparent'}}></span>
+      <b style={{flex:1,color:customized?'var(--text)':'var(--muted)',fontSize:14,opacity:customized?1:.72}}>{title}</b>
       <span aria-hidden="true" style={{fontSize:18,color:open?'var(--gold)':'var(--muted)',transform:open?'rotate(90deg)':'none',transition:'transform .16s ease'}}>›</span>
     </div>
     {open&&<div style={{padding:'14px',borderTop:'1px solid var(--line)'}}>{children}</div>}
@@ -4690,22 +4820,38 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   const [f,setF]=useState(()=>clonePayload(user));
   const [openSection,setOpenSection]=useState(null);
   const events=NOTIFICATION_VISIBLE_EVENTS;
+  function deepPermEqual(a,b){
+    if(a===b) return true;
+    if(Array.isArray(a)||Array.isArray(b)){
+      const as=Array.isArray(a)?[...a].sort():[];
+      const bs=Array.isArray(b)?[...b].sort():[];
+      if(as.length!==bs.length) return false;
+      return as.every((v,i)=>v===bs[i]);
+    }
+    if(a&&b&&typeof a==='object'&&typeof b==='object'){
+      const keys=new Set([...Object.keys(a),...Object.keys(b)]);
+      for(const k of keys){ if(!deepPermEqual(a[k],b[k])) return false; }
+      return true;
+    }
+    return a===b;
+  }
   const editingOtherAdmin=f.role==='admin' && currentUser?.id && f.id!==currentUser.id;
-  const panelPermissionMode=f.panelPermissions?.mode==='custom'?'custom':'default';
+  const masterCustom=userHasCustomAccess(f);
+  const panelPermissionMode=masterCustom?'custom':'default';
   const roleDefault=accessDefaultForRole({accessDefaults},f.role);
   const defaultIds=PANEL_CATALOG.filter(panel=>roleDefault.panels.visible?.[panel.id]===true).map(panel=>panel.id);
-  const statusInheritance=f.accessInheritance?.statuses==='custom'?'custom':'default';
-  const typeInheritance=f.accessInheritance?.types==='custom'?'custom':'default';
-  const notificationInheritance=f.accessInheritance?.notifications==='custom'?'custom':'default';
-  const dashboardInheritance=f.accessInheritance?.dashboard==='custom'?'custom':'default';
-  const actionsInheritance=(f.accessInheritance?.actions==='custom'||f.accessInheritance?.tasks==='custom')?'custom':'default';
-  const taskDetailInheritance=(f.accessInheritance?.taskDetail==='custom'||f.accessInheritance?.tasks==='custom')?'custom':'default';
-  const kanbanInheritance=f.accessInheritance?.kanban==='custom'?'custom':'default';
-  const calendarInheritance=f.accessInheritance?.calendar==='custom'?'custom':'default';
-  const portfolioInheritance=f.accessInheritance?.portfolio==='custom'?'custom':'default';
-  const planningInheritance=f.accessInheritance?.planning==='custom'?'custom':'default';
-  const documentsInheritance=f.accessInheritance?.documents==='custom'?'custom':'default';
-  const tasksListInheritance=f.accessInheritance?.tasksList==='custom'?'custom':'default';
+  const statusInheritance=masterCustom?'custom':'default';
+  const typeInheritance=masterCustom?'custom':'default';
+  const notificationInheritance=masterCustom?'custom':'default';
+  const dashboardInheritance=masterCustom?'custom':'default';
+  const actionsInheritance=masterCustom?'custom':'default';
+  const taskDetailInheritance=masterCustom?'custom':'default';
+  const kanbanInheritance=masterCustom?'custom':'default';
+  const calendarInheritance=masterCustom?'custom':'default';
+  const portfolioInheritance=masterCustom?'custom':'default';
+  const planningInheritance=masterCustom?'custom':'default';
+  const documentsInheritance=masterCustom?'custom':'default';
+  const tasksListInheritance=masterCustom?'custom':'default';
   const customVisible=f.panelPermissions?.visible&&typeof f.panelPermissions.visible==='object'
     ? f.panelPermissions.visible
     : Object.fromEntries(PANEL_CATALOG.map(panel=>[panel.id,defaultIds.includes(panel.id)]));
@@ -4766,6 +4912,40 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   }
   function setMode(mode){
     set('panelPermissions',mode==='default'?{mode:'default'}:{mode:'custom',visible:{...resolvedVisible},order:Array.isArray(f.panelPermissions?.order)?f.panelPermissions.order:[]});
+  }
+  function setCustomAccessMode(enabled){
+    if(!enabled){
+      setF(prev=>({...prev,accessInheritance:{},panelPermissions:{mode:'default'}}));
+      return;
+    }
+    setF(prev=>({
+      ...prev,
+      accessInheritance:{statuses:'custom',types:'custom',notifications:'custom',dashboard:'custom',actions:'custom',taskDetail:'custom',kanban:'custom',calendar:'custom',portfolio:'custom',planning:'custom',documents:'custom',tasksList:'custom'},
+      visibleStatuses:[...(roleDefault.visibleStatuses||[])],
+      visibleTypes:[...(roleDefault.visibleTypes||TASK_TYPES)],
+      notificationPrefs:[...(roleDefault.notificationPrefs||[])],
+      notificationStatusPrefs:{...(roleDefault.notificationStatusPrefs||{})},
+      notificationPanelPermissions:{...(roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(prev.role))},
+      dashboardPermissions:{visible:{...(roleDefault.dashboard?.visible||fullDashboardVisibility())}},
+      taskPermissions:{
+        ...(prev.taskPermissions||{}),
+        canCreate:roleDefault.tasks?.canCreate===true,
+        creationMode:roleDefault.tasks?.creationMode||'task',
+        createFields:{...(roleDefault.tasks?.createFields||{})},
+        canApprovePosts:roleDefault.tasks?.canApprovePosts===true,
+        detailFields:{
+          visible:{...(roleDefault.tasks?.detailFields?.visible||{})},
+          editable:{...(roleDefault.tasks?.detailFields?.editable||{})},
+        }
+      },
+      kanbanPermissions:{...(roleDefault.kanban||builtInKanbanPermissionsForRole(prev.role))},
+      calendarPermissions:{...(roleDefault.calendar||builtInCalendarPermissionsForRole(prev.role))},
+      portfolioPermissions:{...(roleDefault.portfolio||builtInPortfolioPermissionsForRole(prev.role))},
+      planningPermissions:{...(roleDefault.planning||builtInPlanningPermissionsForRole(prev.role))},
+      documentPermissions:{...(roleDefault.documents||builtInDocumentPermissionsForRole(prev.role))},
+      tasksListPermissions:{...(roleDefault.tasksList||builtInTasksListPermissionsForRole(prev.role))},
+      panelPermissions:{mode:'custom',visible:{...resolvedVisible},order:Array.isArray(prev.panelPermissions?.order)?prev.panelPermissions.order:[]},
+    }));
   }
   function togglePanel(id,checked){
     if(editingOtherAdmin) return;
@@ -4874,6 +5054,33 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   const tasksListConfig=tasksListInheritance==='custom'
     ? {...(roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role)),...(f.tasksListPermissions||{})}
     : (roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role));
+
+  // Diferença de verdade contra o padrão da função — "Personalizar" ligado
+  // não significa que algo foi realmente alterado, então comparamos valor
+  // a valor em vez de olhar só o modo.
+  const statusesDiff=!deepPermEqual(f.visibleStatuses||[], roleDefault.visibleStatuses||[]);
+  const typesDiff=!deepPermEqual(f.visibleTypes||TASK_TYPES, roleDefault.visibleTypes||TASK_TYPES);
+  const notificationsDiff=!deepPermEqual(notificationPanelConfig, roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role))
+    || !deepPermEqual(f.notificationPrefs||[], roleDefault.notificationPrefs||[])
+    || !deepPermEqual(f.notificationStatusPrefs||{}, roleDefault.notificationStatusPrefs||{});
+  const dashboardResolvedVisible=dashboardInheritance==='custom'?(f.dashboardPermissions?.visible||{}):(roleDefault.dashboard?.visible||fullDashboardVisibility());
+  const dashboardDiff=!deepPermEqual(dashboardResolvedVisible, roleDefault.dashboard?.visible||fullDashboardVisibility());
+  const actionsDiff=!deepPermEqual(
+    {canCreate:actionConfig?.canCreate,creationMode:actionConfig?.creationMode,createFields:actionConfig?.createFields||{}},
+    {canCreate:roleDefault.tasks?.canCreate,creationMode:roleDefault.tasks?.creationMode,createFields:roleDefault.tasks?.createFields||{}}
+  );
+  const taskDetailDiff=!deepPermEqual(taskDetailConfig, {
+    canApprovePosts:roleDefault.tasks?.canApprovePosts===true,
+    visible:roleDefault.tasks?.detailFields?.visible||{},
+    editable:roleDefault.tasks?.detailFields?.editable||{},
+  });
+  const kanbanDiff=!deepPermEqual(kanbanConfig, roleDefault.kanban||builtInKanbanPermissionsForRole(f.role));
+  const calendarDiff=!deepPermEqual(calendarConfig, roleDefault.calendar||builtInCalendarPermissionsForRole(f.role));
+  const portfolioDiff=!deepPermEqual(portfolioConfig, roleDefault.portfolio||builtInPortfolioPermissionsForRole(f.role));
+  const planningDiff=!deepPermEqual(planningConfig, roleDefault.planning||builtInPlanningPermissionsForRole(f.role));
+  const documentsDiff=!deepPermEqual(documentsConfig, roleDefault.documents||builtInDocumentPermissionsForRole(f.role));
+  const tasksListDiff=!deepPermEqual(tasksListConfig, roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role));
+  const panelsVisibleDiff=!deepPermEqual(resolvedVisible, Object.fromEntries(PANEL_CATALOG.map(panel=>[panel.id,defaultIds.includes(panel.id)])));
   function toggleKanbanPermission(id,checked){
     const current=kanbanInheritance==='custom'?{...(f.kanbanPermissions||{})}:{...(roleDefault.kanban||builtInKanbanPermissionsForRole(f.role))};
     set('kanbanPermissions',{...current,[id]:checked});
@@ -4901,20 +5108,23 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
 
   function panelDetails(panel){
     if(panel.id==='notifications') return <div>
-      <label>Configuração de notificações<select value={notificationInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('notifications',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div style={notificationInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        <h3>Painel e ações</h3>
-        <div className="checks one-col compact-checks-v3">{NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={notificationPanelConfig?.[item.id]===true} onChange={e=>toggleNotificationPanelPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      <div style={notificationInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+        <h3 style={{display:'flex',alignItems:'center',gap:7}}>{notificationsDiff&&<span className="item-custom-dot"/>}<span style={{opacity:notificationsDiff?1:.62}}>Painel e ações</span></h3>
+        <div className="checks one-col compact-checks-v3">{NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=>{const def=(roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role))?.[item.id];const itemDiff=notificationPanelConfig?.[item.id]!==def;return <label key={item.id} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={notificationPanelConfig?.[item.id]===true} onChange={e=>toggleNotificationPanelPermission(item.id,e.target.checked)}/>{item.label}</label>;})}</div>
         <div className="notification-prefs-grid" style={{marginTop:18}}>
-          <div><h3>Eventos que geram notificação</h3><div className="checks one-col compact-checks-v3">{events.map(ev=><label key={ev}><input type="checkbox" checked={(f.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}</div></div>
-          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" checked={f.notificationStatusPrefs?.[st.id]??true} onChange={e=>set('notificationStatusPrefs',{...(f.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div>
+          <div><h3>Eventos que geram notificação</h3><div className="checks one-col compact-checks-v3">{events.map(ev=>{const itemDiff=(roleDefault.notificationPrefs||[]).includes(ev)!==(f.notificationPrefs||[]).includes(ev);return <label key={ev} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={(f.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>;})}</div></div>
+          <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=>{const itemDiff=(roleDefault.notificationStatusPrefs?.[st.id]??true)!==(f.notificationStatusPrefs?.[st.id]??true);return <label key={st.id} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={f.notificationStatusPrefs?.[st.id]??true} onChange={e=>set('notificationStatusPrefs',{...(f.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>;})}</div></div>
         </div>
       </div>
     </div>;
     if(panel.id==='dashboard') return <div>
-      <label>Configuração do Dashboard<select value={dashboardInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('dashboard',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div className="checks one-col compact-checks-v3" style={dashboardInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {DASHBOARD_WIDGETS.map(item=><label key={item.id}><input type="checkbox" checked={dashboardInheritance==='custom'?(f.dashboardPermissions?.visible?.[item.id]??true):(roleDefault.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}
+      <div className="checks one-col compact-checks-v3" style={dashboardInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+        {DASHBOARD_WIDGETS.filter(item=>f.role==='admin'||!item.adminOnly).map(item=>{
+          const val=dashboardInheritance==='custom'?(f.dashboardPermissions?.visible?.[item.id]??true):(roleDefault.dashboard?.visible?.[item.id]??true);
+          const defaultVal=roleDefault.dashboard?.visible?.[item.id]??true;
+          const itemDiff=val!==defaultVal;
+          return <label key={item.id} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={val} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>;
+        })}
       </div>
     </div>;
     if(panel.id==='tasks') return <div className="access-tasks-groups">
@@ -4924,27 +5134,24 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
         <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.calendar===true} onChange={e=>toggleTaskViewVisibility('calendar',e.target.checked)}/>Exibir Calendário</label>
         <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.tasks===true} onChange={e=>toggleTaskViewVisibility('tasks',e.target.checked)}/>Exibir Listas</label>
       </div>
-      {panelPermissionMode!=='custom'&&<small className="muted">Para alterar quais visualizações aparecem, mude “Modelo de acesso” para “Personalizar para este usuário”.</small>}
-      <h3 style={{marginTop:18}}>Kanban</h3><label>Configuração do Kanban<select value={kanbanInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('kanban',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{KANBAN_PERMISSION_ITEMS.map(item=><label key={`kanban:${item.id}`}><input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
-      <h3 style={{marginTop:18}}>Calendário</h3><label>Configuração do Calendário<select value={calendarInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('calendar',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={calendarInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{CALENDAR_PERMISSION_ITEMS.map(item=><label key={`calendar:${item.id}`}><input type="checkbox" checked={calendarConfig?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
-      <h3 style={{marginTop:18}}>Listas</h3><label>Configuração das Listas<select value={tasksListInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('tasksList',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label><div className="checks one-col compact-checks-v3" style={tasksListInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>{TASKS_LIST_PERMISSION_ITEMS.map(item=><label key={`lists:${item.id}`}><input type="checkbox" checked={tasksListConfig?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
+      {panelPermissionMode!=='custom'&&<small className="muted">Para alterar quais visualizações aparecem, ative "Este usuário usa acesso personalizado?" no topo da tela.</small>}
+      <h3 style={{marginTop:18,display:'flex',alignItems:'center',gap:7}}>{kanbanDiff&&<span className="item-custom-dot"/>}<span style={{opacity:kanbanDiff?1:.62}}>Kanban</span></h3><div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{pointerEvents:'none'}:undefined}>{KANBAN_PERMISSION_ITEMS.map(item=>{const itemDiff=kanbanConfig?.[item.id]!==(roleDefault.kanban||builtInKanbanPermissionsForRole(f.role))?.[item.id];return <label key={`kanban:${item.id}`} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>;})}</div>
+      <h3 style={{marginTop:18,display:'flex',alignItems:'center',gap:7}}>{calendarDiff&&<span className="item-custom-dot"/>}<span style={{opacity:calendarDiff?1:.62}}>Calendário</span></h3><div className="checks one-col compact-checks-v3" style={calendarInheritance!=='custom'?{pointerEvents:'none'}:undefined}>{CALENDAR_PERMISSION_ITEMS.map(item=>{const itemDiff=calendarConfig?.[item.id]!==(roleDefault.calendar||builtInCalendarPermissionsForRole(f.role))?.[item.id];return <label key={`calendar:${item.id}`} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={calendarConfig?.[item.id]===true} onChange={e=>toggleCalendarPermission(item.id,e.target.checked)}/>{item.label}</label>;})}</div>
+      <h3 style={{marginTop:18,display:'flex',alignItems:'center',gap:7}}>{tasksListDiff&&<span className="item-custom-dot"/>}<span style={{opacity:tasksListDiff?1:.62}}>Listas</span></h3><div className="checks one-col compact-checks-v3" style={tasksListInheritance!=='custom'?{pointerEvents:'none'}:undefined}>{TASKS_LIST_PERMISSION_ITEMS.map(item=>{const itemDiff=tasksListConfig?.[item.id]!==(roleDefault.tasksList||builtInTasksListPermissionsForRole(f.role))?.[item.id];return <label key={`lists:${item.id}`} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={tasksListConfig?.[item.id]===true} onChange={e=>toggleTasksListPermission(item.id,e.target.checked)}/>{item.label}</label>;})}</div>
     </div>;
     if(panel.id==='teamhub') return <div>
-      <label>Configuração dos Portfólios<select value={portfolioInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('portfolio',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div className="checks one-col compact-checks-v3" style={portfolioInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {PORTFOLIO_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={portfolioConfig?.[item.id]===true} onChange={e=>togglePortfolioPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      <div className="checks one-col compact-checks-v3" style={portfolioInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+        {PORTFOLIO_PERMISSION_ITEMS.map(item=>{const itemDiff=portfolioConfig?.[item.id]!==(roleDefault.portfolio||builtInPortfolioPermissionsForRole(f.role))?.[item.id];return <label key={item.id} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={portfolioConfig?.[item.id]===true} onChange={e=>togglePortfolioPermission(item.id,e.target.checked)}/>{item.label}</label>;})}
       </div>
     </div>;
     if(panel.id==='planning') return <div>
-      <label>Configuração do Planejamento<select value={planningInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('planning',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div className="checks one-col compact-checks-v3" style={planningInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {PLANNING_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={planningConfig?.[item.id]===true} onChange={e=>togglePlanningPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      <div className="checks one-col compact-checks-v3" style={planningInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+        {PLANNING_PERMISSION_ITEMS.map(item=>{const itemDiff=planningConfig?.[item.id]!==(roleDefault.planning||builtInPlanningPermissionsForRole(f.role))?.[item.id];return <label key={item.id} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={planningConfig?.[item.id]===true} onChange={e=>togglePlanningPermission(item.id,e.target.checked)}/>{item.label}</label>;})}
       </div>
     </div>;
     if(panel.id==='documents') return <div>
-      <label>Configuração dos Documentos<select value={documentsInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('documents',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
-      <div className="checks one-col compact-checks-v3" style={documentsInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-        {DOCUMENT_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={documentsConfig?.[item.id]===true} onChange={e=>toggleDocumentPermission(item.id,e.target.checked)}/>{item.label}</label>)}
+      <div className="checks one-col compact-checks-v3" style={documentsInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+        {DOCUMENT_PERMISSION_ITEMS.map(item=>{const itemDiff=documentsConfig?.[item.id]!==(roleDefault.documents||builtInDocumentPermissionsForRole(f.role))?.[item.id];return <label key={item.id} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={documentsConfig?.[item.id]===true} onChange={e=>toggleDocumentPermission(item.id,e.target.checked)}/>{item.label}</label>;})}
       </div>
     </div>;
     if(panel.id==='settings') return <p className="muted">Configurações é uma área exclusiva de Admin e não pode ser liberada para outros perfis.</p>;
@@ -4956,24 +5163,32 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
 
     {f.role==='client'&&<><h3>Empresas vinculadas</h3><div className="arg-linked-company-list-v2">{companies.map(c=><label className="arg-linked-company-row-v2" key={c.id}><input type="checkbox" checked={(f.companyIds||[]).includes(c.id)} onChange={e=>set('companyIds',e.target.checked?[...(f.companyIds||[]),c.id]:(f.companyIds||[]).filter(x=>x!==c.id))}/><AvatarMini value={c.logo} label={c.name}/><span>{c.name}</span></label>)}</div></>}
 
+    <div className={'panel master-custom-access-toggle '+(masterCustom?'is-custom':'')} style={{marginTop:18,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+      <div><b style={{color:masterCustom?'var(--gold)':undefined}}>Este usuário usa acesso personalizado?</b><br/><small className="muted">Desligado, tudo segue o padrão da função. Ligado, libera editar cada seção abaixo pra esse usuário específico.</small></div>
+      <select value={masterCustom?'custom':'default'} disabled={editingOtherAdmin} onChange={e=>setCustomAccessMode(e.target.value==='custom')} style={{width:'auto',minWidth:220}}>
+        <option value="default">Usar padrão da função</option>
+        <option value="custom">Personalizar para este usuário</option>
+      </select>
+    </div>
     <h3 style={{marginTop:18}}>Regras de acesso</h3>
+    {!masterCustom&&<p className="muted" style={{marginTop:-6,marginBottom:10}}>As seções abaixo mostram o padrão da função, só pra consulta. Ative a personalização acima pra poder editar.</p>}
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
-      {f.role!=='admin'&&<AccessConfigCard title="Status disponíveis" open={openSection==='rule:statuses'} onToggleOpen={()=>toggleSection('rule:statuses')} accent>
-        <label>Configuração dos status<select value={statusInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('statuses',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      {f.role!=='admin'&&<AccessConfigCard title="Status disponíveis" open={openSection==='rule:statuses'} onToggleOpen={()=>toggleSection('rule:statuses')} accent customized={statusesDiff}>
+        <label style={{color:statusInheritance==='custom'?'var(--gold)':undefined}}>Configuração dos status<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
         <div style={statusInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
           <StatusVisibilityChecks statuses={statuses} selected={statusInheritance==='custom'?(f.visibleStatuses||[]):(roleDefault.visibleStatuses||[])} onToggle={toggleStatus}/>
         </div>
       </AccessConfigCard>}
 
-      {f.role!=='admin'&&<AccessConfigCard title="Tipos de tarefas disponíveis" open={openSection==='rule:types'} onToggleOpen={()=>toggleSection('rule:types')} accent>
-        <label>Configuração dos tipos<select value={typeInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('types',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      {f.role!=='admin'&&<AccessConfigCard title="Tipos de tarefas disponíveis" open={openSection==='rule:types'} onToggleOpen={()=>toggleSection('rule:types')} accent customized={typesDiff}>
+        <label style={{color:typeInheritance==='custom'?'var(--gold)':undefined}}>Configuração dos tipos<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
         <div style={typeInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
           <TaskTypeVisibilityChecks selected={typeInheritance==='custom'?(f.visibleTypes||[]):(roleDefault.visibleTypes||TASK_TYPES)} onToggle={toggleType}/>
         </div>
       </AccessConfigCard>}
 
-      <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent>
-        <label>Configuração da tarefa aberta<select value={taskDetailInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('taskDetail',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+      <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent customized={taskDetailDiff}>
+        <label style={{color:taskDetailInheritance==='custom'?'var(--gold)':undefined}}>Configuração da tarefa aberta<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
         <div style={taskDetailInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
           <TaskOpenPermissionList
             config={taskDetailConfig}
@@ -4991,8 +5206,9 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
         open={openSection==='rule:taskButton'}
         onToggleOpen={()=>toggleSection('rule:taskButton')}
         onToggleActive={checked=>setTaskPermission('canCreate',checked)}
+        customized={actionsDiff}
       >
-        <label>Configuração do botão<select value={actionsInheritance} disabled={editingOtherAdmin} onChange={e=>setInheritance('actions',e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select></label>
+        <label style={{color:actionsInheritance==='custom'?'var(--gold)':undefined}}>Configuração do botão<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
         <div style={actionsInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
           <label>Texto do botão<select value={actionConfig?.creationMode||'task'} onChange={e=>setTaskPermission('creationMode',e.target.value)}><option value="task">Nova tarefa</option><option value="request">Nova solicitação</option></select></label>
           <h4 style={{margin:'14px 0 8px'}}>Campos disponíveis</h4>
@@ -5002,11 +5218,19 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
     </div>
 
     <h3 style={{marginTop:22}}>Painéis do menu lateral</h3>
-    <label>Modelo de acesso<select value={panelPermissionMode} disabled={editingOtherAdmin} onChange={e=>setMode(e.target.value)}><option value="default">Usar padrão da função</option><option value="custom">Personalizar para este usuário</option></select><small>{panelPermissionMode==='default'?'Os painéis acompanham automaticamente o padrão da função.':'Ative ou desative os painéis e abra cada item para configurar.'}</small></label>
+    <p className="muted" style={{marginTop:-4}}>{masterCustom?'Ative ou desative os painéis e abra cada item para configurar.':'Os painéis acompanham automaticamente o padrão da função.'}</p>
     <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:14}}>
       {SIDEBAR_PANEL_CATALOG.filter(panel=>f.role==='admin'||!panel.adminOnly).map(panel=>{
         const enabled=panel.id==='tasks'?['kanban','calendar','tasks'].some(id=>resolvedVisible[id]===true):resolvedVisible[panel.id]===true;
         const sectionId=`panel:${panel.id}`;
+        const panelCustomizedMap={
+          notifications:notificationsDiff,
+          dashboard:dashboardDiff,
+          tasks:kanbanDiff||calendarDiff||tasksListDiff,
+          teamhub:portfolioDiff,
+          planning:planningDiff,
+          documents:documentsDiff,
+        };
         return <AccessConfigCard
           key={panel.id}
           title={panel.label}
@@ -5015,6 +5239,7 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
           open={openSection===sectionId}
           onToggleOpen={()=>toggleSection(sectionId)}
           onToggleActive={checked=>togglePanel(panel.id,checked)}
+          customized={(panelPermissionMode==='custom'&&resolvedVisible[panel.id]!==(defaultIds.includes(panel.id)))||!!panelCustomizedMap[panel.id]}
         >
           {enabled?panelDetails(panel):<p className="muted">Ative este painel para configurar suas opções.</p>}
         </AccessConfigCard>;
@@ -5180,7 +5405,7 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
       <h4>Painel e ações</h4><div className="checks one-col compact-checks-v3">{NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=><label key={item.id}><input type="checkbox" checked={draft.notificationPanel?.[item.id]===true} onChange={e=>toggleNotificationPanelPermission(item.id,e.target.checked)}/>{item.label}</label>)}</div>
       <div className="notification-prefs-grid" style={{marginTop:18}}><div><h4>Eventos</h4><div className="checks one-col compact-checks-v3">{NOTIFICATION_VISIBLE_EVENTS.map(ev=><label key={ev}><input type="checkbox" checked={(draft.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}</div></div><div><h4>Status que geram notificação</h4><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" checked={(draft.notificationStatusPrefs?.[st.id]??true)} onChange={e=>setDraftValue('notificationStatusPrefs',{...(draft.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div></div>
     </div>;
-    if(panel.id==='dashboard') return <div><h4>Abas, filtros, cards e gráficos</h4><div className="checks one-col compact-checks-v3">{DASHBOARD_WIDGETS.map(item=><label key={item.id}><input type="checkbox" checked={(draft.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
+    if(panel.id==='dashboard') return <div><h4>Abas, filtros, cards e gráficos</h4><div className="checks one-col compact-checks-v3">{DASHBOARD_WIDGETS.filter(item=>!item.adminOnly).map(item=><label key={item.id}><input type="checkbox" checked={(draft.dashboard?.visible?.[item.id]??true)} onChange={e=>toggleDashboardWidget(item.id,e.target.checked)}/>{item.label}</label>)}</div></div>;
     if(panel.id==='tasks') return <div className="access-tasks-groups">
       <h4>Visualizações disponíveis</h4><div className="checks one-col compact-checks-v3 task-view-visibility-checks">
         <label><input type="checkbox" checked={draft.panels?.visible?.kanban===true} onChange={e=>toggleDefaultTaskViewVisibility('kanban',e.target.checked)}/>Exibir Kanban</label>
@@ -5233,7 +5458,7 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
 
       <h3 style={{marginTop:22}}>Painéis do menu lateral</h3>
       <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        {SIDEBAR_PANEL_CATALOG.map(panel=>{
+        {SIDEBAR_PANEL_CATALOG.filter(panel=>!panel.adminOnly).map(panel=>{
           const active=panel.id==='tasks'
             ? ['kanban','calendar','tasks'].some(id=>draft.panels?.visible?.[id]===true)
             : draft.panels?.visible?.[panel.id]===true;
