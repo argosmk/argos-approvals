@@ -47,11 +47,35 @@ async function taskMeta(organizationId: string, taskId: string | null | undefine
 async function activeProfile(organizationId: string, profileId: string) {
   const { data } = await supabase
     .from("profiles")
-    .select("id,role,active,last_seen_at")
+    .select("id,role,active,last_seen_at,visible_statuses,notification_prefs")
     .eq("organization_id", organizationId)
     .eq("id", profileId)
     .maybeSingle();
   return data || null;
+}
+
+function profileCanSeeStatus(profile: any, statusId: string | null | undefined) {
+  if (!statusId) return true;
+  if (profile?.role === "admin") return true;
+  const visible = Array.isArray(profile?.visible_statuses) ? profile.visible_statuses : [];
+  return visible.includes(statusId);
+}
+
+function statusChangePushEnabled(profile: any) {
+  const statuses = profile?.notification_prefs?.statuses;
+  if (typeof statuses?.__all__ === "boolean") return statuses.__all__;
+  if (statuses && typeof statuses === "object") {
+    const legacy = Object.entries(statuses).filter(([key]) => key !== "__all__");
+    if (legacy.length) return legacy.some(([, value]) => value !== false);
+  }
+  return profile?.role !== "client";
+}
+
+function profileAllowsPushEvent(profile: any, event: string | null | undefined) {
+  if (!event) return true;
+  if (event === "Status da tarefa") return statusChangePushEnabled(profile);
+  const events = profile?.notification_prefs?.events;
+  return Array.isArray(events) ? events.includes(event) : true;
 }
 
 async function deliverySettings(organizationId: string) {
@@ -150,7 +174,17 @@ async function reminderTargets(
     }
   }
 
-  return [...ids];
+  if (!ids.size) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id,role,active,visible_statuses")
+    .eq("organization_id", organizationId)
+    .in("id", [...ids]);
+
+  return (profiles ?? [])
+    .filter((profile: any) => profile.active !== false && profileCanSeeStatus(profile, task?.status))
+    .map((profile: any) => String(profile.id));
 }
 
 async function generateReminderQueue() {
@@ -251,6 +285,16 @@ async function processSingle(row: any) {
     return { sent: 0, skipped: 1 };
   }
 
+  if (row.status_id && !profileCanSeeStatus(profile, row.status_id)) {
+    await markRows(ids, { status: "skipped", skip_reason: "status_not_visible" });
+    return { sent: 0, skipped: 1 };
+  }
+
+  if (row.kind !== "reminder" && !profileAllowsPushEvent(profile, row.event)) {
+    await markRows(ids, { status: "skipped", skip_reason: "notification_event_disabled" });
+    return { sent: 0, skipped: 1 };
+  }
+
   const lastSeenMs = profile.last_seen_at ? new Date(profile.last_seen_at).getTime() : 0;
   if (lastSeenMs && Date.now() - lastSeenMs <= settings.presenceGraceSeconds * 1000) {
     await markRows(ids, { status: "skipped", skip_reason: "user_active" });
@@ -321,15 +365,40 @@ async function processSingle(row: any) {
 
 async function processTeamDigest(rows: any[]) {
   if (!rows.length) return { sent: 0, skipped: 0 };
-  const ids = rows.map((r) => r.id);
-  const row = rows[0];
-  const profile = await activeProfile(row.organization_id, row.profile_id);
+  const allIds = rows.map((r) => r.id);
+  const firstRow = rows[0];
+  const profile = await activeProfile(firstRow.organization_id, firstRow.profile_id);
   if (!profile || profile.active === false) {
-    await markRows(ids, { status: "skipped", skip_reason: "inactive_profile" });
-    return { sent: 0, skipped: ids.length };
+    await markRows(allIds, { status: "skipped", skip_reason: "inactive_profile" });
+    return { sent: 0, skipped: allIds.length };
   }
 
-  const settings = await deliverySettings(row.organization_id);
+  const settings = await deliverySettings(firstRow.organization_id);
+  if (!settings.enabled) {
+    await markRows(allIds, { status: "skipped", skip_reason: "delivery_disabled" });
+    return { sent: 0, skipped: allIds.length };
+  }
+
+  const eligibleRows: any[] = [];
+  let filtered = 0;
+  for (const candidate of rows) {
+    if (candidate.status_id && !profileCanSeeStatus(profile, candidate.status_id)) {
+      await markRows([candidate.id], { status: "skipped", skip_reason: "status_not_visible" });
+      filtered++;
+      continue;
+    }
+    if (!profileAllowsPushEvent(profile, candidate.event)) {
+      await markRows([candidate.id], { status: "skipped", skip_reason: "notification_event_disabled" });
+      filtered++;
+      continue;
+    }
+    eligibleRows.push(candidate);
+  }
+
+  if (!eligibleRows.length) return { sent: 0, skipped: filtered };
+
+  const ids = eligibleRows.map((r) => r.id);
+  const row = eligibleRows[0];
   const lastSeenMs = profile.last_seen_at ? new Date(profile.last_seen_at).getTime() : 0;
   if (lastSeenMs && Date.now() - lastSeenMs <= settings.presenceGraceSeconds * 1000) {
     await markRows(ids, { status: "skipped", skip_reason: "user_active" });
@@ -337,10 +406,10 @@ async function processTeamDigest(rows: any[]) {
   }
 
   const firstTask = await taskMeta(row.organization_id, row.task_id);
-  let title = `${rows.length} novas notificações`;
-  let body = rows.length === 1
+  let title = `${eligibleRows.length} novas notificações`;
+  let body = eligibleRows.length === 1
     ? String(row.payload?.text || "Há uma nova atualização no Argos.")
-    : `Você tem ${rows.length} atualizações pendentes no Argos.`;
+    : `Você tem ${eligibleRows.length} atualizações pendentes no Argos.`;
 
   if (rows.length === 1 && firstTask) {
     const companyName = await companyNameForTask(row.organization_id, firstTask.company_id);
@@ -350,18 +419,18 @@ async function processTeamDigest(rows: any[]) {
   const payload = JSON.stringify({
     title,
     body,
-    taskId: rows.length === 1 ? row.task_id : null,
-    url: rows.length === 1 && row.task_id ? `/#/task/${row.task_id}` : "/",
+    taskId: eligibleRows.length === 1 ? row.task_id : null,
+    url: eligibleRows.length === 1 && row.task_id ? `/#/task/${row.task_id}` : "/",
   });
 
   const result = await sendPayload(row.organization_id, row.profile_id, payload);
   if (result.sent <= 0) {
     await markRows(ids, { status: "skipped", skip_reason: "no_subscription" });
-    return { sent: 0, skipped: ids.length };
+    return { sent: 0, skipped: ids.length + filtered };
   }
 
   await markRows(ids, { status: "sent", sent_at: new Date().toISOString(), skip_reason: null });
-  return { sent: 1, skipped: 0 };
+  return { sent: 1, skipped: filtered };
 }
 
 Deno.serve(async () => {
