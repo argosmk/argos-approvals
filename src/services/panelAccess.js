@@ -64,7 +64,7 @@ export const SIDEBAR_PANEL_CATALOG = Object.freeze([
   Object.freeze({id:'planning',label:'Planejamento'}),
   Object.freeze({id:'tasks',label:'Tarefas'}),
   Object.freeze({id:'teamhub',label:'Portfólios'}),
-  Object.freeze({id:'documents',label:'Documentos'}),
+  Object.freeze({id:'documents',label:'Documentos',adminOnly:true}),
   Object.freeze({id:'financial',label:'Financeiro',adminOnly:true}),
   Object.freeze({id:'settings',label:'Configurações',adminOnly:true}),
 ]);

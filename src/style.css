@@ -12202,3 +12202,10 @@ hr.content-fields-divider{
   border-color:rgba(var(--accent-rgb),.4)!important;
   background:rgba(var(--accent-rgb),.05)!important;
 }
+
+/* Status/Tipos disponíveis — esmaece o nome quando o valor bate com o
+   padrão da função (a bolinha colorida ali já é decorativa, sem relação
+   com personalização — não mexer nela). */
+.arg-vs-row-v2.is-default-value .arg-vs-name-v2{
+  opacity:.62;
+}

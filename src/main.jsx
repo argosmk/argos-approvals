@@ -912,22 +912,32 @@ function SortControl({value,setValue,options=null,extraOptions=[]}){
   ];
   return <label className="toolbar-sort-control">Ordenar por<select value={value} onChange={e=>setValue(e.target.value)}>{baseOptions.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>;
 }
-function StatusVisibilityChecks({statuses,selected=[],onToggle}){
+function StatusVisibilityChecks({statuses,selected=[],onToggle,defaultSelected=null}){
   return <div className="arg-vs-list-v2">
-    {statuses.map(s=><label className="arg-vs-row-v2" key={s.id}>
-      <input type="checkbox" checked={selected.includes(s.id)} onChange={e=>onToggle(s.id,e.target.checked)}/>
-      <span className="arg-vs-dot-v2" style={{background:s.color}}></span>
-      <span className="arg-vs-name-v2">{s.name}</span>
-    </label>)}
+    {statuses.map(s=>{
+      const isSel=selected.includes(s.id);
+      const diff=defaultSelected!==null&&isSel!==defaultSelected.includes(s.id);
+      return <label className={'arg-vs-row-v2'+(defaultSelected!==null&&!diff?' is-default-value':'')} key={s.id}>
+        <input type="checkbox" checked={isSel} onChange={e=>onToggle(s.id,e.target.checked)}/>
+        <DiffDot show={diff}/>
+        <span className="arg-vs-dot-v2" style={{background:s.color}}></span>
+        <span className="arg-vs-name-v2">{s.name}</span>
+      </label>;
+    })}
   </div>
 }
-function TaskTypeVisibilityChecks({types=TASK_TYPES,selected=[],onToggle}){
+function TaskTypeVisibilityChecks({types=TASK_TYPES,selected=[],onToggle,defaultSelected=null}){
   return <div className="arg-vs-list-v2">
-    {types.map(type=><label className="arg-vs-row-v2" key={type}>
-      <input type="checkbox" checked={selected.includes(type)} onChange={e=>onToggle(type,e.target.checked)}/>
-      <span className="arg-vs-dot-v2" style={{background:'var(--accent)'}}></span>
-      <span className="arg-vs-name-v2">{type}</span>
-    </label>)}
+    {types.map(type=>{
+      const isSel=selected.includes(type);
+      const diff=defaultSelected!==null&&isSel!==defaultSelected.includes(type);
+      return <label className={'arg-vs-row-v2'+(defaultSelected!==null&&!diff?' is-default-value':'')} key={type}>
+        <input type="checkbox" checked={isSel} onChange={e=>onToggle(type,e.target.checked)}/>
+        <DiffDot show={diff}/>
+        <span className="arg-vs-dot-v2" style={{background:'var(--accent)'}}></span>
+        <span className="arg-vs-name-v2">{type}</span>
+      </label>;
+    })}
   </div>
 }
 
@@ -4304,60 +4314,81 @@ function TaskPage({task,tasks=[],setTasks,companies,users,statuses,types,statusB
       }
       const votes=[...(task.approvalVotes||[]),{userId:effectiveUser.id,userName:effectiveUser.name,at:eventAt}];
       const names=votes.map(v=>v.userName).join(', ');
+      const allApproved=votes.length>=approversForCompany.length;
       const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a tarefa. (${votes.length} de ${approversForCompany.length} aprovaram)`,resolved:false,statusAtTime:task.status};
+      if(allApproved){
+        updateTask(task.id,{status:'agendamento',approvalVotes:[],logs:[...(task.logs||[]),entry],statusLogText:`Todos os aprovadores aprovaram a tarefa`});
+        notifyTask(task,`Todos os ${approversForCompany.length} aprovadores aprovaram (${names}). A tarefa avançou automaticamente para Agendamento.`,'Aprovação','agendamento',effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
+        setClientForm(null);
+        notifySettingsSaved('Todos aprovaram — tarefa avançada automaticamente');
+        return;
+      }
       updateTask(task.id,{approvalVotes:votes,logs:[...(task.logs||[]),entry]},`Voto de aprovação registrado (${votes.length} de ${approversForCompany.length}).`);
-      notifyTask(task,`${votes.length} de ${approversForCompany.length} aprovaram (${names}). Confirme manualmente antes de despachar.`,'Aprovação',task.status,effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
+      notifyTask(task,`${votes.length} de ${approversForCompany.length} aprovaram (${names}). O admin pode avançar manualmente ou aguardar os demais aprovadores.`,'Aprovação',task.status,effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
       setClientForm(null);
       notifySettingsSaved('Aprovação registrada');
       return;
     }
     const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a tarefa.`,resolved:false,statusAtTime:task.status};
-    updateTask(task.id,{status:'agendamento',logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} aprovou a tarefa`});
+    updateTask(task.id,{status:'agendamento',approvalVotes:[],logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} aprovou a tarefa`});
     setClientForm(null);
     notifySettingsSaved('Tarefa aprovada');
   }
   function approveCopy(){
+    if(!clientForm?.copyApproved||!clientForm?.captionApproved) return alert('Marque Copy aprovada e Legenda aprovada para concluir a aprovação.');
+    if(clientForm?.copyChange||clientForm?.captionChange) return alert('Remova as opções de alteração antes de aprovar.');
     if(!createPostStatusId) return alert('Não foi possível identificar o próximo status após Aprovar copy.');
     const eventAt=now();
     if(isMultiApprover){
       if((task.copyApprovalVotes||[]).some(v=>v.userId===effectiveUser.id)){
-        alert('Você já registrou sua aprovação da copy para esta tarefa.');
+        alert('Você já registrou sua aprovação da copy e da legenda para esta tarefa.');
         setClientForm(null);
         return;
       }
-      const votes=[...(task.copyApprovalVotes||[]),{userId:effectiveUser.id,userName:effectiveUser.name,at:eventAt}];
+      const votes=[...(task.copyApprovalVotes||[]),{userId:effectiveUser.id,userName:effectiveUser.name,copyApproved:true,captionApproved:true,at:eventAt}];
       const names=votes.map(v=>v.userName).join(', ');
-      const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a copy. (${votes.length} de ${approversForCompany.length} aprovaram)`,resolved:false,statusAtTime:task.status};
-      updateTask(task.id,{copyApprovalVotes:votes,logs:[...(task.logs||[]),entry]},`Voto de aprovação de copy registrado (${votes.length} de ${approversForCompany.length}).`);
-      notifyTask(task,`${votes.length} de ${approversForCompany.length} aprovaram a copy (${names}). Confirme manualmente antes de despachar.`,'Aprovação',task.status,effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
+      const allApproved=votes.length>=approversForCompany.length;
+      const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou copy e legenda. (${votes.length} de ${approversForCompany.length} aprovaram)`,resolved:false,statusAtTime:task.status};
+      if(allApproved){
+        updateTask(task.id,{status:createPostStatusId,copyApprovalVotes:[],logs:[...(task.logs||[]),entry],statusLogText:`Todos os aprovadores aprovaram copy e legenda`});
+        notifyTask(task,`Todos os ${approversForCompany.length} aprovadores aprovaram copy e legenda (${names}). A tarefa avançou automaticamente.`,'Aprovação',createPostStatusId,effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
+        setClientForm(null);
+        notifySettingsSaved('Todos aprovaram — copy avançada automaticamente');
+        return;
+      }
+      updateTask(task.id,{copyApprovalVotes:votes,logs:[...(task.logs||[]),entry]},`Voto de aprovação de copy e legenda registrado (${votes.length} de ${approversForCompany.length}).`);
+      notifyTask(task,`${votes.length} de ${approversForCompany.length} aprovaram copy e legenda (${names}). O admin pode avançar manualmente ou aguardar os demais aprovadores.`,'Aprovação',task.status,effectiveUser.id,{actorName:effectiveUser.name,at:eventAt});
       setClientForm(null);
       notifySettingsSaved('Aprovação de copy registrada');
       return;
     }
-    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou a copy.`,resolved:false,statusAtTime:task.status};
-    updateTask(task.id,{status:createPostStatusId,logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} aprovou a copy`});
+    const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text:`${effectiveUser.name} aprovou copy e legenda.`,resolved:false,statusAtTime:task.status};
+    updateTask(task.id,{status:createPostStatusId,copyApprovalVotes:[],logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} aprovou copy e legenda`});
     setClientForm(null);
-    notifySettingsSaved('Copy aprovada');
+    notifySettingsSaved('Copy e legenda aprovadas');
   }
   function requestCopyChange(){
+    const items=[];
+    if(clientForm?.copyChange) items.push('Alterar copy');
+    if(clientForm?.captionChange) items.push('Alterar legenda');
+    if(!items.length) return alert('Selecione Alterar copy e/ou Alterar legenda.');
     const desc=String(clientForm?.copyDescription||'').trim();
-    if(!desc) return alert('Descreva o que precisa ser alterado na copy.');
-    const text=`Solicitação de alteração na copy\nDescrição: ${desc}`;
+    if(!desc) return alert('Descreva o que precisa ser alterado.');
+    const text=`Solicitação de alteração\nItens marcados: ${items.join(', ')}\nDescrição: ${desc}`;
     const eventAt=now();
     const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false,statusAtTime:task.status};
-    updateTask(task.id,{status:createCopyStatusId,logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} solicitou alteração na copy`});
+    updateTask(task.id,{status:createCopyStatusId,copyApprovalVotes:[],logs:[...(task.logs||[]),entry],statusLogText:`${effectiveUser.name} solicitou alteração em ${items.join(' e ')}`});
     if(isClient){
       notifyTask(task,text,CLIENT_REQUEST_NOTIFICATION_EVENT,createCopyStatusId,effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});
     }
     setClientForm(null);
-    notifySettingsSaved('Alteração de copy solicitada');
+    notifySettingsSaved('Alteração solicitada');
   }
   function requestChange(){
     const items=[];
-    if(clientForm?.artChange) items.push('Alterar arte/vídeo');
+    if(clientForm?.artChange) items.push('Alterar design da arte/vídeo');
     if(clientForm?.text) items.push('Alterar texto na arte/vídeo');
     if(clientForm?.captionChange) items.push('Alterar legenda');
-    if(clientForm?.redo) items.push('Refazer o post');
     if(!items.length) return alert('Selecione pelo menos uma opção de alteração.');
     const desc=String(clientForm?.description||'').trim();
     if(!desc) return alert('Descreva as alterações que você gostaria de aplicar.');
@@ -4366,7 +4397,7 @@ Itens marcados: ${items.join(', ')}
 Descrição: ${desc}`;
     const eventAt=now();
     const entry={id:safeUUID(),user:effectiveUser.name,userId:effectiveUser.id,type:'comment',visibility:isClient?'client':'internal',at:eventAt,text,resolved:false,statusAtTime:task.status};
-    updateTask(task.id,{status:'alteracao',alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]});
+    updateTask(task.id,{status:'alteracao',approvalVotes:[],alterationCount:(task.alterationCount||0)+1,logs:[...(task.logs||[]),entry]});
     if(isClient){
       notifyTask(task,text,CLIENT_REQUEST_NOTIFICATION_EVENT,'alteracao',effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});
     }
@@ -4462,32 +4493,33 @@ function CopyApprovalForm({form,setForm,approveCopy,requestCopyChange,statusById
   const f=form||{};
   const F=(k,v)=>setForm({...f,[k]:v});
   const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {borderColor:color,color,'--tint':color}; };
-  const canRequest=String(f.copyDescription||'').trim().length>0;
+  const hasChange=!!(f.copyChange||f.captionChange);
+  const canApprove=!!f.copyApproved&&!!f.captionApproved&&!hasChange;
+  const canRequest=hasChange&&String(f.copyDescription||'').trim().length>0;
+  function setDecision(approvedKey,changeKey,mode,checked){
+    setForm({...f,[approvedKey]:mode==='approve'?checked:false,[changeKey]:mode==='change'?checked:false});
+  }
   return <div className="client-actions copy-approval-form">
-    <h3>Aprovar copy</h3>
-    <p className="muted-note">Confirme a copy para seguir para a criação do post.</p>
-    <button className="status-tinted" style={buttonStyle(createPostStatusId)} onClick={approveCopy}>Aprovar copy</button>
+    <h3>Aprovar</h3>
+    <label><input type="checkbox" checked={!!f.copyApproved} onChange={e=>setDecision('copyApproved','copyChange','approve',e.target.checked)}/> Copy aprovada</label>
+    <label><input type="checkbox" checked={!!f.captionApproved} onChange={e=>setDecision('captionApproved','captionChange','approve',e.target.checked)}/> Legenda aprovada</label>
+    <button className="status-tinted" style={canApprove?buttonStyle(createPostStatusId):undefined} disabled={!canApprove} onClick={approveCopy}>Aprovar</button>
     <h3>Solicitar alteração</h3>
-    <AutoTextarea value={f.copyDescription||''} onChange={e=>F('copyDescription',e.target.value)} minHeight={88} placeholder="Descreva o que precisa ser alterado na copy"/>
+    <label><input type="checkbox" checked={!!f.copyChange} onChange={e=>setDecision('copyApproved','copyChange','change',e.target.checked)}/> Alterar copy</label>
+    <label><input type="checkbox" checked={!!f.captionChange} onChange={e=>setDecision('captionApproved','captionChange','change',e.target.checked)}/> Alterar legenda</label>
+    <AutoTextarea value={f.copyDescription||''} onChange={e=>F('copyDescription',e.target.value)} minHeight={88} placeholder="Descreva o que precisa ser alterado"/>
     <button className="status-tinted" style={canRequest?buttonStyle(createCopyStatusId):undefined} disabled={!canRequest} onClick={requestCopyChange}>Solicitar alteração</button>
-    {!canRequest&&<small>Descreva o ajuste para liberar a solicitação.</small>}
+    {hasChange&&!canRequest&&<small>Descreva o ajuste para liberar a solicitação.</small>}
   </div>;
 }
 
 function ClientApprovalForm({form,setForm,approve,requestChange,statusById}){ 
   const f=form||{}; 
   const F=(k,v)=>setForm({...f,[k]:v}); 
-  const hasChange=!!(f.artChange||f.text||f.captionChange||f.redo);
+  const hasChange=!!(f.artChange||f.text||f.captionChange);
   const buttonStyle=(statusId)=>{ const color=statusById?.[statusId]?.color||'var(--gold)'; return {borderColor:color,color,'--tint':color}; };
   const canRequest=hasChange && String(f.description||'').trim().length>0;
-  function toggleRedo(checked){
-    if(checked){
-      const ok=confirm('Tem certeza que deseja solicitar o refazimento do post? Essa opção indica uma alteração maior. Informe o motivo com detalhes na caixa de texto.');
-      if(!ok) return F('redo',false);
-    }
-    F('redo',checked);
-  }
-  return <div className="client-actions"><h3>Aprovar</h3><label><input type="checkbox" checked={!!f.art} onChange={e=>F('art',e.target.checked)}/> Artes/vídeos aprovados</label><label><input type="checkbox" checked={!!f.caption} onChange={e=>F('caption',e.target.checked)}/> Legenda aprovada</label><button className="status-tinted" style={buttonStyle('agendamento')} onClick={approve}>Aprovar</button><h3>Solicitar alteração</h3><label><input type="checkbox" checked={!!f.artChange} onChange={e=>F('artChange',e.target.checked)}/> Alterar arte/vídeo</label><label><input type="checkbox" checked={!!f.text} onChange={e=>F('text',e.target.checked)}/> Alterar texto na arte/vídeo</label><label><input type="checkbox" checked={!!f.captionChange} onChange={e=>F('captionChange',e.target.checked)}/> Alterar legenda</label><label><input type="checkbox" checked={!!f.redo} onChange={e=>toggleRedo(e.target.checked)}/> <span className="danger-text">Refazer o post</span></label><textarea value={f.description||''} onChange={e=>F('description',e.target.value)} placeholder="Descreva as alterações que você gostaria de aplicar"/><button className="status-tinted" style={canRequest?buttonStyle('alteracao'):undefined} disabled={!canRequest} onClick={requestChange}>Solicitar alteração</button>{hasChange&&!canRequest&&<small>Descreva o motivo para liberar a solicitação.</small>}</div> 
+  return <div className="client-actions"><h3>Aprovar</h3><label><input type="checkbox" checked={!!f.art} onChange={e=>F('art',e.target.checked)}/> Artes/vídeos aprovados</label><label><input type="checkbox" checked={!!f.caption} onChange={e=>F('caption',e.target.checked)}/> Legenda aprovada</label><button className="status-tinted" style={buttonStyle('agendamento')} onClick={approve}>Aprovar</button><h3>Solicitar alteração</h3><label><input type="checkbox" checked={!!f.artChange} onChange={e=>F('artChange',e.target.checked)}/> Alterar design da arte/vídeo</label><label><input type="checkbox" checked={!!f.text} onChange={e=>F('text',e.target.checked)}/> Alterar texto na arte/vídeo</label><label><input type="checkbox" checked={!!f.captionChange} onChange={e=>F('captionChange',e.target.checked)}/> Alterar legenda</label><textarea value={f.description||''} onChange={e=>F('description',e.target.value)} placeholder="Descreva as alterações que você gostaria de aplicar"/><button className="status-tinted" style={canRequest?buttonStyle('alteracao'):undefined} disabled={!canRequest} onClick={requestChange}>Solicitar alteração</button>{hasChange&&!canRequest&&<small>Descreva o motivo para liberar a solicitação.</small>}</div> 
 }
 function DriveAdaptiveMedia({url}){
   const [fallback,setFallback]=useState(false);
@@ -4727,6 +4759,9 @@ function CompanyEditor({c,users=[],save,cancel,onArchive,onDelete}){
   return <div className="modal-bg"><div className="modal"><ModalDismiss onClose={cancel}/><h2>Empresa</h2><label>Nome<input value={f.name||''} onChange={e=>set('name',e.target.value)}/></label><label>Instagram<input value={f.instagram} onChange={e=>set('instagram',e.target.value)}/></label><label>Logo ou link de imagem<input value={f.logo} onChange={e=>set('logo',e.target.value)} placeholder="Inicial, URL pública ou link do Drive"/><input type="file" accept="image/*" onChange={e=>handleImageUpload(e,v=>set('logo',v),`companies/${f.id||slug(f.name)||'pending'}`)}/></label><label>Entrada<input type="date" value={f.entryDate||''} onChange={e=>set('entryDate',e.target.value)}/></label>{isExisting&&<div className="danger-zone"><h3>Zona de risco</h3><p>Use arquivar para esconder sem perder histórico. Excluir remove o cadastro do painel.</p><div className="danger-zone-actions"><button onClick={()=>onArchive?.(f)}>{f.active===false?'Restaurar empresa':'Arquivar empresa'}</button><button className="danger-button" onClick={()=>onDelete?.(f)}>Excluir empresa</button></div></div>}<div className="modal-actions"><button onClick={cancel}>Cancelar</button><button className="primary" onClick={async()=>await save(f)}>Salvar</button></div></div></div>
 }
 
+function DiffDot({show}){
+  return show?<span className="item-custom-dot"/>:null;
+}
 function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleActive=null,onToggleOpen=null,children,accent=false,customized=false}){
   const hasToggle=typeof active==='boolean';
   return <div className="panel" style={{padding:0,overflow:'hidden',borderColor:open?'rgba(var(--accent-rgb),.48)':'var(--line)'}}>
@@ -4753,30 +4788,27 @@ function AccessConfigCard({title,active=null,disabled=false,open=false,onToggleA
   </div>;
 }
 
-function TaskOpenPermissionList({config,onTogglePermission,onToggleApproval,disabled=false}){
+function TaskOpenPermissionList({config,onTogglePermission,onToggleApproval,disabled=false,defaultConfig=null}){
   const nonEditable=['preview','stats','history'];
-  const mainTextStyle={
+  const mkTextStyle=(diff,size,lh)=>({
     display:'block',
     flex:1,
     textAlign:'left',
-    fontSize:12,
-    lineHeight:1.35,
-    color:'var(--muted)'
-  };
-  const editTextStyle={
-    display:'block',
-    flex:1,
-    textAlign:'left',
-    fontSize:11,
-    lineHeight:1.3,
-    color:'var(--muted)'
-  };
+    fontSize:size,
+    lineHeight:lh,
+    color:defaultConfig&&!diff?'var(--muted)':'var(--text)',
+    opacity:defaultConfig&&!diff?.62:1,
+  });
 
   return <div style={{display:'block',width:'100%',textAlign:'left'}}>
     {TASK_DETAIL_FIELDS.map(field=>{
       const visible=config?.visible?.[field.id]!==false;
       const editable=config?.editable?.[field.id]===true;
       const supportsEdit=!nonEditable.includes(field.id);
+      const defVisible=defaultConfig?defaultConfig?.visible?.[field.id]!==false:null;
+      const defEditable=defaultConfig?defaultConfig?.editable?.[field.id]===true:null;
+      const visibleDiff=defaultConfig!==null&&visible!==defVisible;
+      const editableDiff=defaultConfig!==null&&editable!==defEditable;
 
       return <div key={field.id} style={{width:'100%',borderBottom:'1px solid rgba(255,255,255,.08)',padding:'8px 4px',boxSizing:'border-box',textAlign:'left'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',width:'100%',gap:8,textAlign:'left'}}>
@@ -4787,7 +4819,8 @@ function TaskOpenPermissionList({config,onTogglePermission,onToggleApproval,disa
             onChange={e=>onTogglePermission('visible',field.id,e.target.checked)}
             style={{width:14,height:14,minWidth:14,margin:0,flex:'0 0 auto'}}
           />
-          <span style={mainTextStyle}>{field.label}</span>
+          <DiffDot show={visibleDiff}/>
+          <span style={mkTextStyle(visibleDiff,12,1.35)}>{field.label}</span>
         </div>
 
         {visible&&supportsEdit&&<div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',width:'100%',gap:8,marginTop:6,paddingLeft:22,textAlign:'left',boxSizing:'border-box'}}>
@@ -4798,7 +4831,8 @@ function TaskOpenPermissionList({config,onTogglePermission,onToggleApproval,disa
             onChange={e=>onTogglePermission('editable',field.id,e.target.checked)}
             style={{width:13,height:13,minWidth:13,margin:0,flex:'0 0 auto'}}
           />
-          <span style={editTextStyle}>Permitir edição</span>
+          <DiffDot show={editableDiff}/>
+          <span style={mkTextStyle(editableDiff,11,1.3)}>Permitir edição</span>
         </div>}
       </div>;
     })}
@@ -4811,7 +4845,8 @@ function TaskOpenPermissionList({config,onTogglePermission,onToggleApproval,disa
         onChange={e=>onToggleApproval(e.target.checked)}
         style={{width:14,height:14,minWidth:14,margin:0,flex:'0 0 auto'}}
       />
-      <span style={mainTextStyle}>Aprovar posts ou solicitar alterações</span>
+      <DiffDot show={defaultConfig!==null&&(config?.canApprovePosts===true)!==(defaultConfig?.canApprovePosts===true)}/>
+      <span style={mkTextStyle(defaultConfig!==null&&(config?.canApprovePosts===true)!==(defaultConfig?.canApprovePosts===true),12,1.35)}>Aprovar posts ou solicitar alterações</span>
     </div>
   </div>;
 }
@@ -5130,9 +5165,9 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
     if(panel.id==='tasks') return <div className="access-tasks-groups">
       <h3>Visualizações disponíveis</h3>
       <div className="checks one-col compact-checks-v3 task-view-visibility-checks">
-        <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.kanban===true} onChange={e=>toggleTaskViewVisibility('kanban',e.target.checked)}/>Exibir Kanban</label>
-        <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.calendar===true} onChange={e=>toggleTaskViewVisibility('calendar',e.target.checked)}/>Exibir Calendário</label>
-        <label><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.tasks===true} onChange={e=>toggleTaskViewVisibility('tasks',e.target.checked)}/>Exibir Listas</label>
+        {(()=>{const diff=panelPermissionMode==='custom'&&resolvedVisible.kanban!==defaultIds.includes('kanban');return <label style={!diff?{opacity:.62}:undefined}><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.kanban===true} onChange={e=>toggleTaskViewVisibility('kanban',e.target.checked)}/><DiffDot show={diff}/>Exibir Kanban</label>;})()}
+        {(()=>{const diff=panelPermissionMode==='custom'&&resolvedVisible.calendar!==defaultIds.includes('calendar');return <label style={!diff?{opacity:.62}:undefined}><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.calendar===true} onChange={e=>toggleTaskViewVisibility('calendar',e.target.checked)}/><DiffDot show={diff}/>Exibir Calendário</label>;})()}
+        {(()=>{const diff=panelPermissionMode==='custom'&&resolvedVisible.tasks!==defaultIds.includes('tasks');return <label style={!diff?{opacity:.62}:undefined}><input type="checkbox" disabled={editingOtherAdmin||panelPermissionMode!=='custom'} checked={resolvedVisible.tasks===true} onChange={e=>toggleTaskViewVisibility('tasks',e.target.checked)}/><DiffDot show={diff}/>Exibir Listas</label>;})()}
       </div>
       {panelPermissionMode!=='custom'&&<small className="muted">Para alterar quais visualizações aparecem, ative "Este usuário usa acesso personalizado?" no topo da tela.</small>}
       <h3 style={{marginTop:18,display:'flex',alignItems:'center',gap:7}}>{kanbanDiff&&<span className="item-custom-dot"/>}<span style={{opacity:kanbanDiff?1:.62}}>Kanban</span></h3><div className="checks one-col compact-checks-v3" style={kanbanInheritance!=='custom'?{pointerEvents:'none'}:undefined}>{KANBAN_PERMISSION_ITEMS.map(item=>{const itemDiff=kanbanConfig?.[item.id]!==(roleDefault.kanban||builtInKanbanPermissionsForRole(f.role))?.[item.id];return <label key={`kanban:${item.id}`} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={kanbanConfig?.[item.id]===true} onChange={e=>toggleKanbanPermission(item.id,e.target.checked)}/>{item.label}</label>;})}</div>
@@ -5174,27 +5209,29 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
     {!masterCustom&&<p className="muted" style={{marginTop:-6,marginBottom:10}}>As seções abaixo mostram o padrão da função, só pra consulta. Ative a personalização acima pra poder editar.</p>}
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
       {f.role!=='admin'&&<AccessConfigCard title="Status disponíveis" open={openSection==='rule:statuses'} onToggleOpen={()=>toggleSection('rule:statuses')} accent customized={statusesDiff}>
-        <label style={{color:statusInheritance==='custom'?'var(--gold)':undefined}}>Configuração dos status<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
-        <div style={statusInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-          <StatusVisibilityChecks statuses={statuses} selected={statusInheritance==='custom'?(f.visibleStatuses||[]):(roleDefault.visibleStatuses||[])} onToggle={toggleStatus}/>
+        <div style={statusInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+          <StatusVisibilityChecks statuses={statuses} selected={statusInheritance==='custom'?(f.visibleStatuses||[]):(roleDefault.visibleStatuses||[])} onToggle={toggleStatus} defaultSelected={roleDefault.visibleStatuses||[]}/>
         </div>
       </AccessConfigCard>}
 
       {f.role!=='admin'&&<AccessConfigCard title="Tipos de tarefas disponíveis" open={openSection==='rule:types'} onToggleOpen={()=>toggleSection('rule:types')} accent customized={typesDiff}>
-        <label style={{color:typeInheritance==='custom'?'var(--gold)':undefined}}>Configuração dos tipos<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
-        <div style={typeInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-          <TaskTypeVisibilityChecks selected={typeInheritance==='custom'?(f.visibleTypes||[]):(roleDefault.visibleTypes||TASK_TYPES)} onToggle={toggleType}/>
+        <div style={typeInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+          <TaskTypeVisibilityChecks selected={typeInheritance==='custom'?(f.visibleTypes||[]):(roleDefault.visibleTypes||TASK_TYPES)} onToggle={toggleType} defaultSelected={roleDefault.visibleTypes||TASK_TYPES}/>
         </div>
       </AccessConfigCard>}
 
       <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent customized={taskDetailDiff}>
-        <label style={{color:taskDetailInheritance==='custom'?'var(--gold)':undefined}}>Configuração da tarefa aberta<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
-        <div style={taskDetailInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
+        <div style={taskDetailInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
           <TaskOpenPermissionList
             config={taskDetailConfig}
             disabled={editingOtherAdmin||taskDetailInheritance!=='custom'}
             onToggleApproval={checked=>setTaskDetailAction('canApprovePosts',checked)}
             onTogglePermission={toggleTaskDetailPermission}
+            defaultConfig={{
+              canApprovePosts:roleDefault.tasks?.canApprovePosts===true,
+              visible:roleDefault.tasks?.detailFields?.visible||{},
+              editable:roleDefault.tasks?.detailFields?.editable||{},
+            }}
           />
         </div>
       </AccessConfigCard>
@@ -5208,11 +5245,10 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
         onToggleActive={checked=>setTaskPermission('canCreate',checked)}
         customized={actionsDiff}
       >
-        <label style={{color:actionsInheritance==='custom'?'var(--gold)':undefined}}>Configuração do botão<small className="muted" style={{marginLeft:8}}>{masterCustom?'(personalizado)':'(padrão da função)'}</small></label>
-        <div style={actionsInheritance!=='custom'?{opacity:.62,pointerEvents:'none'}:undefined}>
-          <label>Texto do botão<select value={actionConfig?.creationMode||'task'} onChange={e=>setTaskPermission('creationMode',e.target.value)}><option value="task">Nova tarefa</option><option value="request">Nova solicitação</option></select></label>
+        <div style={actionsInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
+          {(()=>{const diff=(actionConfig?.creationMode||'task')!==(roleDefault.tasks?.creationMode||'task');return <label style={!diff?{opacity:.62}:undefined}>Texto do botão<DiffDot show={diff}/><select value={actionConfig?.creationMode||'task'} onChange={e=>setTaskPermission('creationMode',e.target.value)}><option value="task">Nova tarefa</option><option value="request">Nova solicitação</option></select></label>;})()}
           <h4 style={{margin:'14px 0 8px'}}>Campos disponíveis</h4>
-          <div className="checks one-col compact-checks-v3">{CREATE_TASK_FIELDS.map(field=><label key={field.id}><input type="checkbox" checked={actionConfig?.createFields?.[field.id]===true} onChange={e=>toggleCreateField(field.id,e.target.checked)}/>{field.label}</label>)}</div>
+          <div className="checks one-col compact-checks-v3">{CREATE_TASK_FIELDS.map(field=>{const diff=(actionConfig?.createFields?.[field.id]===true)!==((roleDefault.tasks?.createFields?.[field.id])===true);return <label key={field.id} className={diff?'custom-access-field':undefined} style={!diff?{opacity:.62}:undefined}><input type="checkbox" checked={actionConfig?.createFields?.[field.id]===true} onChange={e=>toggleCreateField(field.id,e.target.checked)}/><DiffDot show={diff}/>{field.label}</label>;})}</div>
         </div>
       </AccessConfigCard>
     </div>
