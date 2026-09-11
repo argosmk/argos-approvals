@@ -6001,19 +6001,23 @@ function NotificationDeliverySettings({currentUser,statuses}){
       </div>
       <h3 style={{marginTop:22}}>Lembretes por status</h3>
       <p className="muted">Ative só os status que precisam cobrar alguém quando a tarefa ficar parada.</p>
-      <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        {(statuses||[]).map(status=>{const rule=ruleFor(status.id);return <div className="panel" key={status.id} style={{padding:12,borderLeft:`3px solid ${status.color}`}}>
-          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <label style={{margin:0,display:'flex',alignItems:'center',gap:7}}><input type="checkbox" checked={rule.enabled===true} onChange={e=>updateRule(status.id,{enabled:e.target.checked})}/><b>{status.name}</b></label>
-            {rule.enabled===true&&<>
+      <div className="checks one-col status-notify-list compact-checks-v3" style={{gap:0}}>
+        {(statuses||[]).map(status=>{const rule=ruleFor(status.id);return <div key={status.id} style={{padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.07)'}}>
+          <label style={{margin:0,minHeight:28,display:'flex',alignItems:'center',gap:8}}>
+            <input type="checkbox" checked={rule.enabled===true} onChange={e=>updateRule(status.id,{enabled:e.target.checked})}/>
+            <span className="status-dot" style={{background:status.color}}></span>
+            <span>{status.name}</span>
+          </label>
+          {rule.enabled===true&&<div style={{margin:'8px 0 4px 24px'}}>
+            <div className="checks one-col compact-checks-v3" style={{gap:4,marginBottom:10}}>
               <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('client_approvers')} onChange={e=>toggleTarget(status.id,'client_approvers',e.target.checked)}/> Clientes aprovadores</label>
               <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('task_responsible')} onChange={e=>toggleTarget(status.id,'task_responsible',e.target.checked)}/> Responsável da tarefa</label>
               <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('admins')} onChange={e=>toggleTarget(status.id,'admins',e.target.checked)}/> Admins</label>
-            </>}
-          </div>
-          {rule.enabled===true&&<div className="form-two" style={{marginTop:10}}>
-            <label>Primeiro lembrete após (min)<input type="number" min="0" value={rule.firstAfterMinutes} onChange={e=>updateRule(status.id,{firstAfterMinutes:e.target.value})}/></label>
-            <label>Repetir a cada (min)<input type="number" min="1" value={rule.intervalMinutes} onChange={e=>updateRule(status.id,{intervalMinutes:e.target.value})}/></label>
+            </div>
+            <div className="form-two">
+              <label>Primeiro lembrete após (min)<input type="number" min="0" value={rule.firstAfterMinutes} onChange={e=>updateRule(status.id,{firstAfterMinutes:e.target.value})}/></label>
+              <label>Repetir a cada (min)<input type="number" min="1" value={rule.intervalMinutes} onChange={e=>updateRule(status.id,{intervalMinutes:e.target.value})}/></label>
+            </div>
           </div>}
         </div>})}
       </div>
