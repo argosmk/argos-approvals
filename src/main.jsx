@@ -5476,7 +5476,6 @@ function AccessDefaultsEditor({system,setSystem,statuses=[],currentUser=null}){
     return <p className="muted">As configurações internas deste painel serão adicionadas no módulo correspondente. A visibilidade já está funcional.</p>;
   }
   return <div className="settings-section">
-    <NotificationDeliverySettings currentUser={currentUser} statuses={statuses}/>
     <div className="view-tabs access-role-tabs">{[['team','Equipe'],['client','Responsável'],['order','Ordenação']].map(([id,label])=><button key={id} className={mode===id?'active primary':''} aria-pressed={mode===id} onClick={()=>setMode(id)}>{label}</button>)}</div>
     {mode==='order'?<div className="panel access-order-panel"><h2>Ordenação dos painéis</h2><p className="muted">Define a ordem-base da barra lateral para todos os perfis. Financeiro e Configurações aparecem somente para Admin, mas também respeitam esta ordem.</p><div className="access-order-list">{panelOrder.map((id,index)=>{const panel=SIDEBAR_PANEL_CATALOG.find(item=>item.id===id);return <div className="access-order-row" key={id}><b>{index+1}. {panel?.label||id}</b><div><button onClick={()=>moveSidebarPanel(index,-1)} disabled={index===0}>↑ Subir</button><button onClick={()=>moveSidebarPanel(index,1)} disabled={index===panelOrder.length-1}>↓ Descer</button></div></div>})}</div><div className="modal-actions"><button onClick={restorePanelOrder}>Restaurar ordem</button><button className="primary" onClick={savePanelOrder}>Salvar ordenação</button></div></div>:<div className="panel"><h2>Padrão de {roleLabel}</h2>
 
@@ -5491,10 +5490,14 @@ function AccessDefaultsEditor({system,setSystem,statuses=[],currentUser=null}){
         </AccessConfigCard>}
 
         <AccessConfigCard title="Notificações e alertas" open={openSection==='rule:notifications'} onToggleOpen={()=>toggleSection('rule:notifications')} accent>
-          <p className="muted" style={{marginTop:0}}>Mudanças de status só avisam sobre status que também estejam liberados em "Status disponíveis".</p>
+          <h4 style={{marginTop:0}}>Eventos desta função</h4>
+          <p className="muted">Mudanças de status só avisam sobre status que também estejam liberados em "Status disponíveis".</p>
           <div className="checks one-col compact-checks-v3">
             <label><input type="checkbox" checked={statusChangeNotificationsEnabled(draft.notificationStatusPrefs||{},role)} onChange={e=>setDraftValue('notificationStatusPrefs',{__all__:e.target.checked})}/>Mudança de status</label>
             {NOTIFICATION_VISIBLE_EVENTS.map(ev=><label key={ev}><input type="checkbox" checked={(draft.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}
+          </div>
+          <div style={{marginTop:18,paddingTop:16,borderTop:'1px solid var(--line)'}}>
+            <NotificationDeliverySettings currentUser={currentUser} statuses={statuses}/>
           </div>
         </AccessConfigCard>
 
@@ -6025,16 +6028,21 @@ function NotificationDeliverySettings({currentUser,statuses}){
         <label>Aguardar antes de avisar cliente (min)<input type="number" min="0" max="1440" value={form.clientApprovalDelayMinutes} onChange={e=>setForm(prev=>({...prev,clientApprovalDelayMinutes:e.target.value}))}/></label>
         <label>Ignorar push se ativo nos últimos (seg)<input type="number" min="0" max="3600" value={form.presenceGraceSeconds} onChange={e=>setForm(prev=>({...prev,presenceGraceSeconds:e.target.value}))}/></label>
       </div>
-      <h3 style={{marginTop:22}}>Lembretes por status</h3>
-      <p className="muted">Ative só os status que precisam cobrar alguém quando a tarefa ficar parada.</p>
-      <div className="checks one-col status-notify-list compact-checks-v3" style={{gap:0}}>
-        {(statuses||[]).map(status=>{const rule=ruleFor(status.id);return <div key={status.id} style={{padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.07)'}}>
-          <label style={{margin:0,minHeight:28,display:'flex',alignItems:'center',gap:8}}>
-            <input type="checkbox" checked={rule.enabled===true} onChange={e=>updateRule(status.id,{enabled:e.target.checked})}/>
+      <h3 style={{marginTop:22}}>Regras de lembrete</h3>
+      <p className="muted">"Status disponíveis" controla quem pode receber. Aqui você só define a cobrança automática, os destinatários e os tempos de cada fluxo.</p>
+      <div className="status-notify-list compact-checks-v3" style={{display:'flex',flexDirection:'column',gap:0}}>
+        {(statuses||[]).map(status=>{const rule=ruleFor(status.id);return <div key={status.id} style={{padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,.07)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,minHeight:32}}>
             <span className="status-dot" style={{background:status.color}}></span>
-            <span>{status.name}</span>
-          </label>
-          {rule.enabled===true&&<div style={{margin:'8px 0 4px 24px'}}>
+            <b style={{flex:1}}>{status.name}</b>
+            <label style={{margin:0,display:'flex',alignItems:'center',gap:6}}>Lembrete
+              <select value={rule.enabled===true?'on':'off'} onChange={e=>updateRule(status.id,{enabled:e.target.value==='on'})}>
+                <option value="off">Desligado</option>
+                <option value="on">Ativo</option>
+              </select>
+            </label>
+          </div>
+          {rule.enabled===true&&<div style={{margin:'10px 0 4px 24px'}}>
             <div className="checks one-col compact-checks-v3" style={{gap:4,marginBottom:10}}>
               <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('client_approvers')} onChange={e=>toggleTarget(status.id,'client_approvers',e.target.checked)}/> Clientes aprovadores</label>
               <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('task_responsible')} onChange={e=>toggleTarget(status.id,'task_responsible',e.target.checked)}/> Responsável da tarefa</label>
