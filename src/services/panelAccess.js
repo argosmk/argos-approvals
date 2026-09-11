@@ -116,17 +116,9 @@ export const KANBAN_PERMISSION_ITEMS = Object.freeze([
 
 export const NOTIFICATION_PANEL_PERMISSION_ITEMS = Object.freeze([
   Object.freeze({id:'showTabs',label:'Pendentes e concluídas'}),
-  Object.freeze({id:'canEnableAlerts',label:'Ativar som e notificações'}),
-  Object.freeze({id:'canOpenTasks',label:'Abrir tarefas'}),
   Object.freeze({id:'canComplete',label:'Concluir notificações'}),
   Object.freeze({id:'canCompleteAll',label:'Concluir todas as pendentes'}),
   Object.freeze({id:'canDeleteCompleted',label:'Limpar notificações concluídas'}),
-  Object.freeze({id:'showDateTime',label:'Data e hora'}),
-  Object.freeze({id:'showCompany',label:'Empresa'}),
-  Object.freeze({id:'showResponsible',label:'Responsável'}),
-  Object.freeze({id:'showPostDate',label:'Data do post'}),
-  Object.freeze({id:'showDeadline',label:'Prazo'}),
-  Object.freeze({id:'showStatus',label:'Status'}),
 ]);
 
 export function builtInNotificationPanelPermissionsForRole(role){
