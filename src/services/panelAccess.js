@@ -491,7 +491,7 @@ export function builtInAccessDefaultForRole(role){
     visibleStatuses:normalizedRole==='admin'?[]:(normalizedRole==='team'?[...TEAM_DEFAULT]:[...CLIENT_DEFAULT]),
     visibleTypes:normalizedRole==='admin'?[]:[...TASK_TYPES],
     notificationPrefs:defaultNotificationPrefsForRole(normalizedRole),
-    notificationStatusPrefs:{},
+    notificationStatusPrefs:{__all__:normalizedRole!=='client'},
     notificationPanel:builtInNotificationPanelPermissionsForRole(normalizedRole),
     dashboard:{visible:fullDashboardVisibility()},
     tasks:builtInTaskPermissionsForRole(normalizedRole),

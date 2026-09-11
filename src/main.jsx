@@ -138,11 +138,21 @@ const SYSTEM_NOISE_PATTERNS = [/timer/i,/tarefa acessada/i,/inatividade/i,/fecha
 function isSystemNoise(text=''){ return SYSTEM_NOISE_PATTERNS.some(rx=>rx.test(String(text||''))); }
 const LOG_NOISE_PATTERNS = [/timer/i,/tarefa acessada/i,/inatividade/i,/fechar a tela/i,/sair da tarefa/i,/trocar de tarefa/i,/campo/i,/copy/i,/legenda/i,/links? de visualiza/i,/instruções/i,/instrucoes/i];
 function isLogNoise(text=''){ return LOG_NOISE_PATTERNS.some(rx=>rx.test(String(text||''))); }
+function statusChangeNotificationsEnabled(statusPrefs={},role='team'){
+  if(typeof statusPrefs?.__all__==='boolean') return statusPrefs.__all__;
+  const legacy=Object.entries(statusPrefs||{}).filter(([key])=>key!=='__all__');
+  if(legacy.length) return legacy.some(([,value])=>value!==false);
+  return role!=='client';
+}
 function wantsNotification(user, event, statusId){
-  if(!user?.active || user.role==='client') return false;
-  const statusPrefs=user.notificationStatusPrefs||{};
+  if(!user?.active) return false;
   if(event==='Status da tarefa'){
-    return !!statusId && (statusPrefs[statusId]??true);
+    if(!statusId) return false;
+    if(user.role!=='admin'){
+      const visibleStatuses=Array.isArray(user.visibleStatuses)?user.visibleStatuses:[];
+      if(!visibleStatuses.includes(statusId)) return false;
+    }
+    return statusChangeNotificationsEnabled(user.notificationStatusPrefs||{},user.role);
   }
   if(BLOCKED_NOTIFICATION_EVENTS.has(event)) return false;
   if(!NOTIFICATION_VISIBLE_EVENTS.includes(event)) return false;
@@ -5095,9 +5105,12 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   // a valor em vez de olhar só o modo.
   const statusesDiff=!deepPermEqual(f.visibleStatuses||[], roleDefault.visibleStatuses||[]);
   const typesDiff=!deepPermEqual(f.visibleTypes||TASK_TYPES, roleDefault.visibleTypes||TASK_TYPES);
-  const notificationsDiff=!deepPermEqual(notificationPanelConfig, roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role))
-    || !deepPermEqual(f.notificationPrefs||[], roleDefault.notificationPrefs||[])
-    || !deepPermEqual(f.notificationStatusPrefs||{}, roleDefault.notificationStatusPrefs||{});
+  const notificationPanelDiff=!deepPermEqual(notificationPanelConfig, roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role));
+  const statusNotificationsEnabled=statusChangeNotificationsEnabled(f.notificationStatusPrefs||{},f.role);
+  const defaultStatusNotificationsEnabled=statusChangeNotificationsEnabled(roleDefault.notificationStatusPrefs||{},f.role);
+  const notificationRulesDiff=!deepPermEqual(f.notificationPrefs||[], roleDefault.notificationPrefs||[])
+    || statusNotificationsEnabled!==defaultStatusNotificationsEnabled;
+  const notificationsDiff=notificationPanelDiff||notificationRulesDiff;
   const dashboardResolvedVisible=dashboardInheritance==='custom'?(f.dashboardPermissions?.visible||{}):(roleDefault.dashboard?.visible||fullDashboardVisibility());
   const dashboardDiff=!deepPermEqual(dashboardResolvedVisible, roleDefault.dashboard?.visible||fullDashboardVisibility());
   const actionsDiff=!deepPermEqual(
@@ -5216,11 +5229,12 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
         </div>
       </AccessConfigCard>}
 
-      <AccessConfigCard title="Notificações e alertas" open={openSection==='rule:notifications'} onToggleOpen={()=>toggleSection('rule:notifications')} accent customized={notificationsDiff}>
+      <AccessConfigCard title="Notificações e alertas" open={openSection==='rule:notifications'} onToggleOpen={()=>toggleSection('rule:notifications')} accent customized={notificationRulesDiff}>
         <div style={notificationInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
-          <div className="notification-prefs-grid">
-            <div><h3>Eventos que geram notificação</h3><div className="checks one-col compact-checks-v3">{events.map(ev=>{const itemDiff=(roleDefault.notificationPrefs||[]).includes(ev)!==(f.notificationPrefs||[]).includes(ev);return <label key={ev} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={(f.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>;})}</div></div>
-            <div><h3>Status que geram notificação</h3><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=>{const itemDiff=(roleDefault.notificationStatusPrefs?.[st.id]??true)!==(f.notificationStatusPrefs?.[st.id]??true);return <label key={st.id} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={f.notificationStatusPrefs?.[st.id]??true} onChange={e=>set('notificationStatusPrefs',{...(f.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>;})}</div></div>
+          <p className="muted" style={{marginTop:0}}>As notificações de mudança de status só são geradas para status liberados em "Status disponíveis".</p>
+          <div className="checks one-col compact-checks-v3">
+            {(()=>{const itemDiff=statusNotificationsEnabled!==defaultStatusNotificationsEnabled;return <label className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={statusNotificationsEnabled} onChange={e=>set('notificationStatusPrefs',{__all__:e.target.checked})}/>Mudança de status</label>;})()}
+            {events.map(ev=>{const itemDiff=(roleDefault.notificationPrefs||[]).includes(ev)!==(f.notificationPrefs||[]).includes(ev);return <label key={ev} className={itemDiff?'custom-access-field':undefined} style={!itemDiff?{opacity:.62}:undefined}>{itemDiff&&<span className="item-custom-dot"/>}<input type="checkbox" checked={(f.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>;})}
           </div>
         </div>
       </AccessConfigCard>
@@ -5265,7 +5279,7 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
         const enabled=panel.id==='tasks'?['kanban','calendar','tasks'].some(id=>resolvedVisible[id]===true):resolvedVisible[panel.id]===true;
         const sectionId=`panel:${panel.id}`;
         const panelCustomizedMap={
-          notifications:notificationsDiff,
+          notifications:notificationPanelDiff,
           dashboard:dashboardDiff,
           tasks:kanbanDiff||calendarDiff||tasksListDiff,
           teamhub:portfolioDiff,
@@ -5477,7 +5491,11 @@ function AccessDefaultsEditor({system,setSystem,statuses=[],currentUser=null}){
         </AccessConfigCard>}
 
         <AccessConfigCard title="Notificações e alertas" open={openSection==='rule:notifications'} onToggleOpen={()=>toggleSection('rule:notifications')} accent>
-          <div className="notification-prefs-grid"><div><h4>Eventos</h4><div className="checks one-col compact-checks-v3">{NOTIFICATION_VISIBLE_EVENTS.map(ev=><label key={ev}><input type="checkbox" checked={(draft.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}</div></div><div><h4>Status que geram notificação</h4><div className="checks one-col status-notify-list compact-checks-v3">{statuses.map(st=><label key={st.id}><input type="checkbox" checked={(draft.notificationStatusPrefs?.[st.id]??true)} onChange={e=>setDraftValue('notificationStatusPrefs',{...(draft.notificationStatusPrefs||{}),[st.id]:e.target.checked})}/><span className="status-dot" style={{background:st.color}}></span>{st.name}</label>)}</div></div></div>
+          <p className="muted" style={{marginTop:0}}>Mudanças de status só avisam sobre status que também estejam liberados em "Status disponíveis".</p>
+          <div className="checks one-col compact-checks-v3">
+            <label><input type="checkbox" checked={statusChangeNotificationsEnabled(draft.notificationStatusPrefs||{},role)} onChange={e=>setDraftValue('notificationStatusPrefs',{__all__:e.target.checked})}/>Mudança de status</label>
+            {NOTIFICATION_VISIBLE_EVENTS.map(ev=><label key={ev}><input type="checkbox" checked={(draft.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}
+          </div>
         </AccessConfigCard>
 
         <AccessConfigCard title="Tarefa aberta" open={openSection==='rule:taskDetail'} onToggleOpen={()=>toggleSection('rule:taskDetail')} accent>
