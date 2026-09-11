@@ -17,8 +17,8 @@ jobs:
       - name: Rebuild and apply patch
         run: |
           cat tmp/argos_patch_parts/part*.b64 | base64 -d > /tmp/argos.patch
-          git apply --check /tmp/argos.patch
-          git apply /tmp/argos.patch
+          git apply --3way --check /tmp/argos.patch
+          git apply --3way /tmp/argos.patch
       - name: Validate scope
         run: |
           ! grep -q "andre@argosmk.com" src/main.jsx
