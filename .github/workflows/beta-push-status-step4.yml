@@ -1,0 +1,37 @@
+name: Beta push status step 4
+on:
+  push:
+    branches: [beta]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[push-status-step4]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+      - name: Apply exact patch
+        run: python scripts/refactor_push_status_gate_step4.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Build app
+        run: npm run build
+      - name: Syntax check edge function
+        run: npx esbuild supabase/functions/process-notification-push-queue/index.ts --outfile=/tmp/push-worker-check.js --format=esm --platform=neutral --external:npm:*
+      - name: Validate scope
+        run: |
+          grep -q 'visible_statuses,notification_prefs' supabase/functions/process-notification-push-queue/index.ts
+          grep -q 'status_not_visible' supabase/functions/process-notification-push-queue/index.ts
+          grep -q 'notification_event_disabled' supabase/functions/process-notification-push-queue/index.ts
+          grep -q 'profileCanSeeStatus(profile, task?.status)' supabase/functions/process-notification-push-queue/index.ts
+      - name: Commit clean step
+        run: |
+          git config user.name "ARGOS Refactor Bot"
+          git config user.email "actions@github.com"
+          git add supabase/functions/process-notification-push-queue/index.ts
+          git rm scripts/refactor_push_status_gate_step4.py .github/workflows/beta-push-status-step4.yml
+          git commit -m "Beta: faz push e lembretes respeitarem acesso [push-status-step4]"
+          git push origin HEAD:beta
