@@ -33,3 +33,4 @@ jobs:
           git rm scripts/integrate_reminders_into_notifications_step5.py .github/workflows/beta-integrate-reminders-step5.yml
           git commit -m "Beta: integra lembretes em notificações [integrate-reminders-step5]"
           git push origin HEAD:beta
+# rerun 2
