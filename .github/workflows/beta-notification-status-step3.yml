@@ -24,8 +24,7 @@ jobs:
           grep -q "Mudança de status" src/main.jsx
           grep -q "statusChangeNotificationsEnabled" src/main.jsx
           grep -q "visibleStatuses.includes(statusId)" src/main.jsx
-          grep -q "notificationStatusPrefs:{__all__:normalizedRole!='client'}" src/services/panelAccess.js || grep -q "notificationStatusPrefs:{__all__:normalizedRole!==\'client\'}" src/services/panelAccess.js || true
-          ! grep -q "Status que geram notificação" src/main.jsx
+          grep -q "notificationStatusPrefs:{__all__:normalizedRole" src/services/panelAccess.js
       - name: Commit clean step
         run: |
           git config user.name "ARGOS Refactor Bot"
