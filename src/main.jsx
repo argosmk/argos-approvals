@@ -5907,7 +5907,7 @@ function PublicPortfolioSettings({currentUser}){
 function AppearanceSettings({system,setSystem}){
   const [f,setF]=useState({...system,accentColor:normalizeAccentColor(system?.accentColor)});
   useEffect(()=>{setF({...system,accentColor:normalizeAccentColor(system?.accentColor)});},[system]);
-  const set=(k,v)=>setF({...f,[k]:v});
+  const set=(k,v)=>setF(prev=>({...prev,[k]:v}));
   const saveAppearance=()=>{
     const next={...f,accentColor:normalizeAccentColor(f.accentColor)};
     setF(next);
