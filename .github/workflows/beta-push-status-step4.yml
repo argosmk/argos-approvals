@@ -20,7 +20,7 @@ jobs:
       - name: Build app
         run: npm run build
       - name: Syntax check edge function
-        run: npx esbuild supabase/functions/process-notification-push-queue/index.ts --outfile=/tmp/push-worker-check.js --format=esm --platform=neutral --external:npm:*
+        run: npx esbuild supabase/functions/process-notification-push-queue/index.ts --bundle --outfile=/tmp/push-worker-check.js --format=esm --platform=neutral --external:npm:*
       - name: Validate scope
         run: |
           grep -q 'visible_statuses,notification_prefs' supabase/functions/process-notification-push-queue/index.ts
