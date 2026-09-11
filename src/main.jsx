@@ -7,7 +7,7 @@ import { bootstrapTasksFromTables, loadTaskRecords, syncTaskListDelta } from './
 import { bootstrapNotificationsFromTable, loadNotificationRecords, syncNotificationListDelta } from './services/notificationTableService';
 import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, updateProfileNotificationPrefs } from './services/profileTableService';
 import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSettings } from './services/publicPortfolioService';
-import { loadApprovalReminderSettings, saveApprovalReminderSettings } from './services/approvalReminderSettingsService';
+import { loadNotificationDeliverySettings, saveNotificationDeliverySettings } from './services/notificationDeliverySettingsService';
 import {
   CALENDAR_PERMISSION_ITEMS,
   CREATE_TASK_FIELDS,
@@ -5327,7 +5327,7 @@ function UserEditor({u,companies=[],statuses,save,cancel,clientMode=false,curren
   </div></div>
 }
 
-function AccessDefaultsEditor({system,setSystem,statuses=[]}){
+function AccessDefaultsEditor({system,setSystem,statuses=[],currentUser=null}){
   const [mode,setMode]=useState('team');
   const role=mode==='client'?'client':'team';
   const [draft,setDraft]=useState(()=>clonePayload(accessDefaultForRole(system,'team')));
@@ -5458,6 +5458,7 @@ function AccessDefaultsEditor({system,setSystem,statuses=[]}){
     return <p className="muted">As configurações internas deste painel serão adicionadas no módulo correspondente. A visibilidade já está funcional.</p>;
   }
   return <div className="settings-section">
+    <NotificationDeliverySettings currentUser={currentUser} statuses={statuses}/>
     <div className="view-tabs access-role-tabs">{[['team','Equipe'],['client','Responsável'],['order','Ordenação']].map(([id,label])=><button key={id} className={mode===id?'active primary':''} aria-pressed={mode===id} onClick={()=>setMode(id)}>{label}</button>)}</div>
     {mode==='order'?<div className="panel access-order-panel"><h2>Ordenação dos painéis</h2><p className="muted">Define a ordem-base da barra lateral para todos os perfis. Financeiro e Configurações aparecem somente para Admin, mas também respeitam esta ordem.</p><div className="access-order-list">{panelOrder.map((id,index)=>{const panel=SIDEBAR_PANEL_CATALOG.find(item=>item.id===id);return <div className="access-order-row" key={id}><b>{index+1}. {panel?.label||id}</b><div><button onClick={()=>moveSidebarPanel(index,-1)} disabled={index===0}>↑ Subir</button><button onClick={()=>moveSidebarPanel(index,1)} disabled={index===panelOrder.length-1}>↓ Descer</button></div></div>})}</div><div className="modal-actions"><button onClick={restorePanelOrder}>Restaurar ordem</button><button className="primary" onClick={savePanelOrder}>Salvar ordenação</button></div></div>:<div className="panel"><h2>Padrão de {roleLabel}</h2>
 
@@ -5704,9 +5705,9 @@ function SettingsPage({statuses,setStatuses,tasks,setTasks,companies,setCompanie
   function del(s){ if(tasks.some(t=>t.status===s.id)) return alert('Existem tarefas usando este status. Mova essas tarefas antes de excluir.'); setStatuses(statuses.filter(x=>x.id!==s.id)); } 
   function saveStatus(s){ const next={...s,id:s.id||slug(s.name)}; setStatuses(statuses.some(x=>x.id===next.id)?statuses.map(x=>x.id===next.id?next:x):[...statuses,next]); setEditing(null); notifySettingsSaved('Status salvo'); } 
   function moveStatus(index,direction){ const target=index+direction; if(target<0||target>=statuses.length) return; const next=[...statuses]; [next[index],next[target]]=[next[target],next[index]]; setStatuses(next); } 
-  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['approvalReminders','Lembretes de aprovação'],['general','Aparência']];
+  const tabs=[['status','Status'],['accessDefaults','Padrões de acesso'],['companies','Empresas'],['clients','Responsáveis'],['team','Equipe'],['portfolioPublic','Portfólio público'],['general','Aparência']];
   if(currentUser?.role!=='admin') return <section><h1>Acesso negado</h1><div className="panel"><p className="muted">Configurações é uma área exclusiva de Admin.</p></div></section>;
-  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(var(--accent-rgb),.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='approvalReminders'&&<ApprovalReminderSettings currentUser={currentUser} statuses={statuses}/>} {tab==='general'&&<AppearanceSettings system={system} setSystem={setSystem}/>}</section> 
+  return <section><PanelTabsHeader title="Configurações" tabs={tabs} active={tab} onChange={setTab}/>{tab==='status'&&<div className="settings-section"><div className="section-header section-header-actions-only"><button className="primary" onClick={()=>setEditing({id:'',name:'',color:'#ffffff',active:true,final:false})}>+ Novo status</button></div><div className="client-grid compact-admin-grid status-grid" style={{display:'flex',flexDirection:'column',gap:12}}>{statuses.map((s,i)=><div className="panel" key={s.id} style={{borderLeft:`4px solid ${s.color}`,borderTop:'1px solid rgba(var(--accent-rgb),.25)','--status-color':s.color}}><h2>{s.name}</h2><small>{tasks.filter(t=>t.status===s.id).length} tarefa(s)</small><div className="row-actions"><button onClick={()=>moveStatus(i,-1)} disabled={i===0}>↑ Subir</button><button onClick={()=>moveStatus(i,1)} disabled={i===statuses.length-1}>↓ Descer</button><button onClick={()=>setEditing(s)}>Editar</button><button onClick={()=>del(s)}>Excluir</button></div></div>)}</div>{editing&&<StatusEditor s={editing} save={saveStatus} cancel={()=>setEditing(null)}/>}</div>}{tab==='accessDefaults'&&<AccessDefaultsEditor system={system} setSystem={setSystem} statuses={statuses} currentUser={currentUser}/>} {tab==='companies'&&<CompaniesPage companies={companies} setCompanies={setCompanies} tasks={tasks} setTasks={setTasks} users={users} setUsers={setUsers}/>} {tab==='clients'&&<ClientUsersPage users={users} setUsers={setUsers} companies={companies} statuses={statuses} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='team'&&<TeamPage users={users} setUsers={setUsers} statuses={statuses} tasks={tasks} currentUser={currentUser} accessDefaults={system?.accessDefaults}/>} {tab==='portfolioPublic'&&<PublicPortfolioSettings currentUser={currentUser}/>} {tab==='general'&&<AppearanceSettings system={system} setSystem={setSystem}/>}</section> 
 }
 function NotificationSettings({users,setUsers,statuses,currentUser=null}){
   const events=NOTIFICATION_VISIBLE_EVENTS;
@@ -5930,9 +5931,10 @@ function AppearanceSettings({system,setSystem}){
 }
 
 
-function ApprovalReminderSettings({currentUser,statuses}){
+function NotificationDeliverySettings({currentUser,statuses}){
   const organizationId=currentUser?.organizationId;
-  const [form,setForm]=useState({enabled:true,statusKeys:['aprovacao'],firstDayAfter:1,intervalDays:2});
+  const empty={enabled:true,teamDigestMinutes:30,clientApprovalDelayMinutes:5,presenceGraceSeconds:120,rules:[]};
+  const [form,setForm]=useState(empty);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [message,setMessage]=useState('');
@@ -5940,58 +5942,85 @@ function ApprovalReminderSettings({currentUser,statuses}){
 
   useEffect(()=>{
     let alive=true;
-    if(!organizationId){ setLoading(false); setError('Organização não identificada.'); return ()=>{alive=false}; }
+    if(!organizationId){setLoading(false);setError('Organização não identificada.');return()=>{alive=false};}
     (async()=>{
       try{
-        setLoading(true); setError('');
-        const data=await loadApprovalReminderSettings(organizationId);
-        if(alive) setForm(data);
-      }catch(err){ if(alive) setError(err.message||'Não foi possível carregar as configurações.'); }
-      finally{ if(alive) setLoading(false); }
+        setLoading(true);setError('');
+        const data=await loadNotificationDeliverySettings(organizationId);
+        if(alive)setForm({...empty,...data,rules:Array.isArray(data?.rules)?data.rules:[]});
+      }catch(err){if(alive)setError(err.message||'Não foi possível carregar as configurações de entrega.');}
+      finally{if(alive)setLoading(false);}
     })();
     return()=>{alive=false};
   },[organizationId]);
 
-  function toggleStatus(key){
+  function ruleFor(statusKey){
+    return (form.rules||[]).find(rule=>rule.statusKey===statusKey)||{
+      statusKey,enabled:false,targets:['client_approvers'],firstAfterMinutes:1440,intervalMinutes:2880
+    };
+  }
+  function updateRule(statusKey,patch){
     setForm(prev=>{
-      const has=(prev.statusKeys||[]).includes(key);
-      const next=has?prev.statusKeys.filter(k=>k!==key):[...(prev.statusKeys||[]),key];
-      return {...prev,statusKeys:next};
+      const rules=[...(prev.rules||[])];
+      const index=rules.findIndex(rule=>rule.statusKey===statusKey);
+      const base=index>=0?rules[index]:ruleFor(statusKey);
+      const next={...base,...patch,statusKey};
+      if(index>=0)rules[index]=next;else rules.push(next);
+      return {...prev,rules};
     });
   }
-
-  async function save(){
-    if(!(form.statusKeys||[]).length){ setError('Selecione pelo menos um status.'); setMessage(''); return; }
+  function toggleTarget(statusKey,target,checked){
+    const rule=ruleFor(statusKey);
+    const current=Array.isArray(rule.targets)?rule.targets:[];
+    const targets=checked?[...new Set([...current,target])]:current.filter(item=>item!==target);
+    updateRule(statusKey,{targets:targets.length?targets:['client_approvers']});
+  }
+  async function saveDelivery(){
     try{
-      setSaving(true); setError(''); setMessage('');
-      const saved=await saveApprovalReminderSettings(organizationId,form);
-      setForm(saved);
-      setMessage('Configurações de lembrete salvas.');
-      notifySettingsSaved('Lembretes de aprovação salvos');
-    }catch(err){ setError(err.message||'Não foi possível salvar as configurações.'); }
-    finally{ setSaving(false); }
+      setSaving(true);setError('');setMessage('');
+      const saved=await saveNotificationDeliverySettings(organizationId,form);
+      setForm({...empty,...saved,rules:Array.isArray(saved?.rules)?saved.rules:[]});
+      setMessage('Configurações de entrega salvas.');
+      notifySettingsSaved('Notificações e lembretes salvos');
+    }catch(err){setError(err.message||'Não foi possível salvar as configurações de entrega.');}
+    finally{setSaving(false);}
   }
 
-  if(loading) return <div className="settings-section"><div className="panel"><p>Carregando configurações...</p></div></div>;
-
-  return <div className="settings-section"><div className="panel approval-reminder-settings">
+  return <div className="panel" style={{marginBottom:18}}>
     <div className="public-portfolio-settings-head">
-      <div><p>Controla o lembrete automático (push) enviado ao cliente quando um post fica parado num status. A equipe/admin recebe notificação instantânea à parte, espelhando o sino interno, sem precisar de configuração aqui.</p></div>
-      <label className="public-portfolio-active"><input type="checkbox" checked={form.enabled} onChange={e=>setForm(prev=>({...prev,enabled:e.target.checked}))}/><span>Lembretes ativos</span></label>
+      <div><h2 style={{marginBottom:6}}>Entrega de push e lembretes</h2><p className="muted" style={{margin:0}}>Configuração única para agrupamento da equipe, aviso de aprovação, presença e lembretes por status.</p></div>
+      <label className="public-portfolio-active"><input type="checkbox" checked={form.enabled!==false} onChange={e=>setForm(prev=>({...prev,enabled:e.target.checked}))}/><span>Push ativo</span></label>
     </div>
-    {error&&<div className="cloud-error">{error}</div>}
-    {message&&<div className="public-portfolio-success">{message}</div>}
-    <h3>Status que geram lembrete</h3>
-    <div className="checks one-col compact-checks-v3">
-      {(statuses||[]).map(s=><label key={s.id}><input type="checkbox" checked={(form.statusKeys||[]).includes(s.id)} onChange={()=>toggleStatus(s.id)}/>{s.name}</label>)}
-    </div>
-    <div className="form-two">
-      <label>Primeiro lembrete após (dias)<input type="number" min="0" value={form.firstDayAfter} onChange={e=>setForm(prev=>({...prev,firstDayAfter:e.target.value}))}/></label>
-      <label>Repetir a cada (dias)<input type="number" min="1" value={form.intervalDays} onChange={e=>setForm(prev=>({...prev,intervalDays:e.target.value}))}/></label>
-    </div>
-    <small className="muted">Exemplo: primeiro lembrete 1 dia depois de entrar no status, repetindo a cada 2 dias — dias 1, 3, 5, 7... enquanto o post não sair do status escolhido.</small>
-    <div className="row-actions"><button className="primary" onClick={save} disabled={saving||!organizationId}>{saving?'Salvando...':'Salvar lembretes'}</button></div>
-  </div></div>
+    {loading?<p>Carregando configurações...</p>:<>
+      {error&&<div className="cloud-error">{error}</div>}
+      {message&&<div className="public-portfolio-success">{message}</div>}
+      <div className="form-three" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:12,marginTop:14}}>
+        <label>Agrupar push da equipe por (min)<input type="number" min="1" max="1440" value={form.teamDigestMinutes} onChange={e=>setForm(prev=>({...prev,teamDigestMinutes:e.target.value}))}/></label>
+        <label>Aguardar antes de avisar cliente (min)<input type="number" min="0" max="1440" value={form.clientApprovalDelayMinutes} onChange={e=>setForm(prev=>({...prev,clientApprovalDelayMinutes:e.target.value}))}/></label>
+        <label>Ignorar push se ativo nos últimos (seg)<input type="number" min="0" max="3600" value={form.presenceGraceSeconds} onChange={e=>setForm(prev=>({...prev,presenceGraceSeconds:e.target.value}))}/></label>
+      </div>
+      <h3 style={{marginTop:22}}>Lembretes por status</h3>
+      <p className="muted">Ative só os status que precisam cobrar alguém quando a tarefa ficar parada.</p>
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {(statuses||[]).map(status=>{const rule=ruleFor(status.id);return <div className="panel" key={status.id} style={{padding:12,borderLeft:`3px solid ${status.color}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <label style={{margin:0,display:'flex',alignItems:'center',gap:7}}><input type="checkbox" checked={rule.enabled===true} onChange={e=>updateRule(status.id,{enabled:e.target.checked})}/><b>{status.name}</b></label>
+            {rule.enabled===true&&<>
+              <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('client_approvers')} onChange={e=>toggleTarget(status.id,'client_approvers',e.target.checked)}/> Clientes aprovadores</label>
+              <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('task_responsible')} onChange={e=>toggleTarget(status.id,'task_responsible',e.target.checked)}/> Responsável da tarefa</label>
+              <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('admins')} onChange={e=>toggleTarget(status.id,'admins',e.target.checked)}/> Admins</label>
+            </>}
+          </div>
+          {rule.enabled===true&&<div className="form-two" style={{marginTop:10}}>
+            <label>Primeiro lembrete após (min)<input type="number" min="0" value={rule.firstAfterMinutes} onChange={e=>updateRule(status.id,{firstAfterMinutes:e.target.value})}/></label>
+            <label>Repetir a cada (min)<input type="number" min="1" value={rule.intervalMinutes} onChange={e=>updateRule(status.id,{intervalMinutes:e.target.value})}/></label>
+          </div>}
+        </div>})}
+      </div>
+      <small className="muted">No Beta você pode usar 1–2 minutos para testar. Depois ajustamos os tempos finais antes do Alfa.</small>
+      <div className="row-actions" style={{marginTop:14}}><button className="primary" onClick={saveDelivery} disabled={saving||!organizationId}>{saving?'Salvando...':'Salvar entrega e lembretes'}</button></div>
+    </>}
+  </div>;
 }
 
 const DEFAULT_DOCUMENT_FOLDERS = ['Clientes','Funcionários','Financeiro','Processos','Modelos','Interno'];
