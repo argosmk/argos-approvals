@@ -1,0 +1,47 @@
+name: Fix system name field
+on:
+  push:
+    branches:
+      - fix-system-name-field-20260911b
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply surgical fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/main.jsx')
+          s=p.read_text(encoding='utf-8')
+          marker='function AppearanceSettings({system,setSystem}){'
+          start=s.index(marker)
+          end=s.index('\nfunction ApprovalReminderSettings', start)
+          block=s[start:end]
+          old="const set=(k,v)=>setF({...f,[k]:v});"
+          new="const set=(k,v)=>setF(prev=>({...prev,[k]:v}));"
+          if block.count(old)!=1:
+              raise SystemExit(f'expected exactly one target in AppearanceSettings, found {block.count(old)}')
+          block=block.replace(old,new,1)
+          p.write_text(s[:start]+block+s[end:],encoding='utf-8')
+          PY
+      - name: Validate exact scope
+        run: |
+          grep -Fq "const set=(k,v)=>setF(prev=>({...prev,[k]:v}));" src/main.jsx
+          test "$(git diff --name-only)" = "src/main.jsx"
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+      - name: Commit to Alfa
+        run: |
+          git config user.name "ARGOS Fix Bot"
+          git config user.email "actions@github.com"
+          git add src/main.jsx
+          git commit -m "Corrige edição do nome do sistema"
+          git push origin HEAD:main
