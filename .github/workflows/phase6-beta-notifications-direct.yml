@@ -1,0 +1,36 @@
+name: Phase 6 Beta Notifications Direct
+on:
+  push:
+    branches:
+      - phase6-direct-prep
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[phase6-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase6-direct-prep
+          fetch-depth: 0
+      - name: Patch main.jsx
+        run: python scripts/apply_phase6_notifications_beta.py
+      - name: Validate scope
+        run: |
+          grep -q "NotificationDeliverySettings" src/main.jsx
+          grep -q "notification_delivery_settings" src/services/notificationDeliverySettingsService.js
+          grep -q "notification_push_queue" supabase/functions/process-notification-push-queue/index.ts
+          ! grep -q "approvalReminders" src/main.jsx
+          grep -q "const set=(k,v)=>setF(prev=>({...prev,\[k\]:v}));" src/main.jsx
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+      - name: Commit applied frontend
+        run: |
+          git config user.name "ARGOS Beta Bot"
+          git config user.email "actions@github.com"
+          git add src/main.jsx
+          git commit -m "Beta: integra notificações unificadas em Padrões de acesso [phase6-applied]"
+          git push origin HEAD:phase6-direct-prep
