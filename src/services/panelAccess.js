@@ -122,7 +122,7 @@ export const NOTIFICATION_PANEL_PERMISSION_ITEMS = Object.freeze([
 ]);
 
 export function builtInNotificationPanelPermissionsForRole(role){
-  if(role==='admin') return Object.fromEntries(NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=>[item.id,true]));
+  if(role==='admin') return {...Object.fromEntries(NOTIFICATION_PANEL_PERMISSION_ITEMS.map(item=>[item.id,true])),canEnableAlerts:true,canOpenTasks:true,showDateTime:true,showCompany:true,showResponsible:true,showPostDate:true,showDeadline:true,showStatus:true};
   if(role==='team') return {showTabs:true,canEnableAlerts:true,canOpenTasks:true,canComplete:true,canCompleteAll:true,canDeleteCompleted:false,showDateTime:true,showCompany:true,showResponsible:true,showPostDate:true,showDeadline:true,showStatus:true};
   return {showTabs:true,canEnableAlerts:true,canOpenTasks:true,canComplete:true,canCompleteAll:false,canDeleteCompleted:false,showDateTime:true,showCompany:false,showResponsible:false,showPostDate:true,showDeadline:false,showStatus:true};
 }
