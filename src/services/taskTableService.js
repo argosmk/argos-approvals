@@ -157,27 +157,18 @@ export async function upsertTaskRecord(organizationId, task){
 }
 
 export async function patchTaskRecord(organizationId, taskId, patch){
-  const { data: existing, error } = await supabase
-    .from(TASK_TABLE)
-    .select('*')
-    .eq('organization_id', organizationId)
-    .eq('id', String(taskId))
-    .maybeSingle();
+  const cleanPatch=clone(patch);
+  delete cleanPatch.logs;
+  delete cleanPatch.updatedAt;
+  if(!Object.keys(cleanPatch).length) return;
+
+  const {data,error}=await supabase.rpc('argos_patch_app_task',{
+    p_organization_id: organizationId,
+    p_task_id: String(taskId),
+    p_patch: cleanPatch,
+  });
   if(error) throw error;
-  const current = existing ? taskFromRow(existing, []) : { id: String(taskId) };
-  const next = { ...current, ...patch, id: String(taskId), updatedAt: isoNow() };
-  const row = taskToRow(organizationId, next, !!existing);
-  if(existing){
-    const { error: updateError } = await supabase
-      .from(TASK_TABLE)
-      .update(row)
-      .eq('organization_id', organizationId)
-      .eq('id', String(taskId));
-    if(updateError) throw updateError;
-  } else {
-    const { error: insertError } = await supabase.from(TASK_TABLE).insert(row);
-    if(insertError) throw insertError;
-  }
+  if(data!==true) throw new Error(`A tarefa ${taskId} não pôde ser atualizada porque não está mais disponível.`);
 }
 
 export async function softDeleteTaskRecord(organizationId, taskId){
