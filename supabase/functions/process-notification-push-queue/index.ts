@@ -199,6 +199,33 @@ async function reminderTargets(
     .map((profile: any) => String(profile.id));
 }
 
+async function clientProfileIdsForCompany(organizationId: string, companyId: string | null | undefined) {
+  const ids = new Set<string>();
+  if (!companyId) return ids;
+  const { data: ws } = await supabase
+    .from("workspace_state")
+    .select("payload")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  const users = (ws?.payload?.users ?? []) as Array<{
+    id: string;
+    role: string;
+    active?: boolean;
+    companyIds?: string[];
+  }>;
+  for (const user of users) {
+    if (
+      user.role === "client" &&
+      user.active !== false &&
+      Array.isArray(user.companyIds) &&
+      user.companyIds.includes(companyId)
+    ) {
+      ids.add(String(user.id));
+    }
+  }
+  return ids;
+}
+
 async function generateReminderQueue() {
   const { data: rules, error } = await supabase
     .from("notification_reminder_rules")
@@ -341,16 +368,17 @@ async function generateDeadlineNotifications() {
       ? "O prazo interno desta tarefa vence hoje."
       : `O prazo interno desta tarefa venceu em ${deadline}.`;
 
+    const clientProfileIds = await clientProfileIdsForCompany(task.organization_id, task.company_id);
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id,role,active,visible_statuses,company_ids,notification_prefs")
+      .select("id,role,active,visible_statuses,notification_prefs")
       .eq("organization_id", task.organization_id)
       .eq("active", true);
 
     for (const profile of profiles ?? []) {
       const isRecipient = profile.role === "admin"
         || (profile.role === "team" && String(profile.id) === String(task.responsible_id || ""))
-        || (profile.role === "client" && Array.isArray(profile.company_ids) && profile.company_ids.includes(task.company_id));
+        || (profile.role === "client" && clientProfileIds.has(String(profile.id)));
       if (!isRecipient) continue;
       if (!profileCanSeeStatus(profile, task.status)) continue;
       const systemEnabled = profileAllowsSystemEvent(profile, event);
