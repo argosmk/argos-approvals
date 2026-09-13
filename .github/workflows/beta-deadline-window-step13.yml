@@ -1,0 +1,36 @@
+name: Beta deadline window step 13
+on:
+  push:
+    branches: [beta]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[notification-deadline-window-step13]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+      - name: Apply exact patch
+        run: python scripts/fix_notification_deadline_window_step13.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Check edge function syntax
+        run: npx esbuild supabase/functions/process-notification-push-queue/index.ts --bundle --outfile=/tmp/push-worker-check.js --format=esm --platform=neutral --external:npm:*
+      - name: Validate scope
+        run: |
+          grep -q 'const yesterday = saoPauloDateKey' supabase/functions/process-notification-push-queue/index.ts
+          grep -q 'deadline < yesterday' supabase/functions/process-notification-push-queue/index.ts
+      - name: Commit clean step
+        run: |
+          git config user.name "ARGOS Refactor Bot"
+          git config user.email "actions@github.com"
+          git add supabase/functions/process-notification-push-queue/index.ts
+          git rm scripts/fix_notification_deadline_window_step13.py .github/workflows/beta-deadline-window-step13.yml
+          git commit -m "Beta: limita alertas de prazo à virada do vencimento [notification-deadline-window-step13]"
+          git pull --rebase origin beta
+          git push origin HEAD:beta
