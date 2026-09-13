@@ -1318,6 +1318,193 @@ function App(){
   const pendingTaskCreatesRef=useRef(new Map());
   const pendingTaskDeletesRef=useRef(new Set());
 
+  const taskFieldLockSessionRef=useRef((typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():`field-lock-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const activeTaskFieldLockRef=useRef(null);
+
+  useEffect(()=>{
+    if(!isSupabaseConfigured || !cloudReady || !auth?.organizationId || !auth?.id) return;
+    const sessionId=taskFieldLockSessionRef.current;
+    const selector='[data-task-id][data-task-field]';
+    let channel=null;
+    let alive=true;
+    let heartbeat=null;
+
+    let style=document.getElementById('argos-task-field-lock-style');
+    if(!style){
+      style=document.createElement('style');
+      style.id='argos-task-field-lock-style';
+      style.textContent=`
+        [data-argos-lock-host="1"]{position:relative!important;}
+        [data-argos-lock-host="1"]::after{
+          content:attr(data-argos-lock-label);
+          position:absolute;
+          top:6px;
+          right:7px;
+          z-index:20;
+          max-width:70%;
+          padding:4px 7px;
+          border:1px solid rgba(244,197,66,.55);
+          border-radius:7px;
+          background:rgba(30,24,7,.96);
+          color:#f4c542;
+          font-size:10px;
+          font-weight:800;
+          line-height:1.2;
+          pointer-events:none;
+          box-shadow:0 3px 12px rgba(0,0,0,.28);
+        }
+        [data-argos-locked="1"]{
+          opacity:.68!important;
+          cursor:not-allowed!important;
+          box-shadow:0 0 0 1px rgba(244,197,66,.34)!important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const basePresence=()=>({
+      sessionId,
+      userId:auth.id,
+      userName:auth.name||auth.email||'Outro usuário',
+    });
+
+    function clearDecorations(){
+      document.querySelectorAll(selector).forEach(el=>{
+        if(el.dataset.argosLocked==='1'){
+          delete el.dataset.argosLocked;
+          el.removeAttribute('aria-disabled');
+        }
+      });
+      document.querySelectorAll('[data-argos-lock-host="1"]').forEach(host=>{
+        delete host.dataset.argosLockHost;
+        delete host.dataset.argosLockLabel;
+      });
+    }
+
+    function lockHost(el){
+      return el.closest('.rich-text-editor-shell,.task-title,label,.task-links-editor')||el.parentElement;
+    }
+
+    function renderPresenceLocks(){
+      if(!alive||!channel) return;
+      clearDecorations();
+      const nowMs=Date.now();
+      const contenders=new Map();
+      const state=channel.presenceState?.()||{};
+      Object.values(state).flat().forEach(meta=>{
+        if(!meta?.taskId||!meta?.field||!meta?.sessionId) return;
+        if(meta.updatedAt && nowMs-Number(meta.updatedAt)>65000) return;
+        const key=`${meta.taskId}:${meta.field}`;
+        if(!contenders.has(key)) contenders.set(key,[]);
+        contenders.get(key).push(meta);
+      });
+      const winners=new Map();
+      contenders.forEach((items,key)=>{
+        const sorted=[...items].sort((a,b)=>{
+          const timeDiff=Number(a.startedAt||0)-Number(b.startedAt||0);
+          if(timeDiff) return timeDiff;
+          return String(a.sessionId).localeCompare(String(b.sessionId));
+        });
+        winners.set(key,sorted[0]);
+      });
+
+      document.querySelectorAll(selector).forEach(el=>{
+        const taskId=String(el.dataset.taskId||'');
+        const field=String(el.dataset.taskField||'');
+        const winner=winners.get(`${taskId}:${field}`);
+        if(!winner || winner.sessionId===sessionId) return;
+        el.dataset.argosLocked='1';
+        el.setAttribute('aria-disabled','true');
+        const host=lockHost(el);
+        if(host){
+          host.dataset.argosLockHost='1';
+          host.dataset.argosLockLabel=`${winner.userName||'Outro usuário'} está editando`;
+        }
+        if(document.activeElement===el) el.blur();
+      });
+    }
+
+    async function publish(lock){
+      if(!channel) return;
+      const payload={...basePresence(),taskId:null,field:null,startedAt:null,updatedAt:Date.now(),...(lock||{})};
+      try{ await channel.track(payload); }
+      catch(err){ console.warn('task field lock publish failed',err); }
+    }
+
+    function releaseCurrent(expected=null){
+      const current=activeTaskFieldLockRef.current;
+      if(!current) return;
+      if(expected && (current.taskId!==expected.taskId||current.field!==expected.field)) return;
+      activeTaskFieldLockRef.current=null;
+      publish(null);
+    }
+
+    function handlePointerDown(event){
+      const el=event.target?.closest?.(selector);
+      if(!el||el.dataset.argosLocked!=='1') return;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    function handleFocusIn(event){
+      const el=event.target?.closest?.(selector);
+      if(!el) return;
+      if(el.dataset.argosLocked==='1'){
+        event.preventDefault();
+        setTimeout(()=>el.blur(),0);
+        return;
+      }
+      const next={taskId:String(el.dataset.taskId||''),field:String(el.dataset.taskField||''),startedAt:Date.now()};
+      if(!next.taskId||!next.field) return;
+      activeTaskFieldLockRef.current=next;
+      publish(next);
+    }
+
+    function handleFocusOut(event){
+      const el=event.target?.closest?.(selector);
+      if(!el) return;
+      const expected={taskId:String(el.dataset.taskId||''),field:String(el.dataset.taskField||'')};
+      const container=el.closest('.rich-text-editor-shell')?.parentElement||el.closest('label')||el.parentElement;
+      if(container?.contains(event.relatedTarget)) return;
+      setTimeout(()=>{
+        const active=document.activeElement?.closest?.(selector);
+        if(active && String(active.dataset.taskId||'')===expected.taskId && String(active.dataset.taskField||'')===expected.field) return;
+        releaseCurrent(expected);
+      },120);
+    }
+
+    document.addEventListener('pointerdown',handlePointerDown,true);
+    document.addEventListener('focusin',handleFocusIn,true);
+    document.addEventListener('focusout',handleFocusOut,true);
+
+    channel=supabase
+      .channel(`argos-task-field-locks-${auth.organizationId}`,{config:{presence:{key:sessionId}}})
+      .on('presence',{event:'sync'},renderPresenceLocks)
+      .on('presence',{event:'join'},renderPresenceLocks)
+      .on('presence',{event:'leave'},renderPresenceLocks)
+      .subscribe(status=>{
+        if(status==='SUBSCRIBED') publish(activeTaskFieldLockRef.current);
+      });
+
+    heartbeat=setInterval(()=>{
+      if(activeTaskFieldLockRef.current) publish(activeTaskFieldLockRef.current);
+    },20000);
+
+    return()=>{
+      alive=false;
+      if(heartbeat) clearInterval(heartbeat);
+      document.removeEventListener('pointerdown',handlePointerDown,true);
+      document.removeEventListener('focusin',handleFocusIn,true);
+      document.removeEventListener('focusout',handleFocusOut,true);
+      clearDecorations();
+      activeTaskFieldLockRef.current=null;
+      if(channel){
+        try{ channel.untrack(); }catch(e){}
+        supabase.removeChannel(channel);
+      }
+    };
+  },[cloudReady,auth?.organizationId,auth?.id,auth?.name]);
+
   const sameSyncValue=(a,b)=>JSON.stringify(a??null)===JSON.stringify(b??null);
 
   useEffect(()=>{
@@ -4514,12 +4701,12 @@ Descrição: ${desc}`;
     {!isClient&&canViewDetail('materialLinks')&&(canEditDetail('materialLinks')?<TaskLinksEditor task={task} updateTask={updateTask} field="materialLinks" title="Links de material finalizado" placeholder="Adicionar material finalizado"/>:<ReadOnlyReadyLinks title="Links de material finalizado" text={task.materialLinks||''}/>) }
   </div>
 </div><aside className="task-side">{['companyId','responsibleId','type','status','internalDate','postDate'].some(canViewDetail)&&<div className="panel panel-config"><h2>Configurações</h2>
-  {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{[...companies].sort((a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'})).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
-  {canViewDetail('responsibleId')&&<label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!canEditDetail('responsibleId')} value={task.responsibleId} onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).sort((a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'})).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label>}
-  {canViewDetail('type')&&<label>Tipo<select disabled={!canEditDetail('type')} value={task.type} onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label>}
-  {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined,'--status-color':statusById[task.status]?.color||'var(--line)'}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id} style={{background:`${s.color}20`,color:s.color}}>{s.name}</option>)}</select></div></label>}
-  {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
-  {canViewDetail('postDate')&&<label>Data do post<input disabled={!canEditDetail('postDate')} type="date" value={task.postDate||''} onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label>}
+  {canViewDetail('companyId')&&<label>Cliente<div className="select-entity"><EntityLabel value={company?.logo} label={company?.name||'Empresa'}/><select disabled={!canEditDetail('companyId')} value={task.companyId} data-task-id={task.id} data-task-field="companyId" onChange={e=>updateTask(task.id,{companyId:e.target.value})}>{[...companies].sort((a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'})).map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></div></label>}
+  {canViewDetail('responsibleId')&&<label>Responsável<div className="select-entity"><EntityLabel value={users.find(u=>u.id===task.responsibleId)?.avatar} label={users.find(u=>u.id===task.responsibleId)?.name||'Responsável'}/><select disabled={!canEditDetail('responsibleId')} value={task.responsibleId} data-task-id={task.id} data-task-field="responsibleId" onChange={e=>updateTask(task.id,{responsibleId:e.target.value})}>{users.filter(u=>u.active&&(u.role==='team'||u.role==='admin')).sort((a,b)=>String(a?.name||'').localeCompare(String(b?.name||''),'pt-BR',{sensitivity:'base'})).map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></div></label>}
+  {canViewDetail('type')&&<label>Tipo<select disabled={!canEditDetail('type')} value={task.type} data-task-id={task.id} data-task-field="type" onChange={e=>updateTask(task.id,{type:e.target.value})}>{types.map(t=><option key={t}>{t}</option>)}</select></label>}
+  {canViewDetail('status')&&<label>Status<div className="status-select" style={{borderColor:statusById[task.status]?.color||undefined,'--status-color':statusById[task.status]?.color||'var(--line)'}}>{statusDot(statusById[task.status])}<select disabled={!canEditDetail('status')} value={task.status} data-task-id={task.id} data-task-field="status" onChange={e=>updateTask(task.id,{status:e.target.value})}>{statuses.map(s=><option value={s.id} key={s.id} style={{background:`${s.color}20`,color:s.color}}>{s.name}</option>)}</select></div></label>}
+  {canViewDetail('internalDate')&&<label className={'date-field '+priorityClass(task.internalDate)}>Prazo<input disabled={!canEditDetail('internalDate')} type="date" value={task.internalDate||''} data-task-id={task.id} data-task-field="internalDate" onChange={e=>updateTask(task.id,{internalDate:e.target.value})}/></label>}
+  {canViewDetail('postDate')&&<label>Data do post<input disabled={!canEditDetail('postDate')} type="date" value={task.postDate||''} data-task-id={task.id} data-task-field="postDate" onChange={e=>updateTask(task.id,{postDate:e.target.value})}/></label>}
 </div>}{canViewDetail('stats')&&<div className="panel panel-stats"><h2>Estatísticas</h2><p>Alterações: <b>{task.alterationCount||0}</b></p><p>Tempo geral: <b>{fmtSec((task.totalEditSeconds||0)+(task.totalAlterSeconds||0))}</b></p><p>Tempo em edição: <b>{fmtSec(task.totalEditSeconds)}</b></p><p>Tempo em alteração: <b>{fmtSec(task.totalAlterSeconds)}</b></p></div>}<div className="panel panel-actions"><h2>Ações</h2>{isMultiApprover&&task.status==='aprovacao'&&(task.approvalVotes?.length>0)&&<div className="approval-votes-banner">⚠ {task.approvalVotes.length} de {approversForCompany.length} usuários aprovaram ({task.approvalVotes.map(v=>v.userName).join(', ')}). Confirme manualmente antes de despachar.</div>}{isMultiApprover&&isApproveCopyStatus&&(task.copyApprovalVotes?.length>0)&&<div className="approval-votes-banner">⚠ {task.copyApprovalVotes.length} de {approversForCompany.length} usuários aprovaram a copy ({task.copyApprovalVotes.map(v=>v.userName).join(', ')}). Confirme manualmente antes de despachar.</div>}{isTeam&&!canAccess&&['edicao','alteracao','aguardando'].includes(task.status)&&<button className="primary" onClick={start}>{task.status==='aguardando'?'Reabrir tarefa':'Acessar tarefa'}</button>}{isTeam&&!task.startedAt&&task.status==='aprovacao'&&<button className="primary" onClick={reopenFromApproval}>Reabrir tarefa</button>}{isTeam&&task.startedAt&&<div className="status-action-row" style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="status-tinted" style={actionStyle('copy')} onClick={returnToCopy}>Retornar ao copy</button><button className="status-tinted" style={actionStyle('aguardando')} onClick={markWaiting}>Marcar aguardando</button><button className="status-tinted" style={actionStyle('aprovacao')} onClick={sendApproval}>Enviar para aprovação</button></div>}{isAdmin&&isMultiApprover&&task.status==='aprovacao'&&(task.approvalVotes?.length>0)&&<button className="status-tinted" style={actionStyle('agendamento')} onClick={()=>{ if(confirm('Avançar esta tarefa para Agendamento mesmo sem todos os votos do comitê?')) updateTask(task.id,{status:'agendamento',approvalVotes:[]},`${effectiveUser.name} avançou manualmente para Agendamento (comitê: ${task.approvalVotes.length} de ${approversForCompany.length}).`); }}>Avançar mesmo assim</button>}{isAdmin&&isMultiApprover&&isApproveCopyStatus&&createPostStatusId&&(task.copyApprovalVotes?.length>0)&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={()=>{ if(confirm('Avançar a copy desta tarefa mesmo sem todos os votos do comitê?')) updateTask(task.id,{status:createPostStatusId,copyApprovalVotes:[]},`${effectiveUser.name} avançou a copy manualmente (comitê: ${task.copyApprovalVotes.length} de ${approversForCompany.length}).`); }}>Avançar mesmo assim</button>}{isAdmin&&<div className="admin-task-actions-row"><button onClick={()=>{ if(confirm(task.archived?'Desarquivar esta tarefa?':'Arquivar esta tarefa?')) updateTask(task.id,{archived:!task.archived}, task.archived?'Tarefa desarquivada.':'Tarefa arquivada.')}}>{task.archived?'Desarquivar':'Arquivar'}</button><button onClick={duplicateTaskFromDetail}>Duplicar</button><button className="danger" onClick={deleteTaskFromDetail}>Excluir</button></div>}{canApprovePosts&&task.status==='aprovacao'&&!myVoteAlready&&<ClientApprovalForm form={clientForm} setForm={setClientForm} approve={approve} requestChange={requestChange} statusById={statusById}/>} {canApprovePosts&&task.status==='aprovacao'&&myVoteAlready&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={retractVote}>Revisar novamente</button>} {canApprovePosts&&isApproveCopyStatus&&!myCopyVoteAlready&&<CopyApprovalForm form={clientForm} setForm={setClientForm} approveCopy={approveCopy} requestCopyChange={requestCopyChange} statusById={statusById} createPostStatusId={createPostStatusId} createCopyStatusId={createCopyStatusId}/>} {canApprovePosts&&isApproveCopyStatus&&myCopyVoteAlready&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={retractCopyVote}>Revisar novamente</button>} {canApprovePosts&&task.status==='agendamento'&&<button className="status-tinted" style={actionStyle('aprovacao')} onClick={reviewAgain}>Revisar novamente</button>} {isClient&&task.status==='aguardando'&&<p>Aguardando informações. Use os comentários se precisar responder.</p>}</div>{canViewDetail('comments')&&(!hiddenTeam||isAdmin||isClient)&&<div className="panel comments-panel"><h2>Linha do tempo</h2>{canEditDetail('comments')&&!(isClient&&(['agendamento','pronto'].includes(task.status)||(task.status==='aprovacao'&&myVoteAlready)||(isApproveCopyStatus&&myCopyVoteAlready)))&&<div className="comment-line"><AutoTextarea className="comment-compose" value={comment} onChange={e=>setComment(e.target.value)} minHeight={42} rows={1} placeholder="Adicionar comentário..."/><button onClick={addComment}>Enviar</button></div>}{isClient&&['agendamento','pronto'].includes(task.status)&&<p className="muted-note">Esta tarefa já avançou na produção — comentários de cliente ficam desabilitados a partir daqui.</p>}{isClient&&!['agendamento','pronto'].includes(task.status)&&((task.status==='aprovacao'&&myVoteAlready)||(isApproveCopyStatus&&myCopyVoteAlready))&&<p className="muted-note">Você já registrou sua decisão — comentários ficam disponíveis novamente se você revisar.</p>}{(canViewDetail('history')?timeline:comments).length?(canViewDetail('history')?timeline:comments).map(l=>{const isComment=l.type==='comment';const fromSt=l.fromStatusId?statusById[l.fromStatusId]:null;const toSt=l.toStatusId?statusById[l.toStatusId]:null;const atSt=l.statusAtTime?statusById[l.statusAtTime]:null;return <div className={'timeline-entry '+(isComment?'is-comment':'is-log')+(l.resolved?' resolved':'')} key={l.id}><div className="timeline-entry-head"><b>{l.user}</b><small>{timelineTimeLabel(l.at)}</small>{fromSt&&toSt&&<span className="status-transition"><span style={{color:fromSt.color}}>{fromSt.name}</span> → <span style={{color:toSt.color}}>{toSt.name}</span></span>}</div>{isComment&&<p>{linkify(cleanCommentText(l))}</p>}{isComment&&atSt&&<span className="status-pill status-pill-small" style={{color:atSt.color,background:`${atSt.color}20`,borderColor:atSt.color}}>em: {atSt.name}</span>}{!isComment&&!(fromSt&&toSt)&&<p className="timeline-log-text">{linkify(l.text)}</p>}{isComment&&!isClient&&<button className="resolve-btn" onClick={()=>resolveLog(l.id)}>{l.resolved?'Reabrir':'Resolver'}</button>}{l.resolved&&<small className="resolved-note">Resolvido por {l.resolvedBy||'equipe'}{l.resolvedAt?' · '+timelineTimeLabel(l.resolvedAt):''}</small>}</div>;}):<p className="muted-note">Nenhuma atividade ainda.</p>}</div>}</aside></div>{showBackToTop&&<button type="button" className="app-back-top" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Voltar ao topo" title="Voltar ao topo"><BackToTopGlyph/></button>}</section> 
 }
 function InstagramIcons(){ return <div className="insta-icons insta-real-icons">
