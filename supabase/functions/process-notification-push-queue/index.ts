@@ -162,16 +162,6 @@ async function reminderTargets(
     ids.add(String(task.responsible_id));
   }
 
-  if (targets.includes("admins")) {
-    const { data: admins } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("role", "admin")
-      .eq("active", true);
-    for (const admin of admins ?? []) ids.add(String(admin.id));
-  }
-
   if (targets.includes("client_approvers")) {
     const { data: ws } = await supabase
       .from("workspace_state")
@@ -363,7 +353,9 @@ async function generateDeadlineNotifications() {
         || (profile.role === "client" && Array.isArray(profile.company_ids) && profile.company_ids.includes(task.company_id));
       if (!isRecipient) continue;
       if (!profileCanSeeStatus(profile, task.status)) continue;
-      if (!profileAllowsSystemEvent(profile, event)) continue;
+      const systemEnabled = profileAllowsSystemEvent(profile, event);
+      const pushEnabled = profileAllowsPushEvent(profile, event);
+      if (!systemEnabled && !pushEnabled) continue;
 
       const notificationId = `deadline:${event}:${task.id}:${profile.id}:${deadline}`;
       const { error: notificationError } = await supabase
@@ -378,7 +370,7 @@ async function generateDeadlineNotifications() {
           status_id: task.status,
           done: false,
           at: new Date().toISOString(),
-          payload: { actorId: null, actorName: "Sistema", deadline },
+          payload: { actorId: null, actorName: "Sistema", deadline, pushOnly: !systemEnabled && pushEnabled },
           updated_at: new Date().toISOString(),
         }, { onConflict: "organization_id,id", ignoreDuplicates: true });
       if (!notificationError) created++;

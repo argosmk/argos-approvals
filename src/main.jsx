@@ -160,6 +160,21 @@ function wantsNotification(user, event, statusId){
   const prefs=Array.isArray(user.notificationPrefs)?user.notificationPrefs:defaultNotificationPrefsForRole(user.role);
   return prefs.includes(event);
 }
+function wantsPush(user,event,statusId){
+  if(!user?.active) return false;
+  if(statusId&&user.role!=='admin'){
+    const visibleStatuses=Array.isArray(user.visibleStatuses)?user.visibleStatuses:[];
+    if(!visibleStatuses.includes(statusId)) return false;
+  }
+  if(event==='Status da tarefa') return !!statusId && user.notificationPushPrefs?.status===true;
+  if(BLOCKED_NOTIFICATION_EVENTS.has(event)) return false;
+  if(!NOTIFICATION_VISIBLE_EVENTS.includes(event)) return false;
+  const events=Array.isArray(user.notificationPushPrefs?.events)?user.notificationPushPrefs.events:defaultNotificationPrefsForRole(user.role);
+  return events.includes(event);
+}
+function isPushOnlyNotification(notification){
+  return notification?.pushOnly===true || notification?.payload?.pushOnly===true;
+}
 
 const seedCompanies = [
   { id:'smart', name:'SmartStore', instagram:'@smartstore', logo:'S', entryDate:'2026-06-01', active:true },
@@ -434,7 +449,9 @@ async function updateAuthBackedAppUserProfile(draft){
       visible_statuses: draft.visibleStatuses || [],
       notification_prefs: {
         events: draft.notificationPrefs || NOTIFICATION_EVENTS,
-        statuses: draft.notificationStatusPrefs || {}
+        statuses: draft.notificationStatusPrefs || {},
+        push_events: Array.isArray(draft.notificationPushPrefs?.events) ? draft.notificationPushPrefs.events : [],
+        push_status: draft.notificationPushPrefs?.status === true
       }
     };
     // Evita mexer em username/email aqui. Alterar login/senha de usuário Auth
@@ -1670,7 +1687,7 @@ function App(){
 
   useEffect(()=>{
     if(!notificationTablesReady || !auth?.id) return;
-    const scoped=(notifications||[]).filter(n=>n?.userId===auth.id);
+    const scoped=(notifications||[]).filter(n=>n?.userId===auth.id&&!isPushOnlyNotification(n));
     const currentIds=new Set(scoped.map(n=>String(n.id)));
     const previousIds=notificationAlertBaselineRef.current;
     notificationAlertBaselineRef.current=currentIds;
@@ -2090,13 +2107,14 @@ function App(){
     const recipients = users
       .filter(u=>u.active && (u.role==='admin' || (u.role==='team'&&u.id===task.responsibleId) || (u.role==='client'&&Array.isArray(u.companyIds)&&u.companyIds.includes(task.companyId))))
       .filter(u=>u.id!==actorId)
-      .filter(u=>wantsNotification(u,event,statusId));
+      .map(u=>({user:u,system:wantsNotification(u,event,statusId),push:wantsPush(u,event,statusId)}))
+      .filter(item=>item.system||item.push);
     if(!recipients.length) return;
     const stamp=meta.at||now();
-    const created=recipients.map(u=>({
+    const created=recipients.map(item=>({
       id:safeUUID(),
       taskId:task.id,
-      userId:u.id,
+      userId:item.user.id,
       text:`${task.title}: ${text}`,
       at:stamp,
       done:false,
@@ -2110,7 +2128,8 @@ function App(){
         actorName,
         logId:meta.logId||null,
         fromStatus:meta.fromStatus||null,
-        toStatus:meta.toStatus||null
+        toStatus:meta.toStatus||null,
+        pushOnly:!item.system&&item.push
       }
     }));
     setNotifications(prev=>[...created,...(Array.isArray(prev)?prev:[])]);
@@ -2570,7 +2589,7 @@ function Sidebar({auth,effectiveUser,viewAs,setViewAs,users,companies=[],notific
     .filter(user=>!(user.companyIds||[]).some(companyId=>companies.some(company=>company.id===companyId)))
     .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{sensitivity:'base'}));
   const goScreen=(id)=>{ setScreen(id); setMobileMenuOpen(false); };
-  const pendingNotificationsCount = (notifications||[]).filter(n=>n?.userId===effectiveUser?.id && !n?.done).length;
+  const pendingNotificationsCount = (notifications||[]).filter(n=>n?.userId===effectiveUser?.id && !n?.done && !isPushOnlyNotification(n)).length;
   return <aside className={'side '+(mobileMenuOpen?'mobile-open':'')+(sidebarCollapsed?' collapsed':'')}>
     <div className="mobile-side-bar">
       <div className="mobile-brand-mini">
@@ -5035,19 +5054,14 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
   }
   function toggleEvent(ev,checked){
     const current=notificationInheritance==='custom'?(f.notificationPrefs||[]):(roleDefault.notificationPrefs||events);
-    const next=checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev);
-    setF(prev=>({
-      ...prev,
-      notificationPrefs:next,
-      notificationPushPrefs:checked?(prev.notificationPushPrefs||roleDefault.notificationPushPrefs):{...(prev.notificationPushPrefs||roleDefault.notificationPushPrefs),events:(prev.notificationPushPrefs?.events||roleDefault.notificationPushPrefs?.events||[]).filter(x=>x!==ev)}
-    }));
+    set('notificationPrefs',checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev));
   }
   function togglePushEvent(ev,checked){
     const current=f.notificationPushPrefs?.events||roleDefault.notificationPushPrefs?.events||[];
     set('notificationPushPrefs',{...(f.notificationPushPrefs||roleDefault.notificationPushPrefs),events:checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev)});
   }
   function toggleStatusSystem(checked){
-    setF(prev=>({...prev,notificationStatusPrefs:{__all__:checked},notificationPushPrefs:checked?(prev.notificationPushPrefs||roleDefault.notificationPushPrefs):{...(prev.notificationPushPrefs||roleDefault.notificationPushPrefs),status:false}}));
+    set('notificationStatusPrefs',{__all__:checked});
   }
   const notificationPanelConfig=notificationInheritance==='custom'
     ? {...(roleDefault.notificationPanel||builtInNotificationPanelPermissionsForRole(f.role)),...(f.notificationPanelPermissions||{})}
@@ -5261,10 +5275,10 @@ function UserSystemSettings({user,companies=[],statuses=[],save,cancel,currentUs
 
       <AccessConfigCard title="Notificações e alertas" open={openSection==='rule:notifications'} onToggleOpen={()=>toggleSection('rule:notifications')} accent customized={notificationRulesDiff}>
         <div style={notificationInheritance!=='custom'?{pointerEvents:'none'}:undefined}>
-          <p className="muted" style={{marginTop:0}}>"Sistema" cria a notificação dentro do Argos. "Push" envia o mesmo aviso fora do sistema. Status continuam limitados por "Status disponíveis".</p>
+          <p className="muted" style={{marginTop:0}}>"Sistema" e "Push" são canais independentes. Status continuam limitados por "Status disponíveis".</p>
           <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 72px 72px',gap:8,alignItems:'center'}}>
             <small className="muted">Evento</small><small className="muted" style={{textAlign:'center'}}>Sistema</small><small className="muted" style={{textAlign:'center'}}>Push</small>
-            {NOTIFICATION_EVENT_ROWS.map(row=>{const isStatus=row.id==='status';const systemOn=isStatus?statusNotificationsEnabled:(f.notificationPrefs||[]).includes(row.event);const pushOn=isStatus?(f.notificationPushPrefs?.status??roleDefault.notificationPushPrefs?.status??false):(f.notificationPushPrefs?.events||roleDefault.notificationPushPrefs?.events||[]).includes(row.event);return <React.Fragment key={row.id}><span>{row.label}</span><input style={{margin:'0 auto'}} type="checkbox" checked={systemOn} onChange={e=>isStatus?toggleStatusSystem(e.target.checked):toggleEvent(row.event,e.target.checked)}/><input style={{margin:'0 auto'}} type="checkbox" disabled={!systemOn} checked={systemOn&&pushOn} onChange={e=>isStatus?set('notificationPushPrefs',{...(f.notificationPushPrefs||roleDefault.notificationPushPrefs),status:e.target.checked}):togglePushEvent(row.event,e.target.checked)}/></React.Fragment>;})}
+            {NOTIFICATION_EVENT_ROWS.map(row=>{const isStatus=row.id==='status';const systemOn=isStatus?statusNotificationsEnabled:(f.notificationPrefs||[]).includes(row.event);const pushOn=isStatus?(f.notificationPushPrefs?.status??roleDefault.notificationPushPrefs?.status??false):(f.notificationPushPrefs?.events||roleDefault.notificationPushPrefs?.events||[]).includes(row.event);const boxStyle={width:14,height:14,minWidth:14,margin:'0 auto'};return <React.Fragment key={row.id}><span>{row.label}</span><input style={boxStyle} type="checkbox" checked={systemOn} onChange={e=>isStatus?toggleStatusSystem(e.target.checked):toggleEvent(row.event,e.target.checked)}/><input style={boxStyle} type="checkbox" checked={pushOn} onChange={e=>isStatus?set('notificationPushPrefs',{...(f.notificationPushPrefs||roleDefault.notificationPushPrefs),status:e.target.checked}):togglePushEvent(row.event,e.target.checked)}/></React.Fragment>;})}
           </div>
         </div>
       </AccessConfigCard>
@@ -5409,15 +5423,14 @@ function AccessDefaultsEditor({system,setSystem,statuses=[],currentUser=null}){
   }
   function toggleEvent(ev,checked){
     const current=draft.notificationPrefs||[];
-    const next=checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev);
-    setDraft(prev=>({...prev,notificationPrefs:next,notificationPushPrefs:checked?(prev.notificationPushPrefs||{events:[],status:false}):{...(prev.notificationPushPrefs||{events:[],status:false}),events:(prev.notificationPushPrefs?.events||[]).filter(x=>x!==ev)}}));
+    setDraftValue('notificationPrefs',checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev));
   }
   function toggleDefaultPushEvent(ev,checked){
     const current=draft.notificationPushPrefs?.events||[];
     setDraft(prev=>({...prev,notificationPushPrefs:{...(prev.notificationPushPrefs||{events:[],status:false}),events:checked?[...new Set([...current,ev])]:current.filter(x=>x!==ev)}}));
   }
   function toggleDefaultStatusSystem(checked){
-    setDraft(prev=>({...prev,notificationStatusPrefs:{__all__:checked},notificationPushPrefs:checked?(prev.notificationPushPrefs||{events:[],status:false}):{...(prev.notificationPushPrefs||{events:[],status:false}),status:false}}));
+    setDraftValue('notificationStatusPrefs',{__all__:checked});
   }
   function toggleNotificationPanelPermission(id,checked){
     setDraft(prev=>({...prev,notificationPanel:{...(prev.notificationPanel||builtInNotificationPanelPermissionsForRole(role)),[id]:checked}}));
@@ -5528,10 +5541,10 @@ function AccessDefaultsEditor({system,setSystem,statuses=[],currentUser=null}){
         </AccessConfigCard>}
 
         <AccessConfigCard title="Notificações e alertas" open={openSection==='rule:notifications'} onToggleOpen={()=>toggleSection('rule:notifications')} accent>
-          <p className="muted" style={{marginTop:0}}>Escolha apenas o canal de cada evento. Push só pode ser ativado quando a notificação no sistema também estiver ativa.</p>
+          <p className="muted" style={{marginTop:0}}>Escolha os canais de forma independente. Um usuário pode receber Push mesmo sem receber a notificação no painel.</p>
           <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 72px 72px',gap:8,alignItems:'center'}}>
             <small className="muted">Evento</small><small className="muted" style={{textAlign:'center'}}>Sistema</small><small className="muted" style={{textAlign:'center'}}>Push</small>
-            {NOTIFICATION_EVENT_ROWS.map(row=>{const isStatus=row.id==='status';const systemOn=isStatus?statusChangeNotificationsEnabled(draft.notificationStatusPrefs||{},role):(draft.notificationPrefs||[]).includes(row.event);const pushOn=isStatus?(draft.notificationPushPrefs?.status===true):(draft.notificationPushPrefs?.events||[]).includes(row.event);return <React.Fragment key={row.id}><span>{row.label}</span><input style={{margin:'0 auto'}} type="checkbox" checked={systemOn} onChange={e=>isStatus?toggleDefaultStatusSystem(e.target.checked):toggleEvent(row.event,e.target.checked)}/><input style={{margin:'0 auto'}} type="checkbox" disabled={!systemOn} checked={systemOn&&pushOn} onChange={e=>isStatus?setDraft(prev=>({...prev,notificationPushPrefs:{...(prev.notificationPushPrefs||{events:[],status:false}),status:e.target.checked}})):toggleDefaultPushEvent(row.event,e.target.checked)}/></React.Fragment>;})}
+            {NOTIFICATION_EVENT_ROWS.map(row=>{const isStatus=row.id==='status';const systemOn=isStatus?statusChangeNotificationsEnabled(draft.notificationStatusPrefs||{},role):(draft.notificationPrefs||[]).includes(row.event);const pushOn=isStatus?(draft.notificationPushPrefs?.status===true):(draft.notificationPushPrefs?.events||[]).includes(row.event);const boxStyle={width:14,height:14,minWidth:14,margin:'0 auto'};return <React.Fragment key={row.id}><span>{row.label}</span><input style={boxStyle} type="checkbox" checked={systemOn} onChange={e=>isStatus?toggleDefaultStatusSystem(e.target.checked):toggleEvent(row.event,e.target.checked)}/><input style={boxStyle} type="checkbox" checked={pushOn} onChange={e=>isStatus?setDraft(prev=>({...prev,notificationPushPrefs:{...(prev.notificationPushPrefs||{events:[],status:false}),status:e.target.checked}})):toggleDefaultPushEvent(row.event,e.target.checked)}/></React.Fragment>;})}
           </div>
           <div style={{marginTop:18,paddingTop:16,borderTop:'1px solid var(--line)'}}>
             <NotificationDeliverySettings currentUser={currentUser} statuses={statuses} role={role}/>
@@ -6022,9 +6035,8 @@ function NotificationDeliverySettings({currentUser,statuses,role='team'}){
   },[organizationId]);
 
   const roleTargets=role==='client'?['client_approvers']:['task_responsible','admins'];
-  const targetOptions=role==='client'
-    ? [['client_approvers','Responsáveis do cliente']]
-    : [['task_responsible','Responsável da tarefa'],['admins','Admins']];
+  const roleTarget=role==='client'?'client_approvers':'task_responsible';
+  const roleTargetLabel=role==='client'?'Responsáveis do cliente':'Responsável da tarefa';
   const relevantRules=(form.rules||[]).filter(rule=>rule.enabled!==false&&(rule.targets||[]).some(target=>roleTargets.includes(target)));
   const availableStatuses=(statuses||[]).filter(status=>!relevantRules.some(rule=>rule.statusKey===status.id));
 
@@ -6034,10 +6046,11 @@ function NotificationDeliverySettings({currentUser,statuses,role='team'}){
     setForm(prev=>{
       const rules=[...(prev.rules||[])];
       const index=rules.findIndex(rule=>rule.statusKey===statusKey);
-      const target=targetOptions[0][0];
+      const target=roleTarget;
       if(index>=0){
         const current=rules[index];
-        rules[index]={...current,enabled:true,targets:[...new Set([...(current.targets||[]),target])],firstAfterMinutes:Number(current.firstAfterMinutes||1440)};
+        const preserved=(current.targets||[]).filter(item=>!roleTargets.includes(item));
+        rules[index]={...current,enabled:true,targets:[...preserved,target],firstAfterMinutes:Number(current.firstAfterMinutes||1440)};
       }else{
         rules.push({statusKey,enabled:true,targets:[target],firstAfterMinutes:1440,intervalMinutes:2880});
       }
@@ -6047,13 +6060,6 @@ function NotificationDeliverySettings({currentUser,statuses,role='team'}){
   }
   function patchReminder(statusKey,patch){
     setForm(prev=>({...prev,rules:(prev.rules||[]).map(rule=>rule.statusKey===statusKey?{...rule,...patch}:rule)}));
-  }
-  function changeRoleTarget(statusKey,target){
-    setForm(prev=>({...prev,rules:(prev.rules||[]).map(rule=>{
-      if(rule.statusKey!==statusKey)return rule;
-      const others=(rule.targets||[]).filter(item=>!roleTargets.includes(item));
-      return {...rule,targets:[...others,target]};
-    })}));
   }
   function removeReminder(statusKey){
     setForm(prev=>({...prev,rules:(prev.rules||[]).map(rule=>{
@@ -6065,7 +6071,8 @@ function NotificationDeliverySettings({currentUser,statuses,role='team'}){
   async function saveDelivery(){
     try{
       setSaving(true);setError('');setMessage('');
-      const saved=await saveNotificationDeliverySettings(organizationId,form);
+      const normalizedForm={...form,rules:(form.rules||[]).map(rule=>({...rule,targets:(rule.targets||[]).filter(target=>target!=='admins')}))};
+      const saved=await saveNotificationDeliverySettings(organizationId,normalizedForm);
       setForm({...empty,...saved,rules:Array.isArray(saved?.rules)?saved.rules:[]});
       setMessage('Lembretes salvos.');
       notifySettingsSaved('Lembretes salvos');
@@ -6080,13 +6087,12 @@ function NotificationDeliverySettings({currentUser,statuses,role='team'}){
     {error&&<div className="cloud-error">{error}</div>}
     {message&&<div className="public-portfolio-success">{message}</div>}
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
-      {relevantRules.map(rule=>{const status=(statuses||[]).find(item=>item.id===rule.statusKey);const target=(rule.targets||[]).find(item=>roleTargets.includes(item))||targetOptions[0][0];const hours=Math.max(1,Math.round(Number(rule.firstAfterMinutes||1440)/60));return <div key={`${role}:${rule.statusKey}`} className="panel" style={{padding:10}}>
+      {relevantRules.map(rule=>{const status=(statuses||[]).find(item=>item.id===rule.statusKey);const hours=Math.max(1,Math.round(Number(rule.firstAfterMinutes||1440)/60));return <div key={`${role}:${rule.statusKey}`} className="panel" style={{padding:10}}>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span>Se permanecer</span>
           <input type="number" min="1" value={hours} onChange={e=>patchReminder(rule.statusKey,{firstAfterMinutes:Math.max(1,parseInt(e.target.value,10)||1)*60})} style={{width:74}}/>
           <span>hora(s) em <b>{status?.name||rule.statusKey}</b></span>
-          <span>→ lembrar</span>
-          <select value={target} onChange={e=>changeRoleTarget(rule.statusKey,e.target.value)}>{targetOptions.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
+          <span>→ lembrar <b>{roleTargetLabel}</b></span>
           <button type="button" onClick={()=>removeReminder(rule.statusKey)}>Remover</button>
         </div>
       </div>;})}
@@ -6338,7 +6344,7 @@ function DocumentEditor({doc,patchDoc,deleteDoc,folders,companies,users,permissi
 function NotificationsPage({notifications,setNotifications,open,tasks,companies,users,statuses,user,alertsEnabled,notificationPermission,enableAlerts}){ 
   const permissions={...builtInNotificationPanelPermissionsForRole(user?.role),...(user?.notificationPanelPermissions||{})};
   const [tab,setTab]=useState('open'); 
-  const scoped=notifications.filter(n=>(!n.userId||n.userId===user.id));
+  const scoped=notifications.filter(n=>(!n.userId||n.userId===user.id)&&!isPushOnlyNotification(n));
   const effectiveTab=permissions.showTabs?tab:'open';
   const list=scoped.filter(n=>effectiveTab==='done'?n.done:!n.done); 
   const doneCount=scoped.filter(n=>n.done).length;
