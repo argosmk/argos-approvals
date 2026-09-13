@@ -42,5 +42,6 @@ $$;
 
 revoke all on function public.argos_patch_app_task(uuid,text,jsonb) from public;
 revoke all on function public.argos_patch_app_task(uuid,text,jsonb) from anon;
+grant execute on function public.argos_patch_app_task(uuid,text,jsonb) to postgres;
 grant execute on function public.argos_patch_app_task(uuid,text,jsonb) to authenticated;
 grant execute on function public.argos_patch_app_task(uuid,text,jsonb) to service_role;
