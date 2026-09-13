@@ -737,12 +737,14 @@ export const TASK_TYPES = ['Estático', 'Carrossel', 'Vídeo', 'Vídeo Inglês',
 export const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 export const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
 export const CLIENT_REQUEST_NOTIFICATION_EVENT = 'Solicitações de clientes';
-export const BASE_NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa'];
+export const BASE_NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo hoje','Prazo vencido'];
 export const NOTIFICATION_VISIBLE_EVENTS = [...BASE_NOTIFICATION_VISIBLE_EVENTS,CLIENT_REQUEST_NOTIFICATION_EVENT];
 export const NOTIFICATION_EVENT_ROWS = Object.freeze([
   Object.freeze({id:'status',event:'Status da tarefa',label:'Mudança de status'}),
   Object.freeze({id:'comment',event:'Comentário na tarefa',label:'Comentário'}),
   Object.freeze({id:'request',event:CLIENT_REQUEST_NOTIFICATION_EVENT,label:'Solicitação'}),
+  Object.freeze({id:'deadline_today',event:'Prazo hoje',label:'Prazo hoje'}),
+  Object.freeze({id:'deadline_overdue',event:'Prazo vencido',label:'Prazo vencido'}),
 ]);
 export function defaultNotificationPrefsForRole(role){
   if(role==='client') return [];

@@ -83,6 +83,23 @@ function profileAllowsPushEvent(profile: any, event: string | null | undefined) 
   return Array.isArray(legacyEvents) ? legacyEvents.includes(event) : true;
 }
 
+function profileAllowsSystemEvent(profile: any, event: string) {
+  const events = profile?.notification_prefs?.events;
+  if (Array.isArray(events)) return events.includes(event);
+  return profile?.role !== "client";
+}
+
+function saoPauloDateKey() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 async function deliverySettings(organizationId: string) {
   const { data } = await supabase
     .from("notification_delivery_settings")
@@ -248,17 +265,48 @@ async function generateReminderQueue() {
 
       for (const profileId of profileIds) {
         const sourceKey = `reminder:${rule.id}:${task.id}:${profileId}:${enteredKey}`;
+        const notificationId = sourceKey;
+        const reminderText = `A tarefa permanece em ${statusName} há ${elapsedMinutes} min.`;
+
+        const { error: notificationError } = await supabase
+          .from("app_notifications")
+          .upsert({
+            organization_id: rule.organization_id,
+            id: notificationId,
+            task_id: task.id,
+            user_id: profileId,
+            text: reminderText,
+            event: "Lembrete de status",
+            status_id: rule.status_key,
+            done: false,
+            at: new Date().toISOString(),
+            payload: {
+              actorId: null,
+              actorName: "Sistema",
+              reminder: true,
+              skip_auto_push: true,
+            },
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "organization_id,id" });
+        if (notificationError) {
+          console.error("reminder system notification insert failed", notificationError);
+          continue;
+        }
+
         const { error: insertError } = await supabase
           .from("notification_push_queue")
           .insert({
             organization_id: rule.organization_id,
             profile_id: profileId,
+            notification_id: notificationId,
             task_id: task.id,
             kind: "reminder",
+            event: "Lembrete de status",
             status_id: rule.status_key,
             source_key: sourceKey,
             deliver_after: new Date().toISOString(),
             payload: {
+              text: reminderText,
               rule_id: rule.id,
               occurrence_number: occurrence,
               status_name: statusName,
@@ -274,6 +322,72 @@ async function generateReminderQueue() {
   }
 
   return queued;
+}
+
+async function generateDeadlineNotifications() {
+  const today = saoPauloDateKey();
+  const { data: finalStatuses } = await supabase
+    .from("task_statuses")
+    .select("organization_id,key")
+    .eq("final", true);
+  const finalKeys = new Set((finalStatuses ?? []).map((row: any) => `${row.organization_id}:${row.key}`));
+
+  const { data: tasks, error } = await supabase
+    .from("app_tasks")
+    .select("id,organization_id,title,company_id,responsible_id,status,internal_date,archived")
+    .eq("archived", false)
+    .is("deleted_at", null)
+    .not("internal_date", "is", null);
+  if (error) throw error;
+
+  let created = 0;
+  for (const task of tasks ?? []) {
+    const deadline = String(task.internal_date || "").slice(0, 10);
+    if (!deadline || deadline > today) continue;
+    if (finalKeys.has(`${task.organization_id}:${task.status}`)) continue;
+
+    const event = deadline === today ? "Prazo hoje" : "Prazo vencido";
+    const text = deadline === today
+      ? "O prazo interno desta tarefa vence hoje."
+      : `O prazo interno desta tarefa venceu em ${deadline}.`;
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id,role,active,visible_statuses,company_ids,notification_prefs")
+      .eq("organization_id", task.organization_id)
+      .eq("active", true);
+
+    for (const profile of profiles ?? []) {
+      const isRecipient = profile.role === "admin"
+        || (profile.role === "team" && String(profile.id) === String(task.responsible_id || ""))
+        || (profile.role === "client" && Array.isArray(profile.company_ids) && profile.company_ids.includes(task.company_id));
+      if (!isRecipient) continue;
+      if (!profileCanSeeStatus(profile, task.status)) continue;
+      if (!profileAllowsSystemEvent(profile, event)) continue;
+
+      const notificationId = `deadline:${event}:${task.id}:${profile.id}:${deadline}`;
+      const { error: notificationError } = await supabase
+        .from("app_notifications")
+        .upsert({
+          organization_id: task.organization_id,
+          id: notificationId,
+          task_id: task.id,
+          user_id: String(profile.id),
+          text,
+          event,
+          status_id: task.status,
+          done: false,
+          at: new Date().toISOString(),
+          payload: { actorId: null, actorName: "Sistema", deadline },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "organization_id,id", ignoreDuplicates: true });
+      if (!notificationError) created++;
+      else if (!String(notificationError.message || "").toLowerCase().includes("duplicate")) {
+        console.error("deadline notification insert failed", notificationError);
+      }
+    }
+  }
+  return created;
 }
 
 async function processSingle(row: any) {
@@ -447,6 +561,7 @@ Deno.serve(async () => {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
     const queuedReminders = await generateReminderQueue();
+    const deadlineNotifications = await generateDeadlineNotifications();
     const nowIso = new Date().toISOString();
     const { data: dueRows, error } = await supabase
       .from("notification_push_queue")
@@ -486,7 +601,7 @@ Deno.serve(async () => {
       skipped += result.skipped;
     }
 
-    return json({ ok: true, queuedReminders, due: rows.length, sent, skipped });
+    return json({ ok: true, queuedReminders, deadlineNotifications, due: rows.length, sent, skipped });
   } catch (err) {
     console.error(err);
     const message = err instanceof Error ? err.message : String(err);
