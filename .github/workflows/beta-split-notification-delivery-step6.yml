@@ -1,0 +1,36 @@
+name: Beta split notification delivery step 6
+on:
+  push:
+    branches: [beta]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[split-delivery-step6]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+      - name: Apply exact patch
+        run: python scripts/split_notification_delivery_by_role_step6.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Validate scope
+        run: |
+          grep -q "NotificationDeliverySettings currentUser={currentUser} statuses={statuses} role={role}" src/main.jsx
+          grep -q "role==='team'&&<label>Agrupar push da equipe por" src/main.jsx
+          grep -q "role==='client'&&<label>Aguardar antes de avisar cliente" src/main.jsx
+          grep -q "role==='client'&&<label style={{margin:0}}><input type=\"checkbox\" checked={(rule.targets||\[\]).includes('client_approvers')}" src/main.jsx
+          grep -q "role==='team'&&<><label style={{margin:0}}><input type=\"checkbox\" checked={(rule.targets||\[\]).includes('task_responsible')}" src/main.jsx
+      - name: Commit clean step
+        run: |
+          git config user.name "ARGOS Refactor Bot"
+          git config user.email "actions@github.com"
+          git add src/main.jsx
+          git rm scripts/split_notification_delivery_by_role_step6.py .github/workflows/beta-split-notification-delivery-step6.yml
+          git commit -m "Beta: separa entrega entre equipe e responsáveis [split-delivery-step6]"
+          git push origin HEAD:beta
