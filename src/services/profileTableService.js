@@ -15,6 +15,10 @@ export function profileToPartialAppUser(profile){
     visibleStatuses: profile.visible_statuses || [],
     notificationPrefs: profile.notification_prefs?.events || undefined,
     notificationStatusPrefs: profile.notification_prefs?.statuses || undefined,
+    notificationPushPrefs: profile.notification_prefs ? {
+      events: Array.isArray(profile.notification_prefs?.push_events) ? profile.notification_prefs.push_events : undefined,
+      status: typeof profile.notification_prefs?.push_status === 'boolean' ? profile.notification_prefs.push_status : undefined,
+    } : undefined,
     notificationPrefsFromProfile: !!profile.notification_prefs,
     organizationId: profile.organization_id,
     companyIds: profile.company_ids || undefined,
@@ -62,6 +66,8 @@ export async function updateProfileNotificationPrefs(profileId, prefs={}){
   const notification_prefs = {
     events: prefs.notificationPrefs || [],
     statuses: prefs.notificationStatusPrefs || {},
+    push_events: Array.isArray(prefs.notificationPushPrefs?.events) ? prefs.notificationPushPrefs.events : (prefs.notificationPrefs || []),
+    push_status: typeof prefs.notificationPushPrefs?.status === 'boolean' ? prefs.notificationPushPrefs.status : false,
   };
   const { error } = await supabase
     .from('profiles')

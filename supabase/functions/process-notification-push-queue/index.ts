@@ -73,9 +73,14 @@ function statusChangePushEnabled(profile: any) {
 
 function profileAllowsPushEvent(profile: any, event: string | null | undefined) {
   if (!event) return true;
-  if (event === "Status da tarefa") return statusChangePushEnabled(profile);
-  const events = profile?.notification_prefs?.events;
-  return Array.isArray(events) ? events.includes(event) : true;
+  if (event === "Status da tarefa") {
+    const dedicated = profile?.notification_prefs?.push_status;
+    return typeof dedicated === "boolean" ? dedicated : statusChangePushEnabled(profile);
+  }
+  const dedicatedEvents = profile?.notification_prefs?.push_events;
+  if (Array.isArray(dedicatedEvents)) return dedicatedEvents.includes(event);
+  const legacyEvents = profile?.notification_prefs?.events;
+  return Array.isArray(legacyEvents) ? legacyEvents.includes(event) : true;
 }
 
 async function deliverySettings(organizationId: string) {
@@ -231,10 +236,10 @@ async function generateReminderQueue() {
       const enteredAt = logs?.[0]?.at || task.created_at;
       const elapsedMinutes = Math.floor(minutesBetween(enteredAt, nowMs));
       const first = Math.max(0, Number(rule.first_after_minutes ?? 1440));
-      const interval = Math.max(1, Number(rule.interval_minutes ?? 2880));
       if (elapsedMinutes < first) continue;
 
-      const occurrence = Math.floor((elapsedMinutes - first) / interval) + 1;
+      const occurrence = 1;
+      const enteredKey = new Date(enteredAt).toISOString();
       const profileIds = await reminderTargets(
         rule.organization_id,
         task,
@@ -242,7 +247,7 @@ async function generateReminderQueue() {
       );
 
       for (const profileId of profileIds) {
-        const sourceKey = `reminder:${rule.id}:${task.id}:${profileId}:${occurrence}`;
+        const sourceKey = `reminder:${rule.id}:${task.id}:${profileId}:${enteredKey}`;
         const { error: insertError } = await supabase
           .from("notification_push_queue")
           .insert({

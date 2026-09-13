@@ -492,6 +492,7 @@ export function builtInAccessDefaultForRole(role){
     visibleTypes:normalizedRole==='admin'?[]:[...TASK_TYPES],
     notificationPrefs:defaultNotificationPrefsForRole(normalizedRole),
     notificationStatusPrefs:{__all__:normalizedRole!=='client'},
+    notificationPushPrefs:defaultNotificationPushPrefsForRole(normalizedRole),
     notificationPanel:builtInNotificationPanelPermissionsForRole(normalizedRole),
     dashboard:{visible:fullDashboardVisibility()},
     tasks:builtInTaskPermissionsForRole(normalizedRole),
@@ -517,6 +518,7 @@ export function accessDefaultForRole(system,role){
     visibleTypes:Array.isArray(saved.visibleTypes)?saved.visibleTypes:builtIn.visibleTypes,
     notificationPrefs:Array.isArray(saved.notificationPrefs)?((role==='admin'&&saved.notificationPrefs.length===BASE_NOTIFICATION_VISIBLE_EVENTS.length&&BASE_NOTIFICATION_VISIBLE_EVENTS.every(ev=>saved.notificationPrefs.includes(ev)))?[...saved.notificationPrefs,CLIENT_REQUEST_NOTIFICATION_EVENT]:saved.notificationPrefs):builtIn.notificationPrefs,
     notificationStatusPrefs:saved.notificationStatusPrefs&&typeof saved.notificationStatusPrefs==='object'?saved.notificationStatusPrefs:builtIn.notificationStatusPrefs,
+    notificationPushPrefs:saved.notificationPushPrefs&&typeof saved.notificationPushPrefs==='object'?{events:Array.isArray(saved.notificationPushPrefs.events)?saved.notificationPushPrefs.events:builtIn.notificationPushPrefs.events,status:typeof saved.notificationPushPrefs.status==='boolean'?saved.notificationPushPrefs.status:builtIn.notificationPushPrefs.status}:builtIn.notificationPushPrefs,
     notificationPanel:{...builtIn.notificationPanel,...(saved.notificationPanel||{})},
     dashboard:{
       visible:{...builtIn.dashboard.visible,...(saved.dashboard?.visible||{})}
@@ -549,6 +551,7 @@ export function resolveUserAccess(user,system){
     visibleTypes:inheritance.types==='custom'?(user.visibleTypes||[]):defaults.visibleTypes,
     notificationPrefs:inheritance.notifications==='custom'?(user.notificationPrefs||[]):defaults.notificationPrefs,
     notificationStatusPrefs:inheritance.notifications==='custom'?(user.notificationStatusPrefs||{}):defaults.notificationStatusPrefs,
+    notificationPushPrefs:inheritance.notifications==='custom'?(user.notificationPushPrefs||defaults.notificationPushPrefs):defaults.notificationPushPrefs,
     notificationPanelPermissions:inheritance.notifications==='custom'
       ? {...defaults.notificationPanel,...(user.notificationPanelPermissions||{})}
       : defaults.notificationPanel,
@@ -734,10 +737,21 @@ export const TASK_TYPES = ['Estático', 'Carrossel', 'Vídeo', 'Vídeo Inglês',
 export const TEAM_DEFAULT = ['edicao','alteracao','aguardando'];
 export const CLIENT_DEFAULT = ['aguardando','aprovacao','agendamento'];
 export const CLIENT_REQUEST_NOTIFICATION_EVENT = 'Solicitações de clientes';
-export const BASE_NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa','Prazo vencido','Prazo hoje'];
+export const BASE_NOTIFICATION_VISIBLE_EVENTS = ['Comentário na tarefa'];
 export const NOTIFICATION_VISIBLE_EVENTS = [...BASE_NOTIFICATION_VISIBLE_EVENTS,CLIENT_REQUEST_NOTIFICATION_EVENT];
+export const NOTIFICATION_EVENT_ROWS = Object.freeze([
+  Object.freeze({id:'status',event:'Status da tarefa',label:'Mudança de status'}),
+  Object.freeze({id:'comment',event:'Comentário na tarefa',label:'Comentário'}),
+  Object.freeze({id:'request',event:CLIENT_REQUEST_NOTIFICATION_EVENT,label:'Solicitação'}),
+]);
 export function defaultNotificationPrefsForRole(role){
   if(role==='client') return [];
   if(role==='admin') return [...NOTIFICATION_VISIBLE_EVENTS];
   return [...BASE_NOTIFICATION_VISIBLE_EVENTS];
+}
+export function defaultNotificationPushPrefsForRole(role){
+  return {
+    events: defaultNotificationPrefsForRole(role),
+    status: role!=='client',
+  };
 }
