@@ -186,12 +186,5 @@ create trigger app_notifications_enqueue_push_trigger
 after insert on public.app_notifications
 for each row execute function public.enqueue_app_notification_push();
 
-select cron.schedule(
-  'argos-process-notification-push-queue-beta',
-  '* * * * *',
-  $$select net.http_post(
-      url := 'https://ejgunuqynqldwiplxaqq.supabase.co/functions/v1/process-notification-push-queue',
-      headers := jsonb_build_object('Content-Type','application/json'),
-      body := '{}'::jsonb
-    );$$
-);
+-- O agendamento do worker é configurado por ambiente fora desta migration.
+-- Isso evita gravar a URL do Supabase Dev/Beta em um banco de produção.
