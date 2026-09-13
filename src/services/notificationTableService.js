@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 const NOTIFICATION_TABLE='app_notifications';
+const pendingDeletedNotificationIds=new Set();
 
 function isoNow(){ return new Date().toISOString(); }
 function clone(value){
@@ -57,11 +58,20 @@ export async function loadNotificationRecords(organizationId){
     .is('deleted_at',null)
     .order('at',{ascending:false});
   if(error) throw error;
-  return (data||[]).map(notificationFromRow);
+
+  const rows=data||[];
+  const returnedIds=new Set(rows.map(row=>String(row.id)));
+  for(const id of [...pendingDeletedNotificationIds]){
+    if(!returnedIds.has(id)) pendingDeletedNotificationIds.delete(id);
+  }
+
+  return rows
+    .filter(row=>!pendingDeletedNotificationIds.has(String(row.id)))
+    .map(notificationFromRow);
 }
 
 export async function upsertNotificationRecords(organizationId,notifications=[]){
-  const clean=(notifications||[]).filter(n=>n?.id);
+  const clean=(notifications||[]).filter(n=>n?.id && !pendingDeletedNotificationIds.has(String(n.id)));
   if(!clean.length) return;
   const rows=clean.map(n=>notificationToRow(organizationId,n));
   const {error}=await supabase
@@ -73,13 +83,17 @@ export async function upsertNotificationRecords(organizationId,notifications=[])
 export async function softDeleteNotificationRecords(organizationId,ids=[]){
   const clean=[...new Set((ids||[]).filter(Boolean).map(String))];
   if(!clean.length) return;
+  clean.forEach(id=>pendingDeletedNotificationIds.add(id));
   const stamp=isoNow();
   const {error}=await supabase
     .from(NOTIFICATION_TABLE)
     .update({deleted_at:stamp,updated_at:stamp})
     .eq('organization_id',organizationId)
     .in('id',clean);
-  if(error) throw error;
+  if(error){
+    clean.forEach(id=>pendingDeletedNotificationIds.delete(id));
+    throw error;
+  }
 }
 
 export async function bootstrapNotificationsFromTable(organizationId,legacyNotifications=[]){
@@ -94,7 +108,7 @@ export async function bootstrapNotificationsFromTable(organizationId,legacyNotif
 function changedNotifications(previous=[],next=[]){
   const prevMap=new Map((previous||[]).filter(n=>n?.id).map(n=>[String(n.id),n]));
   return (next||[]).filter(n=>{
-    if(!n?.id) return false;
+    if(!n?.id || pendingDeletedNotificationIds.has(String(n.id))) return false;
     return JSON.stringify(prevMap.get(String(n.id))||null)!==JSON.stringify(n);
   });
 }
