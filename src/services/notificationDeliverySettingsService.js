@@ -88,11 +88,21 @@ export async function saveNotificationDeliverySettings(organizationId, settings 
   const { error: deleteError } = await deleteQuery;
   if (deleteError) throw new Error(`Não foi possível atualizar as regras de lembrete: ${deleteError.message}`);
 
-  if (normalizedRules.length) {
-    const { error: rulesError } = await supabase
+  const existingRules = normalizedRules.filter(rule => rule.id);
+  const newRules = normalizedRules.filter(rule => !rule.id);
+
+  if (existingRules.length) {
+    const { error: existingRulesError } = await supabase
       .from('notification_reminder_rules')
-      .upsert(normalizedRules, { onConflict: 'organization_id,status_key' });
-    if (rulesError) throw new Error(`Não foi possível salvar as regras de lembrete: ${rulesError.message}`);
+      .upsert(existingRules, { onConflict: 'organization_id,status_key' });
+    if (existingRulesError) throw new Error(`Não foi possível salvar as regras de lembrete existentes: ${existingRulesError.message}`);
+  }
+
+  if (newRules.length) {
+    const { error: newRulesError } = await supabase
+      .from('notification_reminder_rules')
+      .upsert(newRules, { onConflict: 'organization_id,status_key' });
+    if (newRulesError) throw new Error(`Não foi possível salvar as novas regras de lembrete: ${newRulesError.message}`);
   }
 
   return loadNotificationDeliverySettings(organizationId);
