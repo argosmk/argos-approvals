@@ -5497,7 +5497,7 @@ function AccessDefaultsEditor({system,setSystem,statuses=[],currentUser=null}){
             {NOTIFICATION_VISIBLE_EVENTS.map(ev=><label key={ev}><input type="checkbox" checked={(draft.notificationPrefs||[]).includes(ev)} onChange={e=>toggleEvent(ev,e.target.checked)}/>{ev}</label>)}
           </div>
           <div style={{marginTop:18,paddingTop:16,borderTop:'1px solid var(--line)'}}>
-            <NotificationDeliverySettings currentUser={currentUser} statuses={statuses}/>
+            <NotificationDeliverySettings currentUser={currentUser} statuses={statuses} role={role}/>
           </div>
         </AccessConfigCard>
 
@@ -5960,7 +5960,7 @@ function AppearanceSettings({system,setSystem}){
 }
 
 
-function NotificationDeliverySettings({currentUser,statuses}){
+function NotificationDeliverySettings({currentUser,statuses,role='team'}){
   const organizationId=currentUser?.organizationId;
   const empty={enabled:true,teamDigestMinutes:30,clientApprovalDelayMinutes:5,presenceGraceSeconds:120,rules:[]};
   const [form,setForm]=useState(empty);
@@ -6017,15 +6017,15 @@ function NotificationDeliverySettings({currentUser,statuses}){
 
   return <div className="panel" style={{marginBottom:18}}>
     <div className="public-portfolio-settings-head">
-      <div><h2 style={{marginBottom:6}}>Entrega de push e lembretes</h2><p className="muted" style={{margin:0}}>Configuração única para agrupamento da equipe, aviso de aprovação, presença e lembretes por status.</p></div>
+      <div><h2 style={{marginBottom:6}}>Entrega de push e lembretes</h2><p className="muted" style={{margin:0}}>{role==='client'?'Configurações de entrega para responsáveis/clientes, mantendo os mesmos limites de acesso por status.':'Configurações de entrega para equipe, mantendo os mesmos limites de acesso por status.'}</p></div>
       <label className="public-portfolio-active"><input type="checkbox" checked={form.enabled!==false} onChange={e=>setForm(prev=>({...prev,enabled:e.target.checked}))}/><span>Push ativo</span></label>
     </div>
     {loading?<p>Carregando configurações...</p>:<>
       {error&&<div className="cloud-error">{error}</div>}
       {message&&<div className="public-portfolio-success">{message}</div>}
-      <div className="form-three" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:12,marginTop:14}}>
-        <label>Agrupar push da equipe por (min)<input type="number" min="1" max="1440" value={form.teamDigestMinutes} onChange={e=>setForm(prev=>({...prev,teamDigestMinutes:e.target.value}))}/></label>
-        <label>Aguardar antes de avisar cliente (min)<input type="number" min="0" max="1440" value={form.clientApprovalDelayMinutes} onChange={e=>setForm(prev=>({...prev,clientApprovalDelayMinutes:e.target.value}))}/></label>
+      <div className="form-two" style={{marginTop:14}}>
+        {role==='team'&&<label>Agrupar push da equipe por (min)<input type="number" min="1" max="1440" value={form.teamDigestMinutes} onChange={e=>setForm(prev=>({...prev,teamDigestMinutes:e.target.value}))}/></label>}
+        {role==='client'&&<label>Aguardar antes de avisar cliente (min)<input type="number" min="0" max="1440" value={form.clientApprovalDelayMinutes} onChange={e=>setForm(prev=>({...prev,clientApprovalDelayMinutes:e.target.value}))}/></label>}
         <label>Ignorar push se ativo nos últimos (seg)<input type="number" min="0" max="3600" value={form.presenceGraceSeconds} onChange={e=>setForm(prev=>({...prev,presenceGraceSeconds:e.target.value}))}/></label>
       </div>
       <h3 style={{marginTop:22}}>Regras de lembrete</h3>
@@ -6044,9 +6044,8 @@ function NotificationDeliverySettings({currentUser,statuses}){
           </div>
           {rule.enabled===true&&<div style={{margin:'10px 0 4px 24px'}}>
             <div className="checks one-col compact-checks-v3" style={{gap:4,marginBottom:10}}>
-              <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('client_approvers')} onChange={e=>toggleTarget(status.id,'client_approvers',e.target.checked)}/> Clientes aprovadores</label>
-              <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('task_responsible')} onChange={e=>toggleTarget(status.id,'task_responsible',e.target.checked)}/> Responsável da tarefa</label>
-              <label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('admins')} onChange={e=>toggleTarget(status.id,'admins',e.target.checked)}/> Admins</label>
+              {role==='client'&&<label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('client_approvers')} onChange={e=>toggleTarget(status.id,'client_approvers',e.target.checked)}/> Clientes aprovadores</label>}
+              {role==='team'&&<><label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('task_responsible')} onChange={e=>toggleTarget(status.id,'task_responsible',e.target.checked)}/> Responsável da tarefa</label><label style={{margin:0}}><input type="checkbox" checked={(rule.targets||[]).includes('admins')} onChange={e=>toggleTarget(status.id,'admins',e.target.checked)}/> Admins</label></>}
             </div>
             <div className="form-two">
               <label>Primeiro lembrete após (min)<input type="number" min="0" value={rule.firstAfterMinutes} onChange={e=>updateRule(status.id,{firstAfterMinutes:e.target.value})}/></label>
