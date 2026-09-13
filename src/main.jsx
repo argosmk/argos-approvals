@@ -6091,7 +6091,7 @@ function NotificationDeliverySettings({currentUser,statuses,role='team'}){
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span>Se permanecer</span>
           <input type="number" min="1" value={hours} onChange={e=>patchReminder(rule.statusKey,{firstAfterMinutes:Math.max(1,parseInt(e.target.value,10)||1)*60})} style={{width:74}}/>
-          <span>hora(s) em <b>{status?.name||rule.statusKey}</b></span>
+          <span>hora(s) em <b style={{color:status?.color||undefined}}>{status?.name||rule.statusKey}</b></span>
           <span>→ lembrar <b>{roleTargetLabel}</b></span>
           <button type="button" onClick={()=>removeReminder(rule.statusKey)}>Remover</button>
         </div>
