@@ -223,3 +223,14 @@
   .rep-recado { text-align: left; }
   .rep-hero-meta { text-align: left; }
 }
+
+
+/* HEADER ROOT FIX 2026-09-14 */
+.rep-head{display:block;min-height:0;margin:0;padding:0 0 14px;border-bottom:1px solid rgba(255,255,255,.09)}
+.rep-head::after{content:none;display:none}
+.rep-head h1{
+  min-height:0;margin:0;padding:0 0 9px;
+  display:flex;align-items:center;gap:9px;
+  font-size:20px;line-height:1.15;font-weight:750;letter-spacing:0;
+}
+.rep-intro{margin:0;max-width:78ch;font-size:13px;color:var(--muted)}

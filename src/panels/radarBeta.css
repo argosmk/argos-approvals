@@ -162,3 +162,20 @@
 .radar-check input { width: auto; min-height: 0; }
 .radar-check small { color: var(--muted); font-weight: 500; }
 .radar-settings select { max-width: 220px; }
+
+
+/* HEADER ROOT FIX 2026-09-14 */
+.radar-head{
+  display:block; min-height:0; margin:0; padding:0 0 14px;
+  border-bottom:1px solid rgba(255,255,255,.09);
+}
+.radar-head::after{content:none;display:none}
+.radar-head h1{
+  min-height:0; margin:0; padding:0 0 9px;
+  display:flex; align-items:center; gap:0;
+  font-size:20px; line-height:1.15; font-weight:750; letter-spacing:0;
+}
+.radar-head-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.radar-intro{margin:0;max-width:62ch;font-size:13px}
+.radar-head-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0;align-self:auto}
+@media(max-width:760px){.radar-head-meta{display:grid;grid-template-columns:1fr}.radar-head-actions{justify-content:flex-start}}
