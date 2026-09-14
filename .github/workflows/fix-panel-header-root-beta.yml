@@ -1,0 +1,74 @@
+name: Fix panel header root beta
+
+on:
+  push:
+    branches: [beta]
+    paths: ['.github/workflows/fix-panel-header-root-beta.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply header root fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          radar_jsx = Path('src/panels/RadarBetaPanel.jsx')
+          s = radar_jsx.read_text(encoding='utf-8')
+          old = '''  return <section className="panel-page radar">\n    <header className="radar-head">\n      <div>\n        <h1>Radar de Pautas<span className="radar-beta">beta</span></h1>\n        <p>Procura assuntos em notícias, vídeos e redes a partir das palavras-chave de cada cliente. Sem IA, sem custo, isolado do resto do sistema.</p>\n      </div>\n      <div className="radar-head-actions">\n        <button onClick={() => setTab(tab === 'feed' ? 'briefings' : 'feed')}>{tab === 'feed' ? 'Briefings' : 'Voltar ao feed'}</button>\n        <button className="primary" disabled={!!scan} onClick={handleScan}>{scan ? 'Varrendo…' : 'Varredura agora'}</button>\n      </div>\n    </header>\n'''
+          new = '''  return <section className="panel-page radar">\n    <header className="radar-head">\n      <h1>Radar de Pautas<span className="radar-beta">beta</span></h1>\n    </header>\n    <div className="radar-head-meta">\n      <p className="radar-intro">Procura assuntos em notícias, vídeos e redes a partir das palavras-chave de cada cliente. Sem IA, sem custo, isolado do resto do sistema.</p>\n      <div className="radar-head-actions">\n        <button onClick={() => setTab(tab === 'feed' ? 'briefings' : 'feed')}>{tab === 'feed' ? 'Briefings' : 'Voltar ao feed'}</button>\n        <button className="primary" disabled={!!scan} onClick={handleScan}>{scan ? 'Varrendo…' : 'Varredura agora'}</button>\n      </div>\n    </div>\n'''
+          if old not in s:
+              raise SystemExit('Radar JSX anchor not found')
+          radar_jsx.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          rep_jsx = Path('src/panels/ReportsPanel.jsx')
+          s = rep_jsx.read_text(encoding='utf-8')
+          old = '''  return <section className="panel-page rep">\n    <header className="rep-head">\n      <h1>Relatórios<span className="rep-beta">beta</span></h1>\n      <p>Toda segunda às 8h o sistema fecha a semana; no dia 1º, o mês. Dá para gerar na hora também.</p>\n    </header>\n'''
+          new = '''  return <section className="panel-page rep">\n    <header className="rep-head">\n      <h1>Relatórios<span className="rep-beta">beta</span></h1>\n    </header>\n    <p className="rep-intro">Toda segunda às 8h o sistema fecha a semana; no dia 1º, o mês. Dá para gerar na hora também.</p>\n'''
+          if old not in s:
+              raise SystemExit('Reports JSX anchor not found')
+          rep_jsx.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          radar_css = Path('src/panels/radarBeta.css')
+          s = radar_css.read_text(encoding='utf-8')
+          marker = '/* HEADER ROOT FIX 2026-09-14 */'
+          if marker not in s:
+              s += '''\n\n/* HEADER ROOT FIX 2026-09-14 */\n.radar-head{\n  display:block; min-height:0; margin:0; padding:0 0 14px;\n  border-bottom:1px solid rgba(255,255,255,.09);\n}\n.radar-head::after{content:none;display:none}\n.radar-head h1{\n  min-height:0; margin:0; padding:0 0 9px;\n  display:flex; align-items:center; gap:0;\n  font-size:20px; line-height:1.15; font-weight:750; letter-spacing:0;\n}\n.radar-head-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}\n.radar-intro{margin:0;max-width:62ch;font-size:13px}\n.radar-head-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0;align-self:auto}\n@media(max-width:760px){.radar-head-meta{display:grid;grid-template-columns:1fr}.radar-head-actions{justify-content:flex-start}}\n'''
+          radar_css.write_text(s,encoding='utf-8')
+
+          rep_css = Path('src/panels/reports.css')
+          s = rep_css.read_text(encoding='utf-8')
+          marker = '/* HEADER ROOT FIX 2026-09-14 */'
+          if marker not in s:
+              s += '''\n\n/* HEADER ROOT FIX 2026-09-14 */\n.rep-head{display:block;min-height:0;margin:0;padding:0 0 14px;border-bottom:1px solid rgba(255,255,255,.09)}\n.rep-head::after{content:none;display:none}\n.rep-head h1{\n  min-height:0;margin:0;padding:0 0 9px;\n  display:flex;align-items:center;gap:9px;\n  font-size:20px;line-height:1.15;font-weight:750;letter-spacing:0;\n}\n.rep-intro{margin:0;max-width:78ch;font-size:13px;color:var(--muted)}\n'''
+          rep_css.write_text(s,encoding='utf-8')
+
+          style = Path('src/style.css')
+          s = style.read_text(encoding='utf-8')
+          marker = '/* ROUND HEADER ALIGNMENT ROOT FIX 2026-09-14 */'
+          if marker not in s:
+              s += '''\n\n/* ROUND HEADER ALIGNMENT ROOT FIX 2026-09-14 */\n/* Documentos volta a usar exatamente a mesma métrica do cabeçalho do Dashboard. */\n.main .documents-page .panel-header-block.docs-topbar > .panel-tabs-header{\n  min-height:0!important;\n  padding:0 0 14px!important;\n}\n.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{\n  padding:0 0 9px!important;\n  font-size:20px!important;\n  line-height:1.15!important;\n}\n/* Portfólios: cabeçalho em largura total; conteúdo continua limitado/centralizado. */\n.main .team-hub{max-width:none!important;margin:0!important;padding-bottom:48px!important}\n.main .team-hub > .team-stories-strip,\n.main .team-hub > .team-profile-area{\n  max-width:1180px;\n  margin-left:auto!important;\n  margin-right:auto!important;\n}\n'''
+          style.write_text(s,encoding='utf-8')
+      - run: npm ci
+      - run: npm run build
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name "argos-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/panels/RadarBetaPanel.jsx src/panels/ReportsPanel.jsx src/panels/radarBeta.css src/panels/reports.css src/style.css
+          git commit -m "Beta: corrige alinhamento estrutural dos cabeçalhos"
+          git rm .github/workflows/fix-panel-header-root-beta.yml
+          git commit -m "Beta: remove validação temporária do alinhamento"
+          git push origin beta
