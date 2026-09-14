@@ -2,15 +2,32 @@
 
 .radar { display: grid; gap: 18px; }
 
-/* cabeçalho */
-.radar-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.radar-head h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+/* cabeçalho — alinhado ao padrão global dos painéis */
+.radar-head {
+  position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0 18px;
+  align-items: start; min-height: 52px; margin: 0; padding: 0;
+}
+.radar-head::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 51px; height: 1px;
+  background: rgba(255,255,255,.10); pointer-events: none;
+}
+.radar-head > div:first-child { min-width: 0; }
+.radar-head h1 {
+  min-height: 52px; margin: 0; padding: 0 0 13px; box-sizing: border-box;
+  display: flex; align-items: flex-end; font-size: 22px; line-height: 1.15;
+  font-weight: 750; letter-spacing: 0;
+}
 .radar-beta {
   margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--gold); border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; vertical-align: 3px;
+  color: var(--gold); border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; transform: translateY(-1px);
 }
-.radar-head p { margin: 6px 0 0; max-width: 62ch; font-size: 13px; }
-.radar-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.radar-head p { margin: 10px 0 0; max-width: 62ch; font-size: 13px; }
+.radar-head-actions { display: flex; gap: 8px; flex-wrap: wrap; align-self: start; margin-top: 7px; }
+@media(max-width:760px){
+  .radar-head{grid-template-columns:1fr;gap:0}
+  .radar-head-actions{grid-row:2;margin:10px 0 0}
+  .radar-head p{margin-top:10px}
+}
 
 /* barra de filtros */
 .radar-bar {

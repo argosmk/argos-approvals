@@ -6,17 +6,24 @@
 /* ---------------------------------------------------------------- */
 /* cabeçalho                                                         */
 
-.rep-head { display: grid; gap: 5px; }
+.rep-head {
+  position: relative; display: grid; gap: 0; min-height: 52px; margin: 0; padding: 0;
+}
+.rep-head::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 51px; height: 1px;
+  background: rgba(255,255,255,.10); pointer-events: none;
+}
 .rep-head h1 {
-  margin: 0; font-size: 24px; letter-spacing: -.02em;
-  display: flex; align-items: center; gap: 9px;
+  min-height: 52px; margin: 0; padding: 0 0 13px; box-sizing: border-box;
+  font-size: 22px; line-height: 1.15; font-weight: 750; letter-spacing: 0;
+  display: flex; align-items: flex-end; gap: 9px;
 }
 .rep-beta {
   font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
   color: var(--gold); background: rgba(var(--accent-rgb), .08);
-  border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px;
+  border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; transform: translateY(-1px);
 }
-.rep-head p { margin: 0; max-width: 78ch; font-size: 13px; color: var(--muted); }
+.rep-head p { margin: 10px 0 0; max-width: 78ch; font-size: 13px; color: var(--muted); }
 
 /* ---------------------------------------------------------------- */
 /* barra de comando: filtro de cliente à esquerda, gerar à direita    */
