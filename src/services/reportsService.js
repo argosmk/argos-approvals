@@ -95,6 +95,7 @@ export function weekdayLabel(id) {
  * mostra seta nenhuma, em vez de fingir que houve estabilidade.
  */
 export function delta(atual, anterior) {
+  if (atual === null || atual === undefined || anterior === null || anterior === undefined) return null;
   const a = Number(atual);
   const b = Number(anterior);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
@@ -104,18 +105,19 @@ export function delta(atual, anterior) {
   return { dir: diff > 0 ? 'up' : 'down', abs: Math.abs(diff), pct: Math.round((diff / b) * 100) };
 }
 
-/** Os números que viram cartão no topo do relatório. */
+/** Os números que viram cartão no topo do relatório.
+ *  nivel 1 carrega a leitura; nivel 2 dá contexto e fica menor. */
 export function kpis(numbers) {
   const r = numbers?.resumo || {};
   const p = numbers?.semana_anterior || {};
   return [
-    { id: 'posts', label: 'Posts', valor: r.posts, anterior: p.posts },
-    { id: 'views', label: 'Views', valor: r.views, anterior: p.views },
-    { id: 'alcance', label: 'Contas alcançadas', valor: r.alcance, anterior: p.alcance },
-    { id: 'interacoes', label: 'Interações', valor: r.interacoes },
-    { id: 'seguidores', label: 'Seguidores ganhos', valor: r.seguidores_ganhos, anterior: p.seguidores_ganhos },
-    { id: 'perfil', label: 'Visitas ao perfil', valor: r.visitas_perfil },
-    { id: 'indice', label: 'Índice Argos', valor: r.indice_medio, anterior: p.indice_medio, casas: 1 },
+    { id: 'posts', label: 'Posts', valor: r.posts, anterior: p.posts, nivel: 1 },
+    { id: 'views', label: 'Views', valor: r.views, anterior: p.views, nivel: 1 },
+    { id: 'alcance', label: 'Contas alcançadas', valor: r.alcance, anterior: p.alcance, nivel: 1 },
+    { id: 'indice', label: 'Índice Argos', valor: r.indice_medio, anterior: p.indice_medio, casas: 1, nivel: 1 },
+    { id: 'interacoes', label: 'Interações', valor: r.interacoes, nivel: 2 },
+    { id: 'seguidores', label: 'Seguidores ganhos', valor: r.seguidores_ganhos, anterior: p.seguidores_ganhos, nivel: 2 },
+    { id: 'perfil', label: 'Visitas ao perfil', valor: r.visitas_perfil, nivel: 2 },
   ];
 }
 

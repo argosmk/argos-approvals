@@ -1,62 +1,138 @@
-/* Relatórios semanais — mesma linguagem visual do Radar, tokens do app. */
+/* Relatórios — métricas do Instagram. Mesma linguagem visual do Radar,
+   tokens do app: o ouro é a cor do dado, não da decoração. */
 
-.rep { display: grid; gap: 18px; }
+.rep { display: grid; gap: 16px; }
 
-/* cabeçalho */
-.rep-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.rep-head h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
-.rep-auto {
-  margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--gold); border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; vertical-align: 3px;
+/* ---------------------------------------------------------------- */
+/* cabeçalho                                                         */
+
+.rep-head { display: grid; gap: 5px; }
+.rep-head h1 {
+  margin: 0; font-size: 24px; letter-spacing: -.02em;
+  display: flex; align-items: center; gap: 9px;
 }
-.rep-head p { margin: 6px 0 0; max-width: 64ch; font-size: 13px; }
+.rep-beta {
+  font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--gold); background: rgba(var(--accent-rgb), .08);
+  border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px;
+}
+.rep-head p { margin: 0; max-width: 78ch; font-size: 13px; color: var(--muted); }
 
-/* duas colunas: semanas à esquerda, relatório à direita */
-.rep-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 18px; align-items: start; }
+/* ---------------------------------------------------------------- */
+/* barra de comando: filtro de cliente à esquerda, gerar à direita    */
+
+.rep-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 9px 11px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.rep-clients { display: flex; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.rep-chip {
+  height: 29px; padding: 0 11px; font-size: 12.5px; color: var(--text-2);
+  background: transparent; border: 1px solid var(--line); border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.rep-chip:hover { border-color: var(--line-gold); color: var(--text); }
+.rep-chip small { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rep-chip.is-on { color: var(--gold); border-color: var(--gold); background: rgba(var(--accent-rgb), .09); }
+.rep-chip.is-on small { color: var(--gold); }
+
+.rep-gerador { display: grid; gap: 5px; justify-items: end; }
+.rep-gerador-row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+.rep-gerador select {
+  height: 30px; padding: 0 26px 0 9px; font-size: 12px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; max-width: 200px;
+}
+.rep-gerador select:focus { outline: none; border-color: var(--gold); }
+.rep-btn {
+  height: 30px; padding: 0 14px; font-size: 12px; font-weight: 700;
+  color: var(--gold); background: rgba(var(--accent-rgb), .09);
+  border: 1px solid var(--line-gold); border-radius: 8px; white-space: nowrap;
+}
+.rep-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), .17); }
+.rep-btn:disabled { opacity: .5; cursor: default; }
+.rep-recado { margin: 0; font-size: 11.5px; color: var(--muted); max-width: 46ch; text-align: right; }
+.rep-recado.is-erro { color: #e08b86; }
+
+/* ---------------------------------------------------------------- */
+/* duas colunas: períodos à esquerda, relatório à direita             */
+
+.rep-layout { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 16px; align-items: start; }
 .rep-weeks {
-  display: grid; gap: 6px; padding: 10px; position: sticky; top: 14px;
+  display: grid; gap: 4px; padding: 8px; position: sticky; top: 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   max-height: calc(100vh - 28px); overflow: auto;
 }
 .rep-week {
-  width: 100%; text-align: left; height: auto; min-height: 0; padding: 9px 11px;
+  width: 100%; text-align: left; height: auto; min-height: 0; padding: 9px 10px;
+  display: grid; gap: 3px;
   border: 1px solid transparent; border-radius: 10px; background: transparent;
 }
-.rep-week:hover { background: var(--surface-2); border-color: var(--line); }
-.rep-week.is-on { background: rgba(var(--accent-rgb), .09); border-color: var(--gold); }
-.rep-week b { display: flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--text); }
-.rep-week b i { font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--muted); }
-.rep-week.is-on b i { color: var(--gold); }
+.rep-week:hover { background: var(--surface-2); }
+.rep-week.is-on { background: rgba(var(--accent-rgb), .09); border-color: var(--line-gold); }
+.rep-week-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rep-week b { font-size: 13px; font-weight: 650; color: var(--text); white-space: nowrap; }
 .rep-week.is-on b { color: var(--gold); }
-.rep-week small { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
-
-.rep-body { display: grid; gap: 16px; min-width: 0; }
-
-/* cartões de número */
-.rep-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 1px;
-  background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.rep-kpi { background: var(--surface); padding: 14px 16px; }
-.rep-kpi span { display: block; font-size: 11.5px; color: var(--muted); letter-spacing: .01em; }
-.rep-kpi b { display: block; margin-top: 4px; font-size: 26px; font-weight: 760; line-height: 1.05;
-  font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.rep-kpi i {
-  display: inline-block; margin-top: 6px; font-style: normal; font-size: 11.5px; font-weight: 650;
-  font-variant-numeric: tabular-nums; color: var(--muted);
+.rep-week small { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rep-pill {
+  font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 6px; flex: none;
 }
-.rep-kpi i.up { color: #6bc28d; }
-.rep-kpi i.down { color: #e08b86; }
+.rep-week.is-on .rep-pill { color: var(--gold); border-color: var(--line-gold); }
 
-/* blocos de texto */
+.rep-body { display: grid; gap: 14px; min-width: 0; }
+
+/* de quem é o relatório aberto */
+.rep-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.rep-hero h2 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+.rep-hero p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.rep-hero a { color: var(--muted); text-decoration: none; }
+.rep-hero a:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+.rep-hero-meta { font-size: 11.5px; color: var(--muted); text-align: right; }
+
+/* ---------------------------------------------------------------- */
+/* números                                                           */
+
+/* quatro que carregam a leitura */
+.rep-kpis {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+}
+.rep-kpi { background: var(--surface); padding: 15px 16px 14px; min-width: 0; }
+.rep-kpi span { display: block; font-size: 11.5px; color: var(--muted); }
+.rep-kpi b { display: block; margin-top: 3px; font-size: 29px; font-weight: 760; line-height: 1.04;
+  font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+.rep-delta {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 2px 7px;
+  font-style: normal; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums;
+  border-radius: 999px; background: rgba(255,255,255,.045); color: var(--muted);
+}
+.rep-delta.up { color: #6bc28d; background: rgba(107,194,141,.1); }
+.rep-delta.down { color: #e08b86; background: rgba(224,139,134,.1); }
+
+/* os que dão contexto, sem roubar a cena */
+.rep-mini { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.rep-mini > div { background: var(--surface); padding: 11px 16px; display: flex; align-items: baseline;
+  justify-content: space-between; gap: 10px; }
+.rep-mini span { font-size: 11.5px; color: var(--muted); }
+.rep-mini b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- */
+/* blocos de conteúdo                                                */
+
 .rep-block { padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
-.rep-block > h2 { margin: 0 0 10px; font-size: 17px; letter-spacing: -.02em; }
-.rep-block > h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 700; }
-.rep-narrative { margin: 0; font-size: 14.5px; line-height: 1.62; color: var(--text-2); max-width: 74ch; white-space: pre-wrap; }
+.rep-block > h2 { margin: 0 0 12px; font-size: 16px; letter-spacing: -.02em; }
+.rep-block > h3 { margin: 0 0 10px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); font-weight: 700; }
+.rep-narrative { margin: 0; display: grid; gap: 11px; }
+.rep-narrative p { margin: 0; font-size: 14.5px; line-height: 1.62; color: var(--text-2); max-width: 76ch; }
+.rep-narrative p:first-child { color: var(--text); }
 
-.rep-actions { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: ajuste; }
+.rep-actions { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; counter-reset: ajuste; }
 .rep-actions li {
-  display: grid; grid-template-columns: 24px 1fr; gap: 12px; align-items: baseline;
-  font-size: 14px; color: var(--text-2); padding: 10px 12px;
+  display: grid; grid-template-columns: 20px 1fr; gap: 11px; align-items: baseline;
+  font-size: 14px; line-height: 1.55; color: var(--text-2); padding: 11px 13px;
   border: 1px solid var(--line); border-left: 2px solid var(--gold); border-radius: 10px; background: var(--surface-2);
 }
 .rep-actions li::before {
@@ -65,8 +141,8 @@
 }
 
 /* melhores e piores */
-.rep-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.rep-posts { display: grid; gap: 8px; }
+.rep-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.rep-posts { display: grid; gap: 7px; }
 .rep-post {
   display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center;
   padding: 11px 13px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
@@ -74,21 +150,35 @@
 .rep-post a { font-size: 13px; font-weight: 650; text-decoration: none; color: var(--text); }
 .rep-post a:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
 .rep-post small { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); }
-.rep-post .rep-score { font-size: 18px; font-weight: 760; color: var(--gold); font-variant-numeric: tabular-nums; }
-.rep-post .rep-score em { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.rep-post .rep-score { text-align: right; font-size: 18px; font-weight: 760; color: var(--gold); font-variant-numeric: tabular-nums; }
+.rep-post .rep-score em { display: block; font-style: normal; font-size: 9px; font-weight: 700; color: var(--muted);
+  letter-spacing: .09em; text-transform: uppercase; }
 
-/* barras de magnitude — uma cor só, mais é mais escuro não se aplica:
-   aqui o comprimento carrega o valor e o ouro é a cor do dado. */
-.rep-bars { display: grid; gap: 7px; }
-.rep-bar { display: grid; grid-template-columns: minmax(90px, 150px) 1fr 56px; gap: 12px; align-items: center; font-size: 13px; }
+/* barras de magnitude — uma cor só: o comprimento carrega o valor,
+   e o número fica fora da barra, que dentro ele some quando a barra é curta. */
+.rep-bars { display: grid; gap: 6px; }
+.rep-bar { display: grid; grid-template-columns: minmax(90px, 148px) 1fr 58px; gap: 12px; align-items: center; font-size: 13px; }
 .rep-bar-label { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rep-bar-label small { color: var(--muted); font-size: 11px; margin-left: 5px; }
-.rep-track { height: 14px; background: rgba(255,255,255,.045); border-radius: 3px; }
-.rep-track i { display: block; height: 100%; max-height: 24px; background: var(--gold); border-radius: 0 4px 4px 0; min-width: 2px; }
+.rep-track { height: 13px; background: rgba(255,255,255,.04); border-radius: 3px; }
+.rep-track i { display: block; height: 100%; background: var(--gold); border-radius: 0 4px 4px 0; min-width: 2px; }
 .rep-bar-val { text-align: right; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
+/* três recortes lado a lado quando cabe. Em coluna estreita o rótulo sobe
+   para a própria linha, senão ele corta no meio da palavra. */
+.rep-cuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.rep-cuts .rep-bars { gap: 11px; }
+.rep-cuts .rep-bar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'rotulo valor' 'trilho trilho';
+  gap: 4px 10px;
+}
+.rep-cuts .rep-bar-label { grid-area: rotulo; }
+.rep-cuts .rep-bar-val { grid-area: valor; }
+.rep-cuts .rep-track { grid-area: trilho; }
+
 /* lacunas: o que está travando a análise */
-.rep-gaps { display: flex; align-items: flex-start; gap: 10px; padding: 13px 16px; font-size: 13px;
+.rep-gaps { padding: 13px 16px; font-size: 13px; line-height: 1.55;
   color: var(--text-2); background: rgba(var(--accent-rgb), .05);
   border: 1px solid var(--line-gold); border-radius: var(--radius); }
 .rep-gaps b { color: var(--gold); font-weight: 700; }
@@ -96,63 +186,33 @@
 .rep-gaps li { margin-bottom: 3px; }
 
 /* aviso de base pequena */
-.rep-thin { margin: 0 0 12px; padding: 10px 13px; font-size: 12.5px; color: var(--muted);
+.rep-thin { margin: 0; padding: 10px 13px; font-size: 12.5px; line-height: 1.5; color: var(--muted);
   border: 1px dashed var(--line-gold); border-radius: 10px; }
 
 /* vazio */
 .rep-empty { padding: 46px 24px; text-align: center; background: var(--surface);
   border: 1px dashed var(--line-gold); border-radius: var(--radius); }
 .rep-empty h3 { margin: 0 0 6px; font-size: 15px; color: var(--text); }
-.rep-empty p { margin: 0 auto; max-width: 52ch; font-size: 13px; }
+.rep-empty p { margin: 0 auto; max-width: 56ch; font-size: 13px; }
 
 .rep-note { margin: 0; font-size: 12px; color: var(--muted); }
-.rep-foot { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); padding-inline: 4px; }
+.rep-foot { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); padding-inline: 4px; }
 
+/* ---------------------------------------------------------------- */
 
-/* gerar na hora */
-.rep-gerador { display: grid; gap: 6px; justify-items: end; }
-.rep-gerador-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.rep-gerador select {
-  height: 34px; padding: 0 28px 0 10px; font-size: 12.5px; color: var(--text);
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; max-width: 220px;
+@media (max-width: 1100px) {
+  .rep-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.rep-gerador select:focus { outline: none; border-color: var(--gold); }
-.rep-btn {
-  height: 34px; padding: 0 16px; font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
-  color: var(--gold); background: rgba(var(--accent-rgb), .09);
-  border: 1px solid var(--line-gold); border-radius: 9px; white-space: nowrap;
-}
-.rep-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), .16); }
-.rep-btn:disabled { opacity: .55; cursor: default; }
-.rep-recado { margin: 0; font-size: 11.5px; color: var(--muted); max-width: 44ch; text-align: right; }
-.rep-recado.is-erro { color: #e08b86; }
-
-/* filtro por cliente */
-.rep-clients { display: flex; gap: 6px; flex-wrap: wrap; }
-.rep-chip {
-  height: 30px; padding: 0 12px; font-size: 12.5px; color: var(--text-2);
-  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.rep-chip:hover { border-color: var(--line-gold); }
-.rep-chip small { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.rep-chip.is-on { color: var(--gold); border-color: var(--gold); background: rgba(var(--accent-rgb), .09); }
-.rep-chip.is-on small { color: var(--gold); }
-
-/* quem é o relatório aberto */
-.rep-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.rep-title h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
-.rep-title h2 span { margin-left: 10px; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
-.rep-title a { font-size: 12.5px; color: var(--muted); text-decoration: none; }
-.rep-title a:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
-
 @media (max-width: 860px) {
   .rep-layout { grid-template-columns: 1fr; }
   .rep-weeks { position: static; max-height: none; display: flex; gap: 6px; overflow-x: auto; }
-  .rep-week { width: auto; flex: 0 0 auto; }
+  .rep-week { width: auto; flex: 0 0 auto; min-width: 150px; }
   .rep-two { grid-template-columns: 1fr; }
-  .rep-bar { grid-template-columns: 90px 1fr 48px; }
+  .rep-mini { grid-template-columns: 1fr; }
+  .rep-bar { grid-template-columns: 90px 1fr 50px; }
   .rep-gerador { justify-items: stretch; width: 100%; }
-  .rep-gerador select { max-width: none; flex: 1 1 140px; }
+  .rep-gerador-row { width: 100%; }
+  .rep-gerador select { max-width: none; flex: 1 1 130px; }
   .rep-recado { text-align: left; }
+  .rep-hero-meta { text-align: left; }
 }

@@ -60,7 +60,8 @@ export default function ReportsPanel({ companies = [] }) {
 
   const clientes = useMemo(() => {
     const ids = [...new Set(reports.map(r => r.company_id).filter(Boolean))];
-    return ids.map(id => ({ id, label: nomeDoCliente(id), count: reports.filter(r => r.company_id === id).length }))
+    return ids
+      .map(id => ({ id, label: nomeDoCliente(id), count: reports.filter(r => r.company_id === id).length }))
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }, [reports, nomeDoCliente]);
 
@@ -77,16 +78,28 @@ export default function ReportsPanel({ companies = [] }) {
 
   return <section className="panel-page rep">
     <header className="rep-head">
-      <div>
-        <h1>Relatórios<span className="rep-auto">automático</span></h1>
-        <p>Toda segunda às 8h o banco fecha a semana e escreve o que funcionou, o que não funcionou e os ajustes
-          para a próxima pauta. No dia 1º ele fecha o mês. Aqui do lado dá para gerar na hora, sem esperar.</p>
-      </div>
-      {!!contas.length && <Gerador contas={contas} nomeDoCliente={nomeDoCliente} aoGerar={carregar} />}
+      <h1>Relatórios<span className="rep-beta">beta</span></h1>
+      <p>Toda segunda às 8h o sistema fecha a semana; no dia 1º, o mês. Dá para gerar na hora também.</p>
     </header>
 
     {carregando && <p className="rep-note">Carregando…</p>}
     {erro && <div className="rep-empty"><h3>Não consegui carregar</h3><p>{erro}</p></div>}
+
+    {!carregando && !erro && (!!contas.length || clientes.length > 1) && <div className="rep-toolbar">
+      <div className="rep-clients">
+        {clientes.length > 1 && <>
+          <button className={`rep-chip${cliente === 'todos' ? ' is-on' : ''}`} onClick={() => setCliente('todos')}>
+            Todos<small>{reports.length}</small>
+          </button>
+          {clientes.map(c => <button
+            key={c.id}
+            className={`rep-chip${cliente === c.id ? ' is-on' : ''}`}
+            onClick={() => setCliente(c.id)}
+          >{c.label}<small>{c.count}</small></button>)}
+        </>}
+      </div>
+      {!!contas.length && <Gerador contas={contas} nomeDoCliente={nomeDoCliente} aoGerar={carregar} />}
+    </div>}
 
     {!carregando && !erro && !reports.length && <div className="rep-empty">
       <h3>Nenhum relatório ainda.</h3>
@@ -95,39 +108,29 @@ export default function ReportsPanel({ companies = [] }) {
         : 'Este painel lê os relatórios gravados no banco do sistema. No ambiente local, com banco simulado, ele fica vazio.'}</p>
     </div>}
 
-    {!carregando && !erro && !!reports.length && <>
-      {clientes.length > 1 && <div className="rep-clients">
-        <button className={`rep-chip${cliente === 'todos' ? ' is-on' : ''}`} onClick={() => setCliente('todos')}>
-          Todos<small>{reports.length}</small>
-        </button>
-        {clientes.map(c => <button
-          key={c.id}
-          className={`rep-chip${cliente === c.id ? ' is-on' : ''}`}
-          onClick={() => setCliente(c.id)}
-        >{c.label}<small>{c.count}</small></button>)}
-      </div>}
+    {!carregando && !erro && !!reports.length && <div className="rep-layout">
+      <aside className="rep-weeks">
+        {visiveis.map(r => {
+          const resumo = r.numbers?.resumo || {};
+          return <button
+            key={r.id}
+            className={`rep-week${r.id === selecionado ? ' is-on' : ''}`}
+            onClick={() => setSelecionado(r.id)}
+          >
+            <span className="rep-week-top">
+              <b>{periodLabel(r.period_start, r.period_end)}</b>
+              <i className="rep-pill">{kindLabel(r.kind)}</i>
+            </span>
+            <small>
+              {cliente === 'todos' ? `${nomeDoCliente(r.company_id)} · ` : ''}
+              {num(resumo.posts)} post(s)
+            </small>
+          </button>;
+        })}
+      </aside>
 
-      <div className="rep-layout">
-        <aside className="rep-weeks">
-          {visiveis.map(r => {
-            const resumo = r.numbers?.resumo || {};
-            return <button
-              key={r.id}
-              className={`rep-week${r.id === selecionado ? ' is-on' : ''}`}
-              onClick={() => setSelecionado(r.id)}
-            >
-              <b>{periodLabel(r.period_start, r.period_end)}<i>{kindLabel(r.kind)}</i></b>
-              <small>
-                {cliente === 'todos' ? `${nomeDoCliente(r.company_id)} · ` : ''}
-                {num(resumo.posts)} post(s)
-              </small>
-            </button>;
-          })}
-        </aside>
-
-        {atual && <ReportDetail report={atual} cliente={nomeDoCliente(atual.company_id)} />}
-      </div>
-    </>}
+      {atual && <ReportDetail report={atual} cliente={nomeDoCliente(atual.company_id)} />}
+    </div>}
   </section>;
 }
 
@@ -181,40 +184,51 @@ function ReportDetail({ report, cliente }) {
   const acoes = Array.isArray(report.actions) ? report.actions : [];
   const melhores = Array.isArray(n.melhores) ? n.melhores : [];
   const piores = Array.isArray(n.piores) ? n.piores : [];
-  const mesmosPosts = melhores.length && piores.length
-    && melhores.length === piores.length
-    && melhores.every(m => piores.some(p => p.permalink === m.permalink));
+  // com pouca base, o topo e o fundo da lista são os mesmos posts: aí não
+  // existe "melhores e piores", existe a lista do período.
+  const sobrepoe = melhores.some(m => piores.some(p => p.permalink === m.permalink));
+  const todosOsPosts = sobrepoe
+    ? [...melhores, ...piores.filter(p => !melhores.some(m => m.permalink === p.permalink))]
+      .sort((a, b) => Number(b.indice || 0) - Number(a.indice || 0))
+    : [];
   const base = temBaseParaComparar(n);
   const mensal = report.kind === 'monthly';
+  const cartoes = kpis(n);
+  const principais = cartoes.filter(k => k.nivel !== 2);
+  const apoio = cartoes.filter(k => k.nivel === 2);
+  const paragrafos = String(report.narrative || '').split(/\n{2,}/).filter(Boolean);
+  const pilares = Array.isArray(n.por_pilar) ? n.por_pilar : [];
+  const semPilar = !pilares.length || pilares.every(p => p.pilar === 'sem classificação');
+  const horarios = Array.isArray(n.por_horario) ? n.por_horario : [];
 
   return <div className="rep-body">
-    <div className="rep-title">
-      <h2>{cliente}<span>{kindLabel(report.kind)} · {periodLabel(report.period_start, report.period_end)}</span></h2>
-      {n.conta && <a href={`https://instagram.com/${n.conta}`} target="_blank" rel="noreferrer">@{n.conta}</a>}
+    <div className="rep-hero">
+      <div>
+        <h2>{cliente}</h2>
+        <p>
+          {kindLabel(report.kind)} · {periodLabel(report.period_start, report.period_end)}
+          {n.conta && <> · <a href={`https://instagram.com/${n.conta}`} target="_blank" rel="noreferrer">@{n.conta}</a></>}
+        </p>
+      </div>
+      <div className="rep-hero-meta">Gerado em {dateLabel(report.created_at)}</div>
     </div>
 
     <div className="rep-kpis">
-      {kpis(n).map(k => {
-        const d = delta(k.valor, k.anterior);
-        return <div className="rep-kpi" key={k.id}>
-          <span>{k.label}</span>
-          <b>{num(k.valor, k.casas || 0)}</b>
-          {d && d.dir !== 'flat' && <i className={d.dir}>
-            {d.dir === 'up' ? '↑' : '↓'} {num(d.abs, k.casas || 0)}{d.pct != null ? ` (${Math.abs(d.pct)}%)` : ''}
-          </i>}
-          {d && d.dir === 'flat' && <i>igual ao período anterior</i>}
-        </div>;
-      })}
+      {principais.map(k => <Kpi key={k.id} k={k} />)}
     </div>
+
+    {!!apoio.length && <div className="rep-mini">
+      {apoio.map(k => <div key={k.id}><span>{k.label}</span><b>{num(k.valor, k.casas || 0)}</b></div>)}
+    </div>}
 
     {!base && <p className="rep-thin">
       Menos de {MINIMO_PARA_COMPARAR} posts no período: o que está abaixo é registro, não tendência.
       Comparação entre formatos e horários só passa a significar alguma coisa com mais volume.
     </p>}
 
-    {report.narrative && <section className="rep-block">
+    {!!paragrafos.length && <section className="rep-block">
       <h2>A leitura {mensal ? 'do mês' : 'da semana'}</h2>
-      <p className="rep-narrative">{report.narrative}</p>
+      <div className="rep-narrative">{paragrafos.map((p, i) => <p key={i}>{p}</p>)}</div>
     </section>}
 
     {!!acoes.length && <section className="rep-block">
@@ -222,52 +236,78 @@ function ReportDetail({ report, cliente }) {
       <ol className="rep-actions">{acoes.map((a, i) => <li key={i}>{String(a)}</li>)}</ol>
     </section>}
 
-    {(melhores.length > 0) && <section className="rep-block rep-two">
+    {sobrepoe && <section className="rep-block">
+      <h3>Posts com métrica confiável no período</h3>
+      <PostList posts={todosOsPosts} />
+      <p className="rep-note" style={{ marginTop: 10 }}>
+        Poucos posts medidos: o topo e o fundo do ranking seriam os mesmos, então aqui vai a lista inteira.
+      </p>
+    </section>}
+
+    {!sobrepoe && melhores.length > 0 && <section className="rep-block rep-two">
       <div>
-        <h3>{mesmosPosts ? 'Posts do período' : 'Melhores'}</h3>
+        <h3>Melhores</h3>
         <PostList posts={melhores} />
       </div>
-      {!mesmosPosts && <div>
+      <div>
         <h3>Piores</h3>
         <PostList posts={piores} />
-      </div>}
+      </div>
     </section>}
 
-    {(n.por_formato?.length > 0 || n.por_pilar?.length > 0) && <section className="rep-block">
-      <h3>Por formato</h3>
-      <Bars
-        itens={(n.por_formato || []).map(f => ({
-          label: formatLabel(f.formato), extra: `${f.posts} post(s)`, valor: f.views_medio,
-        }))}
-        sufixo="views em média"
-      />
-      <h3 style={{ marginTop: 20 }}>Por pilar</h3>
-      <Bars
-        itens={(n.por_pilar || []).map(p => ({
-          label: p.pilar, extra: `${p.posts} post(s)`, valor: p.views_medio,
-        }))}
-        sufixo="views em média"
-      />
-    </section>}
-
-    {n.por_horario?.length > 0 && <section className="rep-block">
-      <h3>Por horário</h3>
-      <Bars
-        itens={n.por_horario.map(h => ({
-          label: `${weekdayLabel(h.dia_semana)} ${String(h.hora).padStart(2, '0')}h`,
-          extra: `${h.posts} post(s)`, valor: h.views_medio,
-        }))}
-        sufixo="views em média"
-      />
-    </section>}
+    <div className="rep-cuts">
+      <section className="rep-block">
+        <h3>Por formato</h3>
+        <Bars
+          itens={(n.por_formato || []).map(f => ({
+            label: formatLabel(f.formato), extra: `${f.posts} post(s)`, valor: f.views_medio,
+          }))}
+          sufixo="views em média"
+        />
+      </section>
+      <section className="rep-block">
+        <h3>Por pilar</h3>
+        {semPilar
+          ? <p className="rep-note">Nenhum post classificado por pilar ainda — sem isso o relatório só compara formato.</p>
+          : <Bars
+              itens={(n.por_pilar || []).map(p => ({
+                label: p.pilar, extra: `${p.posts} post(s)`, valor: p.views_medio,
+              }))}
+              sufixo="views em média"
+            />}
+      </section>
+      <section className="rep-block">
+        <h3>Melhores horários</h3>
+        <Bars
+          itens={horarios.slice(0, 6).map(h => ({
+            label: `${weekdayLabel(h.dia_semana)} ${String(h.hora).padStart(2, '0')}h`,
+            extra: `${h.posts} post(s)`, valor: h.views_medio,
+          }))}
+          sufixo="views em média"
+        />
+        {horarios.length > 6 && <p className="rep-note" style={{ marginTop: 10 }}>
+          Mais {horarios.length - 6} horário(s) com média menor.
+        </p>}
+      </section>
+    </div>
 
     <Gaps lacunas={n.lacunas} />
 
     <div className="rep-foot">
-      <span>Período: {periodLabel(report.period_start, report.period_end)}</span>
-      <span>Gerado em {dateLabel(report.created_at)}</span>
-      <span>Só posts desta conta no Instagram, medidos pelo próprio Instagram.</span>
+      <span>Os números cobrem todos os posts da conta no período, não só os produzidos pela Argos.</span>
     </div>
+  </div>;
+}
+
+function Kpi({ k }) {
+  const d = delta(k.valor, k.anterior);
+  return <div className="rep-kpi">
+    <span>{k.label}</span>
+    <b>{num(k.valor, k.casas || 0)}</b>
+    {d && d.dir !== 'flat' && <i className={`rep-delta ${d.dir}`}>
+      {d.dir === 'up' ? '↑' : '↓'} {num(d.abs, k.casas || 0)}{d.pct != null ? ` (${Math.abs(d.pct)}%)` : ''}
+    </i>}
+    {d && d.dir === 'flat' && <i className="rep-delta">igual ao anterior</i>}
   </div>;
 }
 
@@ -320,9 +360,7 @@ function Gaps({ lacunas }) {
   }
   if (!itens.length) return null;
   return <div className="rep-gaps">
-    <div>
-      <b>O que está limitando esta análise</b>
-      <ul>{itens.map((t, i) => <li key={i}>{t}</li>)}</ul>
-    </div>
+    <b>O que está limitando esta análise</b>
+    <ul>{itens.map((t, i) => <li key={i}>{t}</li>)}</ul>
   </div>;
 }
