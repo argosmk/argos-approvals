@@ -1,7 +1,6 @@
 /* Cabeçalhos especiais alinhados à mesma régua visual do Dashboard. */
 .main .radar .radar-head,
-.main .rep .rep-head,
-.main .documents-page .panel-header-block.docs-topbar > .panel-tabs-header{
+.main .rep .rep-head{
   min-height:0!important;
   padding:0!important;
   margin:0!important;
@@ -16,8 +15,7 @@
 }
 
 .main .radar .radar-head h1,
-.main .rep .rep-head h1,
-.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{
+.main .rep .rep-head h1{
   min-height:0!important;
   margin:0!important;
   padding:0 0 9px!important;
@@ -26,4 +24,74 @@
   font-weight:750!important;
   letter-spacing:0!important;
   box-sizing:border-box!important;
+}
+
+/* Documentos: replica a geometria completa usada pelo PanelTabsHeader do Dashboard.
+   Há várias regras legadas específicas de docs no style.css, então aqui zeramos
+   não só espaçamento, mas também display, grid e alinhamento do bloco inteiro. */
+.main .documents-page .panel-header-block.docs-topbar{
+  display:block!important;
+  width:100%!important;
+  min-height:0!important;
+  margin:0 0 18px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.main .documents-page .panel-header-block.docs-topbar > .panel-tabs-header{
+  display:block!important;
+  width:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-bottom:1px solid rgba(255,255,255,.09)!important;
+  box-sizing:border-box!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+  display:grid!important;
+  grid-template-columns:240px minmax(0,1fr)!important;
+  align-items:end!important;
+  column-gap:34px!important;
+  row-gap:10px!important;
+  width:100%!important;
+  min-width:0!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{
+  width:240px!important;
+  min-width:240px!important;
+  max-width:240px!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0 0 9px!important;
+  font-size:20px!important;
+  line-height:1.15!important;
+  font-weight:750!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+  box-sizing:border-box!important;
+}
+
+@media(max-width:980px){
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+    grid-template-columns:220px minmax(0,1fr)!important;
+    column-gap:26px!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{
+    width:220px!important;
+    min-width:220px!important;
+    max-width:220px!important;
+  }
+}
+@media(max-width:760px){
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading{
+    grid-template-columns:1fr!important;
+    row-gap:12px!important;
+  }
+  .main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    padding-bottom:8px!important;
+  }
 }
