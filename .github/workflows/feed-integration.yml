@@ -15,7 +15,7 @@ jobs:
           fetch-depth: 0
       - name: Restore feed payload
         run: |
-          base64 -d .tmp/feed_payload.b64 > /tmp/feed_payload.tgz
+          cat .tmp/feed_payload.part1 .tmp/feed_payload.part2 .tmp/feed_payload.part3 .tmp/feed_payload.part4 .tmp/feed_payload.part5 .tmp/feed_payload.part6 | base64 -d > /tmp/feed_payload.tgz
           tar -xzf /tmp/feed_payload.tgz -C .
           python scripts/apply_feed_integration.py
       - name: Install dependencies
@@ -33,7 +33,7 @@ jobs:
         run: |
           git config user.name "ARGOS Refactor Bot"
           git config user.email "actions@github.com"
-          git rm .tmp/feed_payload.b64 .github/workflows/feed-integration.yml scripts/apply_feed_integration.py
+          git rm .tmp/feed_payload.b64 .tmp/feed_payload.part1 .tmp/feed_payload.part2 .tmp/feed_payload.part3 .tmp/feed_payload.part4 .tmp/feed_payload.part5 .tmp/feed_payload.part6 .github/workflows/feed-integration.yml scripts/apply_feed_integration.py
           git add src/main.jsx src/services/panelAccess.js src/services/radarService.js src/panels/RadarBetaPanel.jsx src/panels/radarBeta.css functions/api/radar/fetch.js vite.config.js
           git commit -m "Integra Radar de Pautas [feed-integration-run]"
           git pull --rebase origin feed-integration
