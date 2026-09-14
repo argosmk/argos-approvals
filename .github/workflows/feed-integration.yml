@@ -1,0 +1,40 @@
+name: Feed integration validation
+on:
+  push:
+    branches: [feed-integration]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: ${{ !contains(github.event.head_commit.message, '[feed-integration-run]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feed-integration
+          fetch-depth: 0
+      - name: Restore feed payload
+        run: |
+          base64 -d .tmp/feed_payload.b64 > /tmp/feed_payload.tgz
+          tar -xzf /tmp/feed_payload.tgz -C .
+          python scripts/apply_feed_integration.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Validate feed wiring
+        run: |
+          grep -q "RadarBetaPanel" src/main.jsx
+          grep -q "radar: 'radar'" src/services/panelAccess.js
+          grep -q "const PROXY_URL = '/api/radar/fetch'" src/services/radarService.js
+          test -f functions/api/radar/fetch.js
+          test -f vite.config.js
+      - name: Commit validated integration
+        run: |
+          git config user.name "ARGOS Refactor Bot"
+          git config user.email "actions@github.com"
+          git rm .tmp/feed_payload.b64 .github/workflows/feed-integration.yml scripts/apply_feed_integration.py
+          git add src/main.jsx src/services/panelAccess.js src/services/radarService.js src/panels/RadarBetaPanel.jsx src/panels/radarBeta.css functions/api/radar/fetch.js vite.config.js
+          git commit -m "Integra Radar de Pautas [feed-integration-run]"
+          git pull --rebase origin feed-integration
+          git push origin HEAD:feed-integration
