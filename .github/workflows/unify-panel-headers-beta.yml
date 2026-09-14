@@ -1,0 +1,121 @@
+name: Unify panel headers beta
+
+on:
+  push:
+    branches: [beta]
+    paths: ['.github/workflows/unify-panel-headers-beta.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply surgical header patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          radar = Path('src/panels/radarBeta.css')
+          s = radar.read_text(encoding='utf-8')
+          old = """/* cabeçalho */
+          .radar-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+          .radar-head h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+          .radar-beta {
+            margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+            color: var(--gold); border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; vertical-align: 3px;
+          }
+          .radar-head p { margin: 6px 0 0; max-width: 62ch; font-size: 13px; }
+          .radar-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+          """
+          new = """/* cabeçalho — alinhado ao padrão global dos painéis */
+          .radar-head {
+            position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0 18px;
+            align-items: start; min-height: 52px; margin: 0; padding: 0;
+          }
+          .radar-head::after {
+            content: ''; position: absolute; left: 0; right: 0; top: 51px; height: 1px;
+            background: rgba(255,255,255,.10); pointer-events: none;
+          }
+          .radar-head > div:first-child { min-width: 0; }
+          .radar-head h1 {
+            min-height: 52px; margin: 0; padding: 0 0 13px; box-sizing: border-box;
+            display: flex; align-items: flex-end; font-size: 22px; line-height: 1.15;
+            font-weight: 750; letter-spacing: 0;
+          }
+          .radar-beta {
+            margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+            color: var(--gold); border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; transform: translateY(-1px);
+          }
+          .radar-head p { margin: 10px 0 0; max-width: 62ch; font-size: 13px; }
+          .radar-head-actions { display: flex; gap: 8px; flex-wrap: wrap; align-self: start; margin-top: 7px; }
+          @media(max-width:760px){
+            .radar-head{grid-template-columns:1fr;gap:0}
+            .radar-head-actions{grid-row:2;margin:10px 0 0}
+            .radar-head p{margin-top:10px}
+          }
+          """
+          old = '\n'.join(line[10:] if line.startswith('          ') else line for line in old.splitlines()) + '\n'
+          new = '\n'.join(line[10:] if line.startswith('          ') else line for line in new.splitlines()) + '\n'
+          if old not in s:
+              raise SystemExit('radar header anchor not found')
+          radar.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          rep = Path('src/panels/reports.css')
+          s = rep.read_text(encoding='utf-8')
+          old = """.rep-head { display: grid; gap: 5px; }
+          .rep-head h1 {
+            margin: 0; font-size: 24px; letter-spacing: -.02em;
+            display: flex; align-items: center; gap: 9px;
+          }
+          .rep-beta {
+            font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+            color: var(--gold); background: rgba(var(--accent-rgb), .08);
+            border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px;
+          }
+          .rep-head p { margin: 0; max-width: 78ch; font-size: 13px; color: var(--muted); }
+          """
+          new = """.rep-head {
+            position: relative; display: grid; gap: 0; min-height: 52px; margin: 0; padding: 0;
+          }
+          .rep-head::after {
+            content: ''; position: absolute; left: 0; right: 0; top: 51px; height: 1px;
+            background: rgba(255,255,255,.10); pointer-events: none;
+          }
+          .rep-head h1 {
+            min-height: 52px; margin: 0; padding: 0 0 13px; box-sizing: border-box;
+            font-size: 22px; line-height: 1.15; font-weight: 750; letter-spacing: 0;
+            display: flex; align-items: flex-end; gap: 9px;
+          }
+          .rep-beta {
+            font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+            color: var(--gold); background: rgba(var(--accent-rgb), .08);
+            border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; transform: translateY(-1px);
+          }
+          .rep-head p { margin: 10px 0 0; max-width: 78ch; font-size: 13px; color: var(--muted); }
+          """
+          old = '\n'.join(line[10:] if line.startswith('          ') else line for line in old.splitlines()) + '\n'
+          new = '\n'.join(line[10:] if line.startswith('          ') else line for line in new.splitlines()) + '\n'
+          if old not in s:
+              raise SystemExit('reports header anchor not found')
+          rep.write_text(s.replace(old, new, 1), encoding='utf-8')
+      - run: npm ci
+      - run: npm run build
+      - name: Commit design and remove temporary workflow
+        run: |
+          git config user.name "argos-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/panels/radarBeta.css src/panels/reports.css
+          git commit -m "Beta: padroniza cabeçalhos Radar e Relatórios"
+          git rm .github/workflows/unify-panel-headers-beta.yml
+          git commit -m "Beta: remove validação temporária dos cabeçalhos"
+          git push origin beta
