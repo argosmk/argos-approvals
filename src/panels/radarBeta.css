@@ -1,0 +1,147 @@
+/* Radar de Pautas (beta) — visual próprio do painel, isolado do resto do app. */
+
+.radar { display: grid; gap: 18px; }
+
+/* cabeçalho */
+.radar-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.radar-head h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+.radar-beta {
+  margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--gold); border: 1px solid var(--line-gold); border-radius: 999px; padding: 3px 8px; vertical-align: 3px;
+}
+.radar-head p { margin: 6px 0 0; max-width: 62ch; font-size: 13px; }
+.radar-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* barra de filtros */
+.radar-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.radar-chip {
+  min-height: 30px; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 650;
+  background: transparent; border: 1px solid var(--line); color: var(--text-2);
+}
+.radar-chip:hover { border-color: rgba(var(--accent-rgb), .4); background: var(--surface-2); }
+.radar-chip.is-on { border-color: var(--gold); color: var(--gold); background: rgba(var(--accent-rgb), .09); }
+.radar-chip .radar-chip-count { opacity: .6; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.radar-bar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.radar-bar-right input { width: 62px; min-height: 32px; text-align: center; }
+
+/* varredura */
+.radar-scan { padding: 14px 16px; background: var(--surface); border: 1px solid var(--line-gold); border-radius: var(--radius); }
+.radar-scan-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.radar-scan-top b { color: var(--text); }
+.radar-scan-top span { color: var(--muted); }
+.radar-scan-top button { margin-left: auto; min-height: 30px; padding: 4px 10px; font-size: 12px; }
+.radar-progress { height: 5px; margin-top: 12px; border-radius: 999px; background: rgba(255,255,255,.06); overflow: hidden; }
+.radar-progress i { display: block; height: 100%; background: var(--gold); border-radius: 999px; transition: width .25s ease; }
+.radar-status { margin: 0; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.radar-status .radar-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.radar-status.is-ok .radar-dot { background: #4ade80; }
+.radar-status.is-warn .radar-dot { background: var(--gold); }
+.radar-status.is-bad { color: #f7a9a3; }
+.radar-status.is-bad .radar-dot { background: var(--danger); }
+
+/* lista de pautas */
+.radar-list { display: grid; gap: 10px; }
+.radar-card {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start;
+  padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+.radar-card:hover { border-color: rgba(var(--accent-rgb), .3); background: var(--surface-2); }
+.radar-card.is-saved { border-color: var(--line-gold); }
+.radar-card-source {
+  display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+}
+.radar-card-source .radar-sep { opacity: .45; }
+.radar-card-title {
+  display: inline-block; margin: 7px 0 9px; font-size: 15.5px; line-height: 1.35; font-weight: 720;
+  color: var(--text); text-decoration: none; letter-spacing: -.01em;
+}
+.radar-card-title:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+.radar-card-snippet { margin: 0 0 10px; font-size: 13px; color: var(--text-2); opacity: .82; max-width: 78ch; }
+.radar-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.radar-tag {
+  font-size: 11px; font-weight: 650; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,.02);
+}
+.radar-tag.is-client { color: var(--text-2); border-color: rgba(255,255,255,.14); }
+.radar-tag.is-client em { font-style: normal; opacity: .7; margin: 0 4px 0 6px; font-weight: 600; }
+.radar-tag.is-client b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.radar-tag.is-term::before { content: "#"; opacity: .5; margin-right: 2px; }
+
+/* ações do card */
+.radar-card-actions { display: grid; gap: 6px; justify-items: stretch; min-width: 104px; }
+.radar-card-actions button { min-height: 32px; padding: 5px 10px; font-size: 12px; font-weight: 650; }
+.radar-card-actions .radar-saved { color: var(--gold); border-color: var(--line-gold); }
+
+/* vazio */
+.radar-empty {
+  padding: 40px 24px; text-align: center; background: var(--surface); border: 1px dashed var(--line-gold);
+  border-radius: var(--radius);
+}
+.radar-empty h3 { margin: 0 0 6px; font-size: 15px; color: var(--text); }
+.radar-empty p { margin: 0 auto; max-width: 46ch; font-size: 13px; }
+
+/* briefings */
+.radar-clients { padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.radar-clients-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.radar-clients-head b { font-size: 13px; }
+.radar-clients-head select { margin-left: auto; min-height: 34px; max-width: 220px; }
+.radar-clients-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.radar-editor { padding: 18px 20px; background: var(--surface); border: 1px solid var(--line-gold); border-radius: var(--radius); }
+.radar-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.radar-editor-head h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+.radar-editor-head .radar-editor-tools { display: flex; align-items: center; gap: 10px; }
+.radar-switch { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.radar-form { display: grid; gap: 14px; }
+.radar-form-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.radar-form label > small { font-weight: 500; opacity: .8; }
+.radar-sources { display: grid; gap: 6px; margin-top: 6px; }
+.radar-sources label { flex-direction: row; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.radar-note { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .radar-card { grid-template-columns: 1fr; }
+  .radar-card-actions { grid-auto-flow: column; justify-content: start; }
+  .radar-form-two { grid-template-columns: 1fr; }
+}
+
+/* por que essa pauta apareceu */
+.radar-card-why {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  margin: 10px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.5;
+}
+.radar-card-why b { color: var(--text-2); font-weight: 650; }
+.radar-card-why .radar-why-label { text-transform: uppercase; letter-spacing: .07em; font-size: 10px; font-weight: 700; opacity: .65; }
+.radar-score { display: inline-flex; align-items: baseline; gap: 5px; }
+.radar-score i { font-style: normal; opacity: .7; font-weight: 500; }
+
+/* selo de formato (notícia, vídeo, post…) */
+.radar-kind {
+  padding: 2px 7px; border-radius: 6px; font-size: 10px; letter-spacing: .07em;
+  border: 1px solid var(--line-gold); color: var(--gold); background: rgba(var(--accent-rgb), .07);
+}
+.radar-card.kind-video .radar-kind { color: #f0a6a0; border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.07); }
+.radar-card.kind-social .radar-kind { color: #8fb8f0; border-color: rgba(120,160,240,.3); background: rgba(120,160,240,.08); }
+.radar-card.kind-discussao .radar-kind { color: #9ee0b0; border-color: rgba(74,222,128,.28); background: rgba(74,222,128,.07); }
+
+/* abas do feed (pautas / salvos) */
+.radar-views { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.02); }
+.radar-views button {
+  min-height: 28px; padding: 3px 14px; border-radius: 999px; border: 1px solid transparent;
+  background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 650;
+}
+.radar-views button.is-on { background: var(--surface-3); color: var(--text); border-color: var(--line); }
+
+/* configuração da varredura */
+.radar-settings { padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.radar-settings > b { display: block; font-size: 13px; margin-bottom: 4px; }
+.radar-settings > small { display: block; color: var(--muted); font-size: 12px; }
+.radar-settings-grid { display: flex; gap: 10px 22px; flex-wrap: wrap; margin-top: 12px; align-items: flex-start; }
+.radar-check { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); font-weight: 600; }
+.radar-check input { width: auto; min-height: 0; }
+.radar-check small { color: var(--muted); font-weight: 500; }
+.radar-settings select { max-width: 220px; }
