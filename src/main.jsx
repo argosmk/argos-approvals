@@ -9,6 +9,7 @@ import { loadOrganizationProfiles, updateProfilePresence, updateProfileSocial, u
 import { loadPublicPortfolio, loadPublicPortfolioSettings, savePublicPortfolioSettings } from './services/publicPortfolioService';
 import { loadNotificationDeliverySettings, saveNotificationDeliverySettings } from './services/notificationDeliverySettingsService';
 import RadarBetaPanel from './panels/RadarBetaPanel';
+import ReportsPanel from './panels/ReportsPanel';
 import {
   CALENDAR_PERMISSION_ITEMS,
   CREATE_TASK_FIELDS,
@@ -2539,6 +2540,7 @@ function App(){
         {activeScreen==='documents' && <DocumentsPage documents={documents} setDocuments={setDocuments} companies={companies} users={users} tasks={tasks} statuses={statuses} currentUser={effectiveUser}/>} 
         {activeScreen==='financial' && <FinancialLab tasks={tasks} companies={companies} users={users} currentUser={effectiveUser}/>} 
         {activeScreen==='radar' && isAdmin && <RadarBetaPanel companies={companies}/>}
+        {activeScreen==='reports' && isAdmin && <ReportsPanel companies={companies}/>}
         {activeScreen==='settings' && isAdmin && <SettingsPage statuses={statuses} setStatuses={setStatuses} tasks={tasks} setTasks={setTasks} companies={companies} setCompanies={setCompanies} users={users} setUsers={setUsers} system={system} setSystem={setSystem} reset={reset} currentUser={effectiveUser}/>} 
         {activeScreen==='notifications' && effectiveUser.role!=='client' && <NotificationsPage notifications={notifications} setNotifications={setNotifications} open={openTaskRoute} tasks={tasks} companies={companies} users={users} statuses={statuses} user={effectiveUser} auth={auth} alertsEnabled={notificationAlertsEnabled} notificationPermission={notificationPermission} enableAlerts={enableNotificationAlerts}/>} 
       </div>

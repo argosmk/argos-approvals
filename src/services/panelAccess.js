@@ -28,6 +28,7 @@ export const ROUTE_SCREEN_ALIASES = {
   financial: 'financial',
   financeiro: 'financial',
   radar: 'radar',
+  relatorios: 'reports',
   settings: 'settings',
 };
 export const SCREEN_TO_ROUTE = {
@@ -41,6 +42,7 @@ export const SCREEN_TO_ROUTE = {
   documents: 'documents',
   financial: 'financeiro',
   radar: 'radar',
+  reports: 'relatorios',
   settings: 'settings',
 };
 
@@ -58,6 +60,7 @@ export const PANEL_CATALOG = Object.freeze([
   Object.freeze({ id:'documents', label:'Documentos', defaultRoles:['admin'] }),
   Object.freeze({ id:'financial', label:'Financeiro', defaultRoles:['admin'] }),
   Object.freeze({ id:'radar', label:'Radar (beta)', defaultRoles:['admin'] }),
+  Object.freeze({ id:'reports', label:'Relatórios', defaultRoles:['admin'] }),
   Object.freeze({ id:'settings', label:'Configurações', defaultRoles:['admin'] }),
 ]);
 
@@ -70,6 +73,7 @@ export const SIDEBAR_PANEL_CATALOG = Object.freeze([
   Object.freeze({id:'documents',label:'Documentos',adminOnly:true}),
   Object.freeze({id:'financial',label:'Financeiro',adminOnly:true}),
   Object.freeze({id:'radar',label:'Radar (beta)',adminOnly:true}),
+  Object.freeze({id:'reports',label:'Relatórios',adminOnly:true}),
   Object.freeze({id:'settings',label:'Configurações',adminOnly:true}),
 ]);
 export const DEFAULT_SIDEBAR_PANEL_ORDER = SIDEBAR_PANEL_CATALOG.map(panel=>panel.id);
