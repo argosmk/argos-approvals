@@ -1,0 +1,32 @@
+name: Validate sync cleanup
+on:
+  push:
+    branches: [sync-cleanup-20260914]
+    paths: ['.github/workflows/validate-sync-cleanup.yml']
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build
+      - name: Verify expected sync
+        run: |
+          grep -q "ReportsPanel" src/main.jsx
+          grep -q "workspaceSaveInFlightRef" src/main.jsx
+          test -f src/panels/ReportsPanel.jsx
+          test -f src/services/reportsService.js
+          test ! -f src/radarAlphaSeed.js
+          ! grep -q "radarAlphaSeed" index.html
+      - name: Cleanup workflow
+        run: |
+          git config user.name 'argos-sync-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/validate-sync-cleanup.yml
+          git commit -m 'Sync: remove validação temporária'
+          git push origin HEAD:sync-cleanup-20260914
