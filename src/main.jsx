@@ -1313,6 +1313,8 @@ function App(){
   const [notificationPermission,setNotificationPermission]=useState(()=>typeof Notification==='undefined'?'unsupported':Notification.permission);
   const taskOpenSessionRef=useRef({});
   const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});
+  const workspaceSaveInFlightRef=useRef(false);
+  const workspaceSaveQueuedRef=useRef(false);
   const saveRetryRef=useRef(null);
   const realtimeRefreshTimerRef=useRef(null);
   const pendingTaskFieldsRef=useRef(new Map());
@@ -2081,6 +2083,11 @@ function App(){
     if(localSignature === workspaceMetaRef.current.lastSavedSignature) return;
     if(saveRetryRef.current) clearTimeout(saveRetryRef.current);
     const timer=setTimeout(async()=>{
+      if(workspaceSaveInFlightRef.current){
+        workspaceSaveQueuedRef.current=true;
+        return;
+      }
+      workspaceSaveInFlightRef.current=true;
       try{
         setSaveStatus('Salvando...');
         const result=await saveWorkspaceState(auth.organizationId, localPayload, workspaceMetaRef.current.updatedAt);
@@ -2099,6 +2106,13 @@ function App(){
         setSaveStatus('Erro ao salvar. Tentando novamente...');
         setCloudError('Não foi possível salvar no Supabase. Suas alterações serão reenviadas automaticamente: '+(err.message||err));
         saveRetryRef.current=setTimeout(()=>setSaveTick(x=>x+1),3000);
+      }finally{
+        workspaceSaveInFlightRef.current=false;
+        if(workspaceSaveQueuedRef.current){
+          workspaceSaveQueuedRef.current=false;
+          if(saveRetryRef.current){ clearTimeout(saveRetryRef.current); saveRetryRef.current=null; }
+          setSaveTick(x=>x+1);
+        }
       }
     },650);
     return()=>clearTimeout(timer);
