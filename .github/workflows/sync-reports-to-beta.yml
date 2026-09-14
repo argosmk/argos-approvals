@@ -1,0 +1,37 @@
+name: Sync reports to beta
+on:
+  push:
+    branches: [sync-cleanup-20260914]
+    paths: ['.github/workflows/sync-reports-to-beta.yml']
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch main
+        run: git fetch origin main
+      - name: Bring reports files
+        run: |
+          git checkout origin/main -- src/panels/ReportsPanel.jsx src/panels/reports.css src/services/reportsService.js
+          git diff 47e4de1318d4c9a2849de9bd171684a19c8783e9..origin/main -- src/main.jsx src/services/panelAccess.js > /tmp/reports.patch
+          git apply --3way /tmp/reports.patch
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+      - name: Commit synchronized beta candidate
+        run: |
+          git config user.name 'argos-sync-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/main.jsx src/services/panelAccess.js src/panels/ReportsPanel.jsx src/panels/reports.css src/services/reportsService.js
+          git commit -m 'Sync: adiciona Relatórios ao Beta'
+          git rm .github/workflows/sync-reports-to-beta.yml
+          git commit -m 'Sync: remove workflow temporário de Relatórios'
+          git push origin HEAD:sync-cleanup-20260914
