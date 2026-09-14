@@ -1,0 +1,57 @@
+name: Fix workspace save race
+
+on:
+  push:
+    branches: [beta]
+    paths: ['.github/workflows/fix-workspace-save-race.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply surgical patch
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/main.jsx')
+          s = p.read_text(encoding='utf-8')
+          old = """  const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});\n  const saveRetryRef=useRef(null);"""
+          new = """  const workspaceMetaRef=useRef({updatedAt:null, basePayload:null, lastSavedSignature:null, applyingRemote:false});\n  const workspaceSaveInFlightRef=useRef(false);\n  const workspaceSaveQueuedRef=useRef(false);\n  const saveRetryRef=useRef(null);"""
+          if old not in s:
+              raise SystemExit('workspace refs anchor not found')
+          s = s.replace(old, new, 1)
+
+          old2 = """    const timer=setTimeout(async()=>{\n      try{\n        setSaveStatus('Salvando...');\n        const result=await saveWorkspaceState(auth.organizationId, localPayload, workspaceMetaRef.current.updatedAt);"""
+          new2 = """    const timer=setTimeout(async()=>{\n      if(workspaceSaveInFlightRef.current){\n        workspaceSaveQueuedRef.current=true;\n        return;\n      }\n      workspaceSaveInFlightRef.current=true;\n      try{\n        setSaveStatus('Salvando...');\n        const result=await saveWorkspaceState(auth.organizationId, localPayload, workspaceMetaRef.current.updatedAt);"""
+          if old2 not in s:
+              raise SystemExit('save timer anchor not found')
+          s = s.replace(old2, new2, 1)
+
+          old3 = """        setCloudError('Não foi possível salvar no Supabase. Suas alterações serão reenviadas automaticamente: '+(err.message||err));\n        saveRetryRef.current=setTimeout(()=>setSaveTick(x=>x+1),3000);\n      }\n    },650);"""
+          new3 = """        setCloudError('Não foi possível salvar no Supabase. Suas alterações serão reenviadas automaticamente: '+(err.message||err));\n        saveRetryRef.current=setTimeout(()=>setSaveTick(x=>x+1),3000);\n      }finally{\n        workspaceSaveInFlightRef.current=false;\n        if(workspaceSaveQueuedRef.current){\n          workspaceSaveQueuedRef.current=false;\n          if(saveRetryRef.current){ clearTimeout(saveRetryRef.current); saveRetryRef.current=null; }\n          setSaveTick(x=>x+1);\n        }\n      }\n    },650);"""
+          if old3 not in s:
+              raise SystemExit('save catch anchor not found')
+          s = s.replace(old3, new3, 1)
+          p.write_text(s, encoding='utf-8')
+      - run: npm ci
+      - run: npm run build
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name "argos-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/main.jsx
+          git commit -m "Beta: serializa salvamento do workspace"
+          git rm .github/workflows/fix-workspace-save-race.yml
+          git commit -m "Beta: remove validação temporária do save"
+          git push origin beta
