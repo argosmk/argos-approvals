@@ -127,15 +127,15 @@ export default function RadarBetaPanel({ companies = [] }) {
 
   return <section className="panel-page radar">
     <header className="radar-head">
-      <div>
-        <h1>Radar de Pautas<span className="radar-beta">beta</span></h1>
-        <p>Procura assuntos em notícias, vídeos e redes a partir das palavras-chave de cada cliente. Sem IA, sem custo, isolado do resto do sistema.</p>
-      </div>
+      <h1>Radar de Pautas<span className="radar-beta">beta</span></h1>
+    </header>
+    <div className="radar-head-meta">
+      <p className="radar-intro">Procura assuntos em notícias, vídeos e redes a partir das palavras-chave de cada cliente. Sem IA, sem custo, isolado do resto do sistema.</p>
       <div className="radar-head-actions">
         <button onClick={() => setTab(tab === 'feed' ? 'briefings' : 'feed')}>{tab === 'feed' ? 'Briefings' : 'Voltar ao feed'}</button>
         <button className="primary" disabled={!!scan} onClick={handleScan}>{scan ? 'Varrendo…' : 'Varredura agora'}</button>
       </div>
-    </header>
+    </div>
 
     {scan && <div className="radar-scan">
       <div className="radar-scan-top">

@@ -79,8 +79,8 @@ export default function ReportsPanel({ companies = [] }) {
   return <section className="panel-page rep">
     <header className="rep-head">
       <h1>Relatórios<span className="rep-beta">beta</span></h1>
-      <p>Toda segunda às 8h o sistema fecha a semana; no dia 1º, o mês. Dá para gerar na hora também.</p>
     </header>
+    <p className="rep-intro">Toda segunda às 8h o sistema fecha a semana; no dia 1º, o mês. Dá para gerar na hora também.</p>
 
     {carregando && <p className="rep-note">Carregando…</p>}
     {erro && <div className="rep-empty"><h3>Não consegui carregar</h3><p>{erro}</p></div>}

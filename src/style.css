@@ -12209,3 +12209,24 @@ hr.content-fields-divider{
 .arg-vs-row-v2.is-default-value .arg-vs-name-v2{
   opacity:.62;
 }
+
+
+/* ROUND HEADER ALIGNMENT ROOT FIX 2026-09-14 */
+/* Documentos volta a usar exatamente a mesma métrica do cabeçalho do Dashboard. */
+.main .documents-page .panel-header-block.docs-topbar > .panel-tabs-header{
+  min-height:0!important;
+  padding:0 0 14px!important;
+}
+.main .documents-page .panel-header-block.docs-topbar .panel-tabs-heading > h1{
+  padding:0 0 9px!important;
+  font-size:20px!important;
+  line-height:1.15!important;
+}
+/* Portfólios: cabeçalho em largura total; conteúdo continua limitado/centralizado. */
+.main .team-hub{max-width:none!important;margin:0!important;padding-bottom:48px!important}
+.main .team-hub > .team-stories-strip,
+.main .team-hub > .team-profile-area{
+  max-width:1180px;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
