@@ -1,0 +1,33 @@
+/* Padronização mobile dos botões de ação dentro da tarefa.
+   Escopo deliberadamente restrito à página de tarefa para não alterar
+   botões de navegação, filtros, calendário ou outros painéis. */
+@media (max-width:760px){
+  .task-page .approval-actions > button,
+  .task-page .approval-actions > .status-action-btn,
+  .task-page .task-actions > button,
+  .task-page .task-action-group > button,
+  .task-page .admin-task-actions-row > button,
+  .task-page .approval-box > button,
+  .task-page .approval-box .approval-actions button,
+  .task-page .approval-box .change-actions button,
+  .task-page .approval-box .request-change-actions button,
+  .task-page .content-approval-actions > button{
+    width:100%!important;
+    max-width:none!important;
+    flex:1 1 100%!important;
+    box-sizing:border-box!important;
+    text-align:center!important;
+  }
+
+  .task-page .approval-actions,
+  .task-page .task-actions,
+  .task-page .task-action-group,
+  .task-page .admin-task-actions-row,
+  .task-page .approval-box .approval-actions,
+  .task-page .approval-box .change-actions,
+  .task-page .approval-box .request-change-actions,
+  .task-page .content-approval-actions{
+    width:100%!important;
+    align-items:stretch!important;
+  }
+}
