@@ -553,11 +553,18 @@ export function resolveUserAccess(user,system){
   if(!user) return user;
   const defaults=accessDefaultForRole(system,user.role);
   const inheritance=user.accessInheritance||{};
+  const savedNotificationPrefs=Array.isArray(user.notificationPrefs)?user.notificationPrefs:[];
+  const legacyAdminNotificationPrefs=user.role==='admin'
+    && savedNotificationPrefs.length===BASE_NOTIFICATION_VISIBLE_EVENTS.length
+    && BASE_NOTIFICATION_VISIBLE_EVENTS.every(event=>savedNotificationPrefs.includes(event));
+  const resolvedCustomNotificationPrefs=legacyAdminNotificationPrefs
+    ? [...savedNotificationPrefs,CLIENT_REQUEST_NOTIFICATION_EVENT]
+    : savedNotificationPrefs;
   return {
     ...user,
     visibleStatuses:inheritance.statuses==='custom'?(user.visibleStatuses||[]):defaults.visibleStatuses,
     visibleTypes:inheritance.types==='custom'?(user.visibleTypes||[]):defaults.visibleTypes,
-    notificationPrefs:inheritance.notifications==='custom'?(user.notificationPrefs||[]):defaults.notificationPrefs,
+    notificationPrefs:inheritance.notifications==='custom'?resolvedCustomNotificationPrefs:defaults.notificationPrefs,
     notificationStatusPrefs:inheritance.notifications==='custom'?(user.notificationStatusPrefs||{}):defaults.notificationStatusPrefs,
     notificationPushPrefs:inheritance.notifications==='custom'?(user.notificationPushPrefs||defaults.notificationPushPrefs):defaults.notificationPushPrefs,
     notificationPanelPermissions:inheritance.notifications==='custom'
