@@ -12234,3 +12234,15 @@ hr.content-fields-divider{
 /* Approval committee timeline: pendente legível; resolvido atenuado. */
 .comments-panel .timeline-entry.is-comment:not(.resolved) p{color:var(--text)!important;opacity:1!important;text-decoration:none!important}
 .comments-panel .timeline-entry.is-comment.resolved p{color:var(--muted)!important;opacity:.68!important;text-decoration:line-through!important}
+
+
+/* ARGOS_TASK_ACTIONS_GROUPING_20260916 */
+.panel-actions{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.panel-actions>h2{width:100%;margin-bottom:2px}
+.panel-actions>.approval-votes-banner{width:100%;margin:0 0 2px}
+.panel-actions>.task-flow-action{margin:0}
+.panel-actions>.admin-task-actions-row{margin:2px 0 0;padding-top:10px;border-top:1px solid var(--line);gap:8px!important;width:100%}
+.panel-actions>.admin-task-actions-row button{margin:0}
+.panel-actions>.admin-task-actions-row .danger{margin-left:4px}
+.panel-actions>form,.panel-actions>.client-approval-form,.panel-actions>.copy-approval-form{width:100%}
+@media(max-width:760px){.panel-actions{gap:8px}.panel-actions>.admin-task-actions-row{padding-top:8px}.panel-actions>.admin-task-actions-row .danger{margin-left:0}}
