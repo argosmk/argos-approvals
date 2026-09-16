@@ -1,0 +1,23 @@
+name: Patch task actions
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-task-actions.yml'
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: python .github/patch_task_actions.py
+      - run: npm ci && npm run build
+      - run: |
+          git config user.name argos-bot
+          git config user.email argos-bot@users.noreply.github.com
+          git add src/main.jsx src/style.css
+          git commit -m "Alfa: organiza e colore ações da tarefa" || exit 0
+          git push
