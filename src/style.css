@@ -12230,3 +12230,7 @@ hr.content-fields-divider{
   margin-left:auto!important;
   margin-right:auto!important;
 }
+
+/* Approval committee timeline: pendente legível; resolvido atenuado. */
+.comments-panel .timeline-entry.is-comment:not(.resolved) p{color:var(--text)!important;opacity:1!important;text-decoration:none!important}
+.comments-panel .timeline-entry.is-comment.resolved p{color:var(--muted)!important;opacity:.68!important;text-decoration:line-through!important}
