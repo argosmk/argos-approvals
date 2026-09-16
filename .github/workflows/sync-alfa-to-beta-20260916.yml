@@ -1,0 +1,36 @@
+name: Sync Alfa to Beta 2026-09-16
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/sync-alfa-to-beta-20260916.yml']
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+      - name: Sincronizar melhorias gerais do Alfa
+        run: |
+          set -e
+          git config user.name "argosmk"
+          git config user.email "adm.argosconsultoria@gmail.com"
+          git fetch origin main beta
+          git cherry-pick 7b020691da0b8dc4babb45d34f1a894a2077e778
+          git cherry-pick 31ed5a3fe65485baf6cd2287563f38b0d56bfcc6
+          git cherry-pick fde8569d966186f2c860abc71f3d15eb43620cfc
+          git cherry-pick 6f9afb6488c4bc98fba14050cb7d84badb2557d3
+          git cherry-pick c6f14778c99a8758ee77955ed1d25ffa907ec76f
+          git cherry-pick 8939ba1b94ab8ceb2493414067297a5e0062da19
+          git cherry-pick 57c3eb6fa37db75aec68e3c0f322abcac6387a89
+          git cherry-pick 8dc4083a31239d86cc9ca1a864e42f4a1cbf37ff
+          git cherry-pick cdad8943045e2c9dead4abef5104f015b0cb2f33
+          git cherry-pick 3c7a3c22063acb61ef650be1e80f6f6f3f47877f
+          git cherry-pick 2ebb232f5467dd1ff2a87546fb6a514556bc488a
+      - name: Validar build do Beta
+        run: npm ci && npm run build
+      - name: Publicar Beta
+        run: git push origin beta
