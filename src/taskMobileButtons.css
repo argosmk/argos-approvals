@@ -1,31 +1,95 @@
-/* Padronização mobile dos botões de ação dentro da tarefa.
-   A regra parte do contêiner real .panel-actions, incluindo ações diretas,
-   formulários de aprovação/copy e grupos administrativos. */
+/* Organização das ações da tarefa.
+   Administrativas primeiro; depois, em um único bloco lógico, ações que mudam status.
+   No mobile todos os controles de ação ocupam a largura disponível. */
+
+.task-page .panel-actions{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+}
+
+.task-page .panel-actions > h2{
+  order:0!important;
+}
+
+.task-page .panel-actions > .admin-task-actions-row{
+  order:1!important;
+  width:100%!important;
+  margin:0 0 12px!important;
+  padding:0 0 12px!important;
+  border-top:0!important;
+  border-bottom:1px solid var(--line)!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  flex-wrap:wrap!important;
+}
+
+.task-page .panel-actions > .admin-task-actions-row .danger{
+  margin-left:0!important;
+}
+
+.task-page .panel-actions > :not(h2):not(.admin-task-actions-row){
+  order:2!important;
+}
+
+.task-page .panel-actions > .approval-votes-banner{
+  width:100%!important;
+  margin:0 0 2px!important;
+}
+
+/* Ações de fluxo ficam próximas entre si, mas sem colar formulários e avisos. */
+.task-page .panel-actions > .task-flow-action,
+.task-page .panel-actions > .status-action-row{
+  margin-top:0!important;
+}
+
 @media (max-width:760px){
   .task-page .panel-actions,
-  .task-page .panel-actions > form,
+  .task-page .panel-actions > .admin-task-actions-row,
+  .task-page .panel-actions > .status-action-row,
+  .task-page .panel-actions > .approval-actions,
+  .task-page .panel-actions > .task-actions,
+  .task-page .panel-actions > .task-action-group,
+  .task-page .panel-actions > .approval-box,
+  .task-page .panel-actions > .client-actions,
   .task-page .panel-actions > .client-approval-form,
   .task-page .panel-actions > .copy-approval-form,
-  .task-page .panel-actions .status-action-row,
-  .task-page .panel-actions .admin-task-actions-row{
+  .task-page .panel-actions .approval-actions,
+  .task-page .panel-actions .change-actions,
+  .task-page .panel-actions .request-change-actions,
+  .task-page .panel-actions .content-approval-actions{
     width:100%!important;
-    max-width:none!important;
     align-items:stretch!important;
+    box-sizing:border-box!important;
   }
 
-  .task-page .panel-actions button{
+  .task-page .panel-actions > button,
+  .task-page .panel-actions > .status-action-row > button,
+  .task-page .panel-actions > .admin-task-actions-row > button,
+  .task-page .panel-actions > .approval-actions > button,
+  .task-page .panel-actions > .task-actions > button,
+  .task-page .panel-actions > .task-action-group > button,
+  .task-page .panel-actions > .approval-box > button,
+  .task-page .panel-actions .client-actions > button,
+  .task-page .panel-actions .client-approval-form > button,
+  .task-page .panel-actions .copy-approval-form > button,
+  .task-page .panel-actions .approval-box .approval-actions button,
+  .task-page .panel-actions .approval-box .change-actions button,
+  .task-page .panel-actions .approval-box .request-change-actions button,
+  .task-page .panel-actions .content-approval-actions > button{
     width:100%!important;
     max-width:none!important;
-    min-width:0!important;
     flex:1 1 100%!important;
     box-sizing:border-box!important;
     text-align:center!important;
   }
 
-  .task-page .panel-actions .status-action-row,
-  .task-page .panel-actions .admin-task-actions-row{
+  .task-page .panel-actions > .admin-task-actions-row{
     display:grid!important;
-    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-columns:1fr!important;
     gap:8px!important;
+    margin-bottom:10px!important;
+    padding-bottom:10px!important;
   }
 }
