@@ -1,0 +1,116 @@
+/* Organização das ações da tarefa.
+   Administrativas primeiro; depois ações de fluxo.
+   O formulário de aprovação usa naturalmente toda a largura do painel. */
+
+.task-page .panel-actions{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+}
+
+.task-page .panel-actions > h2{
+  order:0!important;
+}
+
+.task-page .panel-actions > .admin-task-actions-row{
+  order:1!important;
+  width:100%!important;
+  margin:0 0 12px!important;
+  padding:0 0 12px!important;
+  border-top:0!important;
+  border-bottom:1px solid var(--line)!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  flex-wrap:wrap!important;
+}
+
+.task-page .panel-actions > .admin-task-actions-row .danger{
+  margin-left:0!important;
+}
+
+.task-page .panel-actions > :not(h2):not(.admin-task-actions-row){
+  order:2!important;
+}
+
+.task-page .panel-actions > .approval-votes-banner{
+  width:100%!important;
+  margin:0 0 2px!important;
+}
+
+.task-page .panel-actions > .task-flow-action{
+  align-self:flex-start!important;
+  margin-top:0!important;
+}
+
+.task-page .panel-actions > .status-action-row{
+  margin-top:0!important;
+}
+
+/* Nova tarefa e Nova solicitação usam o mesmo modal.
+   A partir de uma janela estreita, o formulário passa para uma coluna
+   mesmo em desktop, evitando compressão por zoom ou viewport reduzida. */
+@media (max-width:980px){
+  .modal-bg{
+    padding:16px!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+  }
+
+  .modal-bg > .modal.create{
+    width:min(720px,100%)!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+  }
+
+  .modal.create .form-two,
+  .modal.create .checks{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+
+  .modal.create .form-two > *,
+  .modal.create .checks > *,
+  .modal.create input,
+  .modal.create select,
+  .modal.create textarea,
+  .modal.create label,
+  .modal.create .select-entity,
+  .modal.create .status-select{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+}
+
+@media (max-width:760px){
+  .modal-bg{
+    padding:12px!important;
+  }
+
+  .modal-bg > .modal.create{
+    width:100%!important;
+    padding:18px 14px!important;
+  }
+
+  .task-page .panel-actions > .admin-task-actions-row{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:8px!important;
+    margin-bottom:10px!important;
+    padding-bottom:10px!important;
+  }
+
+  .task-page .panel-actions > .admin-task-actions-row > button,
+  .task-page .panel-actions > .task-flow-action,
+  .task-page .panel-actions > .status-action-row > button,
+  .task-page .panel-actions .client-actions > button{
+    width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+    text-align:center!important;
+  }
+
+  .task-page .panel-actions > .task-flow-action{
+    align-self:stretch!important;
+  }
+}
