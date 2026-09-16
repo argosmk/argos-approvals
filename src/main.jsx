@@ -2314,28 +2314,44 @@ function App(){
       .filter(item=>item.system||item.push);
     if(!recipients.length) return;
     const stamp=meta.at||now();
-    const created=recipients.map(item=>({
-      id:safeUUID(),
-      taskId:task.id,
-      userId:item.user.id,
-      text:`${task.title}: ${text}`,
-      at:stamp,
-      done:false,
-      event,
-      statusId,
-      actorId:actorId||null,
-      actorName,
-      logId:meta.logId||null,
-      payload:{
-        actorId:actorId||null,
-        actorName,
-        logId:meta.logId||null,
-        fromStatus:meta.fromStatus||null,
-        toStatus:meta.toStatus||null,
-        pushOnly:!item.system&&item.push
-      }
-    }));
-    setNotifications(prev=>[...created,...(Array.isArray(prev)?prev:[])]);
+    setNotifications(prev=>{
+      const current=Array.isArray(prev)?prev:[];
+      const replacedIds=new Set();
+      const created=recipients.map(item=>{
+        const previousStatusNotification=event==='Status da tarefa'
+          ? current.find(notification=>
+              !notification?.done &&
+              notification?.event==='Status da tarefa' &&
+              String(notification?.taskId||'')===String(task.id) &&
+              String(notification?.userId||'')===String(item.user.id)
+            )
+          : null;
+        if(previousStatusNotification?.id) replacedIds.add(String(previousStatusNotification.id));
+        return {
+          id:previousStatusNotification?.id||safeUUID(),
+          taskId:task.id,
+          userId:item.user.id,
+          text:`${task.title}: ${text}`,
+          at:stamp,
+          done:false,
+          event,
+          statusId,
+          actorId:actorId||null,
+          actorName,
+          logId:meta.logId||null,
+          payload:{
+            actorId:actorId||null,
+            actorName,
+            logId:meta.logId||null,
+            fromStatus:meta.fromStatus||null,
+            toStatus:meta.toStatus||null,
+            pushOnly:!item.system&&item.push
+          }
+        };
+      });
+      const remaining=current.filter(notification=>!replacedIds.has(String(notification?.id||'')));
+      return [...created,...remaining];
+    });
   }
   function updateTask(id, patch, logText){
     if(realtimeConflict?.taskId===id && Object.prototype.hasOwnProperty.call(patch,realtimeConflict.field)){
