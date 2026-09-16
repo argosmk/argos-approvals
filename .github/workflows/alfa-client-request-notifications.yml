@@ -14,59 +14,15 @@ jobs:
           ref: main
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Corrigir notificações de solicitação
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p=Path('src/services/panelAccess.js')
-          s=p.read_text()
-          old="""export function resolveUserAccess(user,system){
-  if(!user) return user;
-  const defaults=accessDefaultForRole(system,user.role);
-  const inheritance=user.accessInheritance||{};
-  return {
-"""
-          new="""export function resolveUserAccess(user,system){
-  if(!user) return user;
-  const defaults=accessDefaultForRole(system,user.role);
-  const inheritance=user.accessInheritance||{};
-  const savedNotificationPrefs=Array.isArray(user.notificationPrefs)?user.notificationPrefs:[];
-  const legacyAdminNotificationPrefs=user.role==='admin'
-    && savedNotificationPrefs.length===BASE_NOTIFICATION_VISIBLE_EVENTS.length
-    && BASE_NOTIFICATION_VISIBLE_EVENTS.every(event=>savedNotificationPrefs.includes(event));
-  const resolvedCustomNotificationPrefs=legacyAdminNotificationPrefs
-    ? [...savedNotificationPrefs,CLIENT_REQUEST_NOTIFICATION_EVENT]
-    : savedNotificationPrefs;
-  return {
-"""
-          if old not in s: raise SystemExit('resolveUserAccess anchor not found')
-          s=s.replace(old,new,1)
-          old2="notificationPrefs:inheritance.notifications==='custom'?(user.notificationPrefs||[]):defaults.notificationPrefs,"
-          new2="notificationPrefs:inheritance.notifications==='custom'?resolvedCustomNotificationPrefs:defaults.notificationPrefs,"
-          if old2 not in s: raise SystemExit('notificationPrefs anchor not found')
-          s=s.replace(old2,new2,1)
-          p.write_text(s)
-
-          p=Path('src/main.jsx')
-          s=p.read_text()
-          old="""if(isClient) notifyTask(task,`${effectiveUser.name} solicitou alteração. ${votes.length} de ${approversForCompany.length} representantes responderam; a tarefa permanece em Aprovar copy.`,CLIENT_REQUEST_NOTIFICATION_EVENT,task.status,effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});"""
-          new="""if(isClient) notifyTask(task,`${effectiveUser.name} solicitou alteração em ${items.join(' e ')}: ${desc} (${votes.length} de ${approversForCompany.length} representantes responderam; a tarefa permanece em Aprovar copy.)`,CLIENT_REQUEST_NOTIFICATION_EVENT,task.status,effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});"""
-          if old not in s: raise SystemExit('copy request notification anchor not found')
-          s=s.replace(old,new,1)
-          old2="""if(isClient) notifyTask(task,`${effectiveUser.name} solicitou alteração. ${votes.length} de ${approversForCompany.length} representantes responderam; a tarefa permanece em Aprovação.`,CLIENT_REQUEST_NOTIFICATION_EVENT,task.status,effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});"""
-          new2="""if(isClient) notifyTask(task,`${effectiveUser.name} solicitou alteração em ${items.join(' e ')}: ${desc} (${votes.length} de ${approversForCompany.length} representantes responderam; a tarefa permanece em Aprovação.)`,CLIENT_REQUEST_NOTIFICATION_EVENT,task.status,effectiveUser.id,{actorName:effectiveUser.name,logId:entry.id,at:eventAt});"""
-          if old2 not in s: raise SystemExit('post request notification anchor not found')
-          s=s.replace(old2,new2,1)
-          p.write_text(s)
-          PY
-      - name: Validar build
+          node-version: '20'
+      - name: Patch
+        run: python3 .github/scripts/patch-client-request-notifications.py
+      - name: Build
         run: npm ci && npm run build
-      - name: Commitar correção
+      - name: Commit
         run: |
-          git config user.name "argosmk"
-          git config user.email "adm.argosconsultoria@gmail.com"
+          git config user.name argosmk
+          git config user.email adm.argosconsultoria@gmail.com
           git add src/main.jsx src/services/panelAccess.js
-          git commit -m "Alfa: garante notificações de solicitações de clientes"
+          git commit -m 'Alfa: garante notificações de solicitações de clientes'
           git push origin main
