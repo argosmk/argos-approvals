@@ -38,7 +38,6 @@
   margin:0 0 2px!important;
 }
 
-/* Botões avulsos de fluxo continuam compactos no desktop. */
 .task-page .panel-actions > .task-flow-action{
   align-self:flex-start!important;
   margin-top:0!important;
@@ -48,7 +47,38 @@
   margin-top:0!important;
 }
 
+/* O mesmo modal atende Nova tarefa e Nova solicitação.
+   Em telas estreitas ele deve depender apenas da viewport, nunca do painel ao fundo. */
 @media (max-width:760px){
+  .modal-bg{
+    padding:12px!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+  }
+
+  .modal-bg > .modal.create{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:18px 14px!important;
+  }
+
+  .modal.create .form-two,
+  .modal.create .checks{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+
+  .modal.create input,
+  .modal.create select,
+  .modal.create textarea,
+  .modal.create label,
+  .modal.create .select-entity,
+  .modal.create .status-select{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+
   .task-page .panel-actions > .admin-task-actions-row{
     display:grid!important;
     grid-template-columns:1fr!important;
