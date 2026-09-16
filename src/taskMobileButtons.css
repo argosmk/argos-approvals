@@ -1,33 +1,31 @@
 /* Padronização mobile dos botões de ação dentro da tarefa.
-   Escopo deliberadamente restrito à página de tarefa para não alterar
-   botões de navegação, filtros, calendário ou outros painéis. */
+   A regra parte do contêiner real .panel-actions, incluindo ações diretas,
+   formulários de aprovação/copy e grupos administrativos. */
 @media (max-width:760px){
-  .task-page .approval-actions > button,
-  .task-page .approval-actions > .status-action-btn,
-  .task-page .task-actions > button,
-  .task-page .task-action-group > button,
-  .task-page .admin-task-actions-row > button,
-  .task-page .approval-box > button,
-  .task-page .approval-box .approval-actions button,
-  .task-page .approval-box .change-actions button,
-  .task-page .approval-box .request-change-actions button,
-  .task-page .content-approval-actions > button{
+  .task-page .panel-actions,
+  .task-page .panel-actions > form,
+  .task-page .panel-actions > .client-approval-form,
+  .task-page .panel-actions > .copy-approval-form,
+  .task-page .panel-actions .status-action-row,
+  .task-page .panel-actions .admin-task-actions-row{
     width:100%!important;
     max-width:none!important;
+    align-items:stretch!important;
+  }
+
+  .task-page .panel-actions button{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
     flex:1 1 100%!important;
     box-sizing:border-box!important;
     text-align:center!important;
   }
 
-  .task-page .approval-actions,
-  .task-page .task-actions,
-  .task-page .task-action-group,
-  .task-page .admin-task-actions-row,
-  .task-page .approval-box .approval-actions,
-  .task-page .approval-box .change-actions,
-  .task-page .approval-box .request-change-actions,
-  .task-page .content-approval-actions{
-    width:100%!important;
-    align-items:stretch!important;
+  .task-page .panel-actions .status-action-row,
+  .task-page .panel-actions .admin-task-actions-row{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:8px!important;
   }
 }
